@@ -27,6 +27,9 @@ Database PostgreSQL Separate database and
 separate database user
 for every tenant.
 
+ORM / Migrations Prisma Use Prisma for table
+migration and ORM.
+
 Cache / coordination Redis Use for appropriate
 caching, rate limiting,
 queue coordination, or
@@ -324,6 +327,8 @@ selected.
 
 ## 11. Database Schema and Migrations
 
+Use Prisma for table migration and ORM.
+
 Maintain: 1. A control-plane schema for global tenant metadata. 2. A
 tenant schema template/migration set applied independently to each
 tenant database.
@@ -444,15 +449,14 @@ workflow before implementing the detailed schema.
 ## 16. Unresolved Technical Decisions
 
 Do not invent these choices silently: - Exact Next.js, Node.js,
-PostgreSQL, Redis, and Auth.js versions. - ORM or query layer. -
-Production hosting provider. - PostgreSQL hosting and provisioning
-permissions. - DNS provider and wildcard DNS/TLS support. - File storage
-provider and tenant isolation mechanism. - Queue library and worker
-runtime. - Email delivery and verification method. - Exact
-authentication providers and account recovery flow. - Expected tenant
-count and database connection strategy. - Backup retention, restore
-objectives, and tenant deletion policy. - Exact database naming and
-secret-management scheme.
+PostgreSQL, Redis, and Auth.js versions. - Production hosting
+provider. - PostgreSQL hosting and provisioning permissions. - DNS
+provider and wildcard DNS/TLS support. - File storage provider and
+tenant isolation mechanism. - Queue library and worker runtime. - Email
+delivery and verification method. - Exact authentication providers and
+account recovery flow. - Expected tenant count and database connection
+strategy. - Backup retention, restore objectives, and tenant deletion
+policy. - Exact database naming and secret-management scheme.
 
 ## 17. Definition of Done for the Core
 
