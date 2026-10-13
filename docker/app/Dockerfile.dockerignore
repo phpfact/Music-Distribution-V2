@@ -1,0 +1,28 @@
+# Applies to docker/app/Dockerfile (BuildKit picks up <Dockerfile>.dockerignore).
+# Keeps secrets, local state and unrelated files out of the build context.
+
+# Secrets and local configuration: never bake these into an image.
+.env
+.env.*
+
+# Dependencies and build output are produced inside the image.
+node_modules
+.next
+out
+*.tsbuildinfo
+next-env.d.ts
+
+# Local data, VCS and tooling.
+backups
+.git
+.gitignore
+.DS_Store
+.vscode
+.idea
+*.log
+
+# Infrastructure and docs are not part of the application.
+Makefile
+*.md
+docker
+!docker/app/dev-entrypoint.sh

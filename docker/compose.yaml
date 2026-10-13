@@ -1,0 +1,217 @@
+# Base stack, shared by development and production.
+# Never used on its own: combine it with exactly one override.
+#
+#   development   -f docker/compose.yaml -f docker/compose.dev.yaml
+#   production    -f docker/compose.yaml -f docker/compose.prod.yaml
+#
+# The Makefile does this for you (`make up`, `make prod-up`).
+#
+# This file publishes NO host ports. Services reach each other on the internal
+# network by service name (postgres:5432, redis:6379). Each override decides
+# what, if anything, is reachable from the host.
+#
+# Images are pinned by tag AND digest. To upgrade one, change both:
+#   docker buildx imagetools inspect <image>:<new-tag>
+
+# Explicit project name: it prefixes every container, network and volume.
+# Without it Compose would use the folder name ("docker") and collide with any
+# other project that keeps its Compose files in a folder of that name.
+# Changing it later points the stack at a NEW, empty set of volumes.
+name: mdnext
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: docker/app/Dockerfile
+    init: true
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in your env file (run 'make init')}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in your env file (run 'make init')}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your env file (run 'make init')}
+      POSTGRES_POOL_MAX: ${POSTGRES_POOL_MAX:-10}
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in your env file (run 'make init')}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      # Liveness only. Dependency status is reported by /api/health/ready.
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+      start_interval: 2s
+    networks:
+      - internal
+    logging: *default-logging
+
+  postgres:
+    image: postgres:18.6@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
+    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
+    environment:
+      # Used ONLY to initialize an empty data directory. Changing them later
+      # does not alter an existing database (see README, "Credentials").
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in your env file (run 'make init')}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in your env file (run 'make init')}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your env file (run 'make init')}
+    volumes:
+      # PostgreSQL 18+ images keep data under /var/lib/postgresql/<major>/docker,
+      # so the volume is mounted at /var/lib/postgresql (not .../data as in <=17).
+      - postgres_data:/var/lib/postgresql
+      - ./postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    shm_size: 256mb
+    healthcheck:
+      # Over TCP on purpose: during first-time initialization the server only
+      # listens on a Unix socket, so this cannot report "ready" too early.
+      test: ["CMD-SHELL", "pg_isready -q -h 127.0.0.1 -p 5432 -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+      start_interval: 2s
+    # Give PostgreSQL time to checkpoint and shut down cleanly.
+    stop_grace_period: 60s
+    restart: unless-stopped
+    networks:
+      - internal
+    logging: *default-logging
+
+  redis:
+    image: redis:8.10.2-alpine@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0
+    command:
+      - redis-server
+      - /usr/local/etc/redis/redis.conf
+      - --requirepass
+      - ${REDIS_PASSWORD:?Set REDIS_PASSWORD in your env file (run 'make init')}
+      - --maxmemory
+      - ${REDIS_MAXMEMORY:-256mb}
+      - --maxmemory-policy
+      - ${REDIS_MAXMEMORY_POLICY:-noeviction}
+    environment:
+      # Lets redis-cli inside the container (health check, `make redis-cli`)
+      # authenticate without the password appearing in a process list.
+      REDISCLI_AUTH: ${REDIS_PASSWORD}
+    volumes:
+      # The image declares no volume: without this mount, data would live only
+      # in the container's writable layer and vanish when it is recreated.
+      - redis_data:/data
+      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    healthcheck:
+      # Not PONG while still loading the AOF, so dependents wait for real readiness.
+      test: ["CMD-SHELL", "redis-cli -h 127.0.0.1 ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+      start_interval: 2s
+    stop_grace_period: 30s
+    restart: unless-stopped
+    networks:
+      - internal
+    logging: *default-logging
+
+  # Optional management GUI. Nothing depends on it, so the application keeps
+  # running if it is stopped or unhealthy.
+  pgadmin:
+    image: dpage/pgadmin4:9.18@sha256:c332c5f6dfba995d9ebc4af261d93506d6876085d712eaaa3defc8dd1a3f26de
+    environment:
+      # Used ONLY the first time, to create the login in an empty pgadmin_data
+      # volume. Change the password afterwards inside pgAdmin itself.
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:?Set PGADMIN_DEFAULT_EMAIL in your env file (run 'make init')}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:?Set PGADMIN_DEFAULT_PASSWORD in your env file (run 'make init')}
+      # Fixed unprivileged port. Left unset, the image listens on 80 normally
+      # but silently switches to 8080 under a restricted security context
+      # (as in compose.prod.yaml), which would break the port mapping.
+      PGADMIN_LISTEN_ADDRESS: 0.0.0.0
+      PGADMIN_LISTEN_PORT: "8080"
+      PGADMIN_DISABLE_POSTFIX: "true"
+      PGADMIN_CONFIG_UPGRADE_CHECK_ENABLED: "False"
+    configs:
+      # Pre-registers the PostgreSQL server (host "postgres", no password stored).
+      # Read once, when the pgadmin_data volume is first initialized.
+      - source: pgadmin_servers
+        target: /pgadmin4/servers.json
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/misc/ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+      start_interval: 3s
+    restart: unless-stopped
+    networks:
+      - internal
+    logging: *default-logging
+
+  # Optional management GUI. Nothing depends on it.
+  redisinsight:
+    image: redis/redisinsight:3.8.0@sha256:b5e19ee240abef6edb435871b90ff8a210995422e8e018ab61c0339d318a1f84
+    volumes:
+      # The image declares no volume; /data holds its settings and saved connections.
+      - redisinsight_data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5540/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+      start_interval: 3s
+    restart: unless-stopped
+    networks:
+      - internal
+    logging: *default-logging
+
+configs:
+  pgadmin_servers:
+    content: |
+      {
+        "Servers": {
+          "1": {
+            "Name": "Music Distribution (postgres)",
+            "Group": "Servers",
+            "Host": "postgres",
+            "Port": 5432,
+            "MaintenanceDB": "${POSTGRES_DB}",
+            "Username": "${POSTGRES_USER}",
+            "SSLMode": "prefer"
+          }
+        }
+      }
+
+networks:
+  internal:
+    driver: bridge
+
+# Named volumes hold all persistent state. `docker compose down` keeps them;
+# only an explicit `down --volumes` / `docker volume rm` deletes them, and no
+# Makefile target does that except the deliberately guarded `destroy-data`.
+volumes:
+  postgres_data:
+  redis_data:
+  pgadmin_data:
+  redisinsight_data:

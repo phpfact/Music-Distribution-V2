@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Next.js build output and generated types
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# Secrets and local configuration (the template is the only env file tracked)
+.env
+.env.*
+!.env.example
+
+# Database backups contain all application data
+backups/
+
+# Logs and OS/editor files
+*.log
+.DS_Store
+.vscode/
+.idea/

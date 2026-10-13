@@ -1,0 +1,87 @@
+# Production override. Use together with compose.yaml (`make prod-up`).
+#
+# - The app runs the optimized standalone build as a non-root user on a
+#   read-only filesystem with all capabilities dropped.
+# - PostgreSQL and Redis publish NO host ports; they are reachable only on the
+#   internal network.
+# - pgAdmin and Redis Insight are behind the "tools" profile, so they do not
+#   start unless asked for (`make prod-tools-up`), and then only on 127.0.0.1.
+# - The app binds to 127.0.0.1 by default. Terminate HTTPS in a reverse proxy
+#   on the host and forward to it (see README, "Production").
+
+services:
+  app:
+    build:
+      target: runner
+    image: ${APP_IMAGE:-mdnext-app}:${APP_TAG:-local}
+    environment:
+      NODE_ENV: production
+    ports:
+      - "${APP_BIND_ADDRESS:-127.0.0.1}:${APP_PORT:-3000}:3000"
+    read_only: true
+    tmpfs:
+      - /tmp
+      # Next.js writes its image/data cache here; uid/gid 1000 is the "node" user.
+      - /app/.next/cache:uid=1000,gid=1000,mode=0755
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "${APP_CPU_LIMIT:-1.0}"
+          memory: ${APP_MEMORY_LIMIT:-512m}
+
+  postgres:
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "${POSTGRES_CPU_LIMIT:-1.0}"
+          # If you raise this, raise shared_buffers in postgres/postgresql.conf too.
+          memory: ${POSTGRES_MEMORY_LIMIT:-1g}
+
+  redis:
+    # Start directly as the unprivileged user (the image's entrypoint would
+    # otherwise need root and extra capabilities just to drop them).
+    user: redis
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "${REDIS_CPU_LIMIT:-0.5}"
+          # Headroom above REDIS_MAXMEMORY for AOF rewrites and snapshots.
+          memory: ${REDIS_MEMORY_LIMIT:-512m}
+
+  pgadmin:
+    profiles: ["tools"]
+    ports:
+      - "127.0.0.1:${PGADMIN_PORT:-5050}:8080"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  redisinsight:
+    profiles: ["tools"]
+    ports:
+      - "127.0.0.1:${REDISINSIGHT_PORT:-5540}:5540"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 512m
