@@ -1,14 +1,17 @@
 # Next.js application image. Build context is the repository root.
 #
-#   dev     source is bind-mounted; dependencies live in a named volume
-#   runner  optimized production build, non-root, no dev dependencies
+#   dev       source is bind-mounted; dependencies live in a named volume
+#   runner    optimized production build, non-root, no dev dependencies
+#   migrator  one-off job that applies database migrations (make prod-migrate)
 #
 # The base image is pinned by tag AND digest. To upgrade, change both:
 #   docker buildx imagetools inspect node:<version>-trixie-slim
 ARG NODE_IMAGE=node:24.21.0-trixie-slim@sha256:173f125896c3b47ddf056734c7ea789d04595a6a08769a8f78e0df642781fb66
 
 FROM ${NODE_IMAGE} AS base
-ENV NEXT_TELEMETRY_DISABLED=1
+# CHECKPOINT_DISABLE stops the Prisma CLI from contacting its update server.
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    CHECKPOINT_DISABLE=1
 WORKDIR /app
 
 # --- Development -------------------------------------------------------------
@@ -35,7 +38,8 @@ ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 # No secrets are needed or available here; runtime config is validated at startup.
-RUN npm run build
+# The Prisma clients are generated code, so they are built from the schemas first.
+RUN npm run db:generate && npm run build
 
 # --- Production runtime ------------------------------------------------------
 FROM base AS runner
@@ -50,3 +54,16 @@ COPY --from=builder --chown=node:node /app/.next/static ./.next/static
 USER node
 EXPOSE 3000
 CMD ["node", "server.js"]
+
+# --- Migrations (one-off job) ------------------------------------------------
+# The Prisma CLI, the migration files and the tenant migration script. Needs
+# the full dependency set, which is why it is not part of the runner image.
+FROM base AS migrator
+ENV NODE_ENV=production \
+    NPM_CONFIG_UPDATE_NOTIFIER=false
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json ./
+COPY prisma ./prisma
+RUN npm run db:generate
+USER node
+CMD ["npm", "run", "db:deploy"]

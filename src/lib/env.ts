@@ -16,6 +16,8 @@ export type Env = {
     user: string;
     password: string;
     poolMax: number;
+    tenantPoolMax: number;
+    tenantClientsMax: number;
   };
   redis: {
     host: string;
@@ -93,6 +95,8 @@ function parseEnv(source: NodeJS.ProcessEnv): Env {
       user: required("POSTGRES_USER"),
       password: secret("POSTGRES_PASSWORD"),
       poolMax: integer("POSTGRES_POOL_MAX", 10, 1, 100),
+      tenantPoolMax: integer("POSTGRES_TENANT_POOL_MAX", 3, 1, 20),
+      tenantClientsMax: integer("POSTGRES_TENANT_CLIENTS_MAX", 50, 1, 1000),
     },
     redis: {
       host: required("REDIS_HOST"),

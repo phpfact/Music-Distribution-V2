@@ -10,6 +10,7 @@
 #   DOCKER=<cmd>     docker binary, e.g. DOCKER="sudo docker" if your user needs sudo
 #   FILE=<path>      backup file for `make restore`
 #   db=<name>        database for `make psql` (default: the application database)
+#   name=<words>     migration name for `make db-migration` / `make tenant-migration`
 #   APP_IMAGE=<name> production image name (default: mdnext-app)
 #   APP_TAG=<tag>    production image tag (default: git short SHA, or "local")
 
@@ -45,6 +46,7 @@ SCRIPTS := docker/scripts
 
 .PHONY: help init up down stop restart build rebuild ps logs urls ports validate \
         sh db-sh psql redis-cli typecheck lint check health backup restore \
+        db-generate db-migration tenant-migration db-migrate db-status prod-migrate \
         prod-build prod-up prod-deploy prod-down prod-restart prod-ps prod-logs \
         prod-health prod-images prod-tools-up prod-tools-down destroy-data \
         _require-env _require-dev
@@ -83,7 +85,7 @@ restart: _require-env ## Restart all services, or one with s=<service>
 	@$(COMPOSE_ALL) restart $(s)
 
 build: _require-env ## Build the application image (data volumes are not affected)
-	@$(COMPOSE) build app
+	@$(COMPOSE) $(if $(filter prod,$(MODE)),--profile migrate build app migrate,build app)
 
 rebuild: build up ## Build the application image, then start/update the stack
 
@@ -130,6 +132,29 @@ lint: _require-dev ## Run ESLint
 
 check: lint typecheck ## Run lint and typecheck
 
+##@ Database schema (Prisma)
+
+db-generate: _require-dev ## Regenerate the Prisma clients after editing a schema
+	@$(COMPOSE) exec -T app npm run --silent db:generate
+
+db-migration: _require-dev ## Create and apply a control-plane migration: make db-migration name=<what_changed>
+	@NAME="$(name)" $(SCRIPTS)/migration.sh control
+
+tenant-migration: _require-dev ## Create a tenant migration (applied to a scratch database): name=<what_changed>
+	@NAME="$(name)" $(SCRIPTS)/migration.sh tenant
+
+db-migrate: _require-env ## Apply pending migrations: control plane, then every tenant database
+	@if [ "$(MODE)" = "prod" ]; then \
+		$(DOCKER) image inspect "$(APP_IMAGE):$(APP_TAG)-migrate" >/dev/null 2>&1 \
+			|| { echo "error: image '$(APP_IMAGE):$(APP_TAG)-migrate' not found locally. Build it (make prod-build) or pull it first."; exit 1; }; \
+		$(COMPOSE) --profile migrate run --rm --no-build migrate; \
+	else \
+		$(COMPOSE) exec -T app npm run --silent db:deploy; \
+	fi
+
+db-status: _require-dev ## Show which control-plane migrations are applied
+	@$(COMPOSE) exec -T app npm run --silent db:control:status
+
 ##@ Health and data
 
 health: _require-env ## Show service health and the app's dependency checks
@@ -143,9 +168,12 @@ restore: _require-env ## Restore a dump: make restore FILE=backups/<name>.dump (
 
 ##@ Production (same commands with MODE=prod)
 
-prod-build: ## Build the optimized production image, tagged with APP_TAG
+prod-build: ## Build the production image and its migration image, tagged with APP_TAG
 	@$(MAKE) --no-print-directory MODE=prod build
-	@echo "Built production image: $(APP_IMAGE):$(APP_TAG)"
+	@echo "Built production images: $(APP_IMAGE):$(APP_TAG) and $(APP_IMAGE):$(APP_TAG)-migrate"
+
+prod-migrate: ## Apply pending database migrations in production (run before prod-up)
+	@$(MAKE) --no-print-directory MODE=prod db-migrate
 
 prod-up: ## Start the production stack using the image tagged APP_TAG
 	@$(MAKE) --no-print-directory MODE=prod up

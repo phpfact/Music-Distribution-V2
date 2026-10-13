@@ -7,6 +7,9 @@ out/
 next-env.d.ts
 *.tsbuildinfo
 
+# Prisma clients, generated from prisma/*/schema.prisma (npm run db:generate)
+src/generated/
+
 # Secrets and local configuration (the template is the only env file tracked)
 .env
 .env.*

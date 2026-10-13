@@ -2,7 +2,8 @@
 
 Infrastructure foundation: a minimal Next.js application with PostgreSQL, pgAdmin,
 Redis and Redis Insight, all run through Docker for both local development and
-production. It contains no product features yet.
+production, plus the database schemas and migrations (Prisma). It contains no
+product features yet.
 
 ## Stack
 
@@ -14,6 +15,7 @@ production. It contains no product features yet.
 | TypeScript    | 6.0.3 (strict)          | See "Version constraints"                           |
 | Tailwind CSS  | 4.3.3                   | via `@tailwindcss/postcss`                          |
 | ESLint        | 9.39.5                  | See "Version constraints"                           |
+| Prisma        | 7.10.0                  | ORM and migrations, `pg` driver adapter. See "Database schema and migrations" |
 | PostgreSQL    | 18.6                    |                                                     |
 | pgAdmin       | 9.18                    |                                                     |
 | Redis         | 8.10.2                  | AOF + RDB persistence                               |
@@ -31,6 +33,9 @@ upgrading `eslint-config-next`:
 
 - **TypeScript 6.0.3, not 7.x.** `typescript-eslint` 8.x (a dependency of
   `eslint-config-next` 16.4) supports `typescript <6.1.0`.
+- **Prisma 7.10.0, not 8.x.** Prisma 8 is still a release candidate, although
+  npm's `latest` tag for the `prisma` package already points at it. Keep
+  `prisma`, `@prisma/client` and `@prisma/adapter-pg` on the same version.
 - **ESLint 9.39.5, not 10.x.** `eslint-plugin-react`, `eslint-plugin-import` and
   `eslint-plugin-jsx-a11y` (all pulled in by `eslint-config-next` 16.4) do not
   declare ESLint 10 support. npm prints a notice that ESLint 9 is no longer
@@ -87,8 +92,18 @@ dependencies into a volume. Later starts take a few seconds.
 src/                     Next.js application (App Router)
   app/api/health/        liveness (/api/health) and readiness (/api/health/ready)
   lib/env.ts             runtime configuration and validation
-  lib/postgres.ts        bounded connection pool
+  lib/postgres.ts        bounded connection pool (control-plane database)
+  lib/db/control.ts      Prisma client for the control-plane database
+  lib/db/tenant.ts       Prisma client for one tenant's database
   lib/redis.ts           shared Redis client
+  generated/prisma/      generated Prisma clients (git-ignored)
+prisma/
+  control/               control-plane schema and its migrations
+  tenant/                tenant schema and its migrations (applied per tenant database)
+  control.config.ts      Prisma CLI configuration for the control plane
+  tenant.config.ts       Prisma CLI configuration for one tenant database
+  connection.ts          builds the CLI's connection URL from POSTGRES_*
+  migrate-tenants.ts     applies tenant migrations to every tenant database
 docker/
   compose.yaml           base stack, shared by both environments
   compose.dev.yaml       development override (hot reload, host ports)
@@ -111,7 +126,9 @@ never copied into an image.
 | ------------------------------------------ | ----------------------------------------------- | ----- |
 | `POSTGRES_DB`, `POSTGRES_USER`             | database and role name                          | applied on first initialization only |
 | `POSTGRES_PASSWORD`                        | database password (**secret**)                  | applied on first initialization only |
-| `POSTGRES_POOL_MAX`                        | max connections per app instance (default 10)   | 1 to 100 |
+| `POSTGRES_POOL_MAX`                        | max control-plane connections per app instance (default 10) | 1 to 100 |
+| `POSTGRES_TENANT_POOL_MAX`                 | max connections per tenant database, per app instance (default 3) | 1 to 20 |
+| `POSTGRES_TENANT_CLIENTS_MAX`              | tenant clients kept open per app instance (default 50) | 1 to 1000 |
 | `REDIS_PASSWORD`                           | Redis password (**secret**)                     | applied on every start |
 | `REDIS_MAXMEMORY`, `REDIS_MAXMEMORY_POLICY`| memory cap and eviction policy                  | see "Redis" |
 | `PGADMIN_DEFAULT_EMAIL`, `PGADMIN_DEFAULT_PASSWORD` | initial pgAdmin login (**secret**)     | applied on first initialization only |
@@ -176,9 +193,13 @@ Run `make` for the full list. The most common ones:
 | `make db-sh` / `make psql`      | shell / `psql` in the PostgreSQL container (`db=<name>` optional) |
 | `make redis-cli`                | authenticated `redis-cli`                                       |
 | `make lint` / `make typecheck` / `make check` | ESLint, TypeScript, or both (dev stack must be running) |
+| `make db-migration name=...` / `make tenant-migration name=...` | create a migration from schema edits |
+| `make db-migrate` / `make db-status` | apply pending migrations / show what is applied            |
+| `make db-generate`              | regenerate the Prisma clients                                   |
 | `make backup` / `make restore FILE=...` | database backup and restore                             |
 | `make ports` / `make validate`  | check host ports / validate the Compose configuration           |
 | `make prod-build` / `prod-up` / `prod-deploy` / `prod-down` | production image and stack         |
+| `make prod-migrate`             | apply pending migrations in production                          |
 | `make prod-ps` / `prod-logs` / `prod-health` / `prod-restart` / `prod-images` | production status   |
 | `make prod-tools-up` / `prod-tools-down` | start or remove the GUIs in production                 |
 | `make destroy-data`             | **permanently delete** this stack's volumes (typed confirmation) |
@@ -186,8 +207,8 @@ Run `make` for the full list. The most common ones:
 Services are `app`, `postgres`, `redis`, `pgadmin` and `redisinsight`.
 
 Options: `s=<service>`, `MODE=dev|prod`, `ENV_FILE=<path>` (no spaces),
-`DOCKER="sudo docker"`, `FILE=<backup>`, `db=<database>`, `APP_IMAGE=<name>`,
-`APP_TAG=<tag>`. Every generic command also works for production with
+`DOCKER="sudo docker"`, `FILE=<backup>`, `db=<database>`, `name=<migration>`,
+`APP_IMAGE=<name>`, `APP_TAG=<tag>`. Every generic command also works for production with
 `MODE=prod`, for example `make backup MODE=prod`.
 
 ## Development
@@ -245,6 +266,84 @@ shows both the container states and the readiness report.
 Startup order is enforced with health conditions: the app, pgAdmin and Redis
 Insight start only after the service they depend on reports healthy. Nothing
 depends on the two GUIs, so the app keeps running if one of them is down.
+
+## Database schema and migrations
+
+Prisma is the ORM and the migration tool. There are two schemas, because there
+are two kinds of database:
+
+| Schema | Database | Contents |
+| ------ | -------- | -------- |
+| [prisma/control/schema.prisma](prisma/control/schema.prisma) | the control plane (`POSTGRES_DB`), one for the platform | `plans`, `tenants`, `tenant_domains`, `tenant_provisioning_runs`, `audit_events` |
+| [prisma/tenant/schema.prisma](prisma/tenant/schema.prisma) | one per tenant | `users`, `roles`, `permissions`, `role_permissions`, `user_roles`, `customers`, `artists`, `labels`, `audio_releases`, `video_releases`, `release_assets` |
+
+Each has its own migration history and its own generated client. Tenant tables
+carry no tenant id: the database itself is the boundary.
+
+### Using the clients
+
+```ts
+import { getControlDb } from "@/lib/db/control";
+import { getTenantDb } from "@/lib/db/tenant";
+
+const tenant = await getControlDb().tenant.findUnique({ where: { slug } });
+const customers = await getTenantDb(target).customer.findMany();
+```
+
+Both modules are server-only. `getTenantDb` takes the tenant's database name
+and login, which must come from the tenant resolved on the server for the
+request, never from request input. Model and enum types are imported from
+`@/generated/prisma/control/client` and `@/generated/prisma/tenant/client`.
+
+The clients are generated code and are not committed. They are generated when
+the dev container starts and during the image build; after editing a schema
+run `make db-generate` (the migration commands below do it for you).
+
+### Changing a schema
+
+1. Edit `prisma/control/schema.prisma` or `prisma/tenant/schema.prisma`.
+2. Create the migration:
+
+   ```bash
+   make db-migration name=add_plan_limits        # control plane
+   make tenant-migration name=add_customer_notes # tenant schema
+   ```
+
+   This writes `prisma/<schema>/migrations/<timestamp>_<name>/migration.sql`,
+   applies it to a development database and regenerates the clients. A
+   control-plane migration is applied to the development control plane. A
+   tenant migration is applied to a scratch database,
+   `<POSTGRES_DB>_tenant_dev`, created on first use; it exists only to develop
+   and try tenant migrations.
+3. Read the SQL. Prisma writes it from the schema diff; a rename, for example,
+   becomes a drop and an add unless you edit it. Constraints Prisma cannot
+   express (the `CHECK` constraints at the end of the two `init` migrations)
+   are added to the SQL by hand.
+4. `make restart s=app`, so the dev server stops using the old client.
+5. Commit the schema and the migration together. Never edit a migration that
+   has been applied anywhere else; add a new one.
+
+### Applying migrations
+
+```bash
+make db-migrate
+```
+
+applies pending control-plane migrations, then pending tenant migrations to
+the database of every `active` or `suspended` tenant, one at a time. It is
+safe to repeat. For each tenant the outcome is recorded on its `tenants` row:
+`schema_status` (`current` or `failed`), `schema_version` (the newest migration
+applied) and `schema_migrated_at`. A tenant that fails is reported and the run
+continues with the next one; the command then exits with an error. A tenant
+whose database is missing counts as failed, it is never recreated empty.
+
+Tenants that are still being provisioned are skipped: provisioning has to
+apply the migrations to a new database itself, before it activates the tenant.
+
+Migrations connect with the administrative login (`POSTGRES_USER`), because
+they change schemas. Tenant logins must not own their tables or be able to
+alter them; granting them only the data privileges they need is part of
+provisioning.
 
 ## pgAdmin
 
@@ -361,8 +460,8 @@ writes `backups/<database>_<UTC timestamp>.dump` (pg_dump custom format,
 compressed), checks that `pg_restore` can read it back, and only then gives it
 its final name. The directory and files are created private (700 / 600): a
 backup contains all application data, so treat it like the database itself and
-encrypt it wherever you store it. It covers the application database only, not
-roles or pgAdmin settings. Schedule it with cron or your host's scheduler; no
+encrypt it wherever you store it. It covers the control-plane database only: not
+tenant databases, roles or pgAdmin settings. Schedule it with cron or your host's scheduler; no
 scheduler is included.
 
 ```bash
@@ -424,6 +523,9 @@ What changes compared with development:
   with all capabilities dropped.
 - pgAdmin and Redis Insight do not start unless you ask for them.
 - The app is published on `127.0.0.1` only. CPU and memory limits apply.
+- Migrations run from a separate image (`<tag>-migrate`) that holds the Prisma
+  CLI and the migration files. It is a one-off job, never part of the running
+  stack.
 
 ### Before the first deployment
 
@@ -444,9 +546,14 @@ What changes compared with development:
 ### Deploy
 
 ```bash
-make prod-deploy        # = make prod-build, then make prod-up
+make prod-build         # the app image and its migration image
+make prod-migrate       # apply pending database migrations
+make prod-up
 make prod-health
 ```
+
+`make prod-deploy` is `prod-build` followed by `prod-up`; it does not run
+migrations.
 
 Each build is tagged `mdnext-app:<git short SHA>`, or `local` when the project
 is not a git repository. `make prod-up` only starts an application image that
@@ -455,8 +562,13 @@ a tag you chose. To build elsewhere and pull on the server, use
 `APP_IMAGE=<registry>/<name>` for both `prod-build` and `prod-up`, and
 push/pull the image yourself.
 
-Database data is untouched by a deployment. No migrations exist yet; when they
-do, running them is a separate, deliberate step.
+Database data is untouched by `prod-build` and `prod-up`. Migrations are a
+separate, deliberate step: `make prod-migrate` starts PostgreSQL if needed,
+applies what is pending (see "Applying migrations") and exits. Run it before
+`prod-up`, so the new application code never meets an old schema, and take a
+backup first. Because the previous application version keeps running until
+`prod-up`, write migrations it can tolerate: add first, remove in a later
+release.
 
 ### Roll back
 
@@ -465,8 +577,9 @@ make prod-images                  # tags available on this host
 make prod-up APP_TAG=<previous>   # start the previous image
 ```
 
-This rolls back the application only. Rolling back data means restoring a
-backup.
+This rolls back the application only. Migrations are not reversed: Prisma has
+no down migrations. Rolling back the schema or data means restoring a backup,
+or writing a new migration that undoes the change.
 
 ### Management GUIs in production
 
@@ -505,13 +618,18 @@ make prod-down          # keeps all volumes
 - **One stack per host**: development and production share the project name
   and therefore the volumes. Do not run both on the same machine against data
   you care about.
-- **Scaling**: each app instance holds up to `POSTGRES_POOL_MAX` connections;
-  keep instances x pool size below PostgreSQL's `max_connections` (100).
-- **Database role**: the app currently connects as `POSTGRES_USER`, which the
-  official image creates as a superuser. That is acceptable while the only
-  query is the readiness check (`SELECT 1`). Before adding real queries,
-  create a least-privilege application role and keep the superuser for
-  administration and provisioning only.
+- **Scaling**: each app instance holds up to `POSTGRES_POOL_MAX` connections
+  to the control plane, plus up to `POSTGRES_TENANT_POOL_MAX` for each tenant
+  with requests in flight. Tenant connections are closed after 10 seconds
+  idle, so the total follows the number of tenants active at the same moment,
+  not the number of tenants. Keep instances x (pool + busy tenants x tenant
+  pool) below PostgreSQL's `max_connections` (100), or put a connection pooler
+  in front as the tenant count grows.
+- **Database role**: the app currently connects to the control plane as
+  `POSTGRES_USER`, which the official image creates as a superuser. That is
+  acceptable while the only query is the readiness check (`SELECT 1`). Before
+  adding real queries, create a least-privilege application role and keep the
+  superuser for administration, provisioning and migrations only.
 
 ### Not covered here
 
@@ -539,3 +657,7 @@ would replace the corresponding service).
 | `Cannot connect to the Docker daemon` | Start Docker Desktop / the Docker service. |
 | `image 'mdnext-app:...' not found locally` | Run `make prod-build` (or pull the image) before `make prod-up`. |
 | A new dependency is missing in the container | `make restart s=app` reinstalls when the lockfile changed. |
+| `Cannot find module '@/generated/prisma/...'` | The Prisma clients have not been generated: `make db-generate`. |
+| A new model or column is missing at runtime | The dev server still holds the old Prisma client: `make restart s=app`. |
+| `The table ... does not exist` | Migrations are pending: `make db-migrate`. |
+| `make db-migration` stops, saying the environment is non-interactive | The change needs a confirmation (it would lose data). Run it from a terminal. |

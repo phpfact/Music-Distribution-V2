@@ -38,6 +38,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in your env file (run 'make init')}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your env file (run 'make init')}
       POSTGRES_POOL_MAX: ${POSTGRES_POOL_MAX:-10}
+      POSTGRES_TENANT_POOL_MAX: ${POSTGRES_TENANT_POOL_MAX:-3}
+      POSTGRES_TENANT_CLIENTS_MAX: ${POSTGRES_TENANT_CLIENTS_MAX:-50}
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in your env file (run 'make init')}

@@ -10,9 +10,18 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint . --max-warnings 0",
-    "typecheck": "next typegen && tsc --noEmit"
+    "typecheck": "next typegen && tsc --noEmit",
+    "db:generate": "prisma generate --config prisma/control.config.ts && prisma generate --config prisma/tenant.config.ts",
+    "db:deploy": "npm run db:control:deploy && npm run db:tenants:deploy",
+    "db:control:deploy": "prisma migrate deploy --config prisma/control.config.ts",
+    "db:control:migrate": "prisma migrate dev --config prisma/control.config.ts",
+    "db:control:status": "prisma migrate status --config prisma/control.config.ts",
+    "db:tenants:deploy": "tsx prisma/migrate-tenants.ts",
+    "db:tenant:migrate": "prisma migrate dev --config prisma/tenant.config.ts"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
     "next": "16.4.0",
     "pg": "8.23.1",
     "react": "19.3.0",
@@ -28,7 +37,9 @@
     "@types/react-dom": "^19",
     "eslint": "9.39.5",
     "eslint-config-next": "16.4.0",
+    "prisma": "7.10.0",
     "tailwindcss": "4.3.3",
+    "tsx": "4.23.15",
     "typescript": "6.0.3"
   }
 }

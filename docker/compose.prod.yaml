@@ -6,6 +6,8 @@
 #   internal network.
 # - pgAdmin and Redis Insight are behind the "tools" profile, so they do not
 #   start unless asked for (`make prod-tools-up`), and then only on 127.0.0.1.
+# - Database migrations are a one-off job behind the "migrate" profile
+#   (`make prod-migrate`); `up` never runs them.
 # - The app binds to 127.0.0.1 by default. Terminate HTTPS in a reverse proxy
 #   on the host and forward to it (see README, "Production").
 
@@ -33,6 +35,33 @@ services:
         limits:
           cpus: "${APP_CPU_LIMIT:-1.0}"
           memory: ${APP_MEMORY_LIMIT:-512m}
+
+  # One-off job, not a running service: applies pending migrations to the
+  # control plane and to every tenant database, then exits.
+  migrate:
+    profiles: ["migrate"]
+    build:
+      context: ..
+      dockerfile: docker/app/Dockerfile
+      target: migrator
+    image: ${APP_IMAGE:-mdnext-app}:${APP_TAG:-local}-migrate
+    init: true
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in your env file (run 'make init')}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in your env file (run 'make init')}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your env file (run 'make init')}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+    networks:
+      - internal
 
   postgres:
     security_opt:

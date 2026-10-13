@@ -1,0 +1,224 @@
+// Tenant database: one tenant's application data.
+//
+// Every tenant has its own PostgreSQL database with this schema, so no table
+// here carries a tenant id. The same migrations (prisma/tenant/migrations) are
+// applied to each tenant database independently.
+//
+// The connection is configured in prisma/tenant.config.ts, not in this file.
+//
+// The release tables hold ownership and identity only. Review workflow,
+// metadata and delivery columns are added once those requirements are agreed.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../../src/generated/prisma/tenant"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserStatus {
+  active
+  disabled
+
+  @@map("user_status")
+}
+
+/// A category only. It grants no privileges; roles and permissions do.
+enum CustomerType {
+  artist
+  label
+  white_label
+
+  @@map("customer_type")
+}
+
+enum CustomerStatus {
+  active
+  disabled
+
+  @@map("customer_status")
+}
+
+model User {
+  id         String     @id @default(uuid(7)) @db.Uuid
+  /// Lower-case (checked in the database, see the init migration).
+  email      String     @unique @db.VarChar(320)
+  name       String     @db.VarChar(200)
+  status     UserStatus @default(active)
+  /// Set for a customer's users; empty for the tenant's own staff.
+  customerId String?    @map("customer_id") @db.Uuid
+  customer   Customer?  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  roles UserRole[]
+
+  @@index([customerId])
+  @@map("users")
+}
+
+model Role {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  key         String   @unique @db.VarChar(100)
+  name        String   @db.VarChar(200)
+  description String?  @db.VarChar(500)
+  /// Predefined by the platform; tenants cannot edit or delete it.
+  isSystem    Boolean  @default(false) @map("is_system")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  permissions RolePermission[]
+  users       UserRole[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  /// Stable identifier checked by the authorization service, e.g. "customers.create".
+  key         String   @unique @db.VarChar(100)
+  description String?  @db.VarChar(500)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String     @map("role_id") @db.Uuid
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionId String     @map("permission_id") @db.Uuid
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId    String   @map("user_id") @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId    String   @map("role_id") @db.Uuid
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+model Customer {
+  id        String         @id @default(uuid(7)) @db.Uuid
+  type      CustomerType
+  name      String         @db.VarChar(200)
+  status    CustomerStatus @default(active)
+  /// Set for a sub-customer. A customer cannot be its own parent (checked in the database).
+  parentId  String?        @map("parent_id") @db.Uuid
+  parent    Customer?      @relation("CustomerHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children  Customer[]     @relation("CustomerHierarchy")
+  createdAt DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  users         User[]
+  artists       Artist[]
+  labels        Label[]
+  audioReleases AudioRelease[]
+  videoReleases VideoRelease[]
+
+  @@index([parentId])
+  @@map("customers")
+}
+
+model Artist {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  customerId String   @map("customer_id") @db.Uuid
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  name       String   @db.VarChar(200)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  audioReleases AudioRelease[]
+  videoReleases VideoRelease[]
+
+  @@index([customerId])
+  @@map("artists")
+}
+
+model Label {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  customerId String   @map("customer_id") @db.Uuid
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  name       String   @db.VarChar(200)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  audioReleases AudioRelease[]
+  videoReleases VideoRelease[]
+
+  @@index([customerId])
+  @@map("labels")
+}
+
+model AudioRelease {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  customerId String   @map("customer_id") @db.Uuid
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  artistId   String?  @map("artist_id") @db.Uuid
+  artist     Artist?  @relation(fields: [artistId], references: [id], onDelete: Restrict)
+  labelId    String?  @map("label_id") @db.Uuid
+  label      Label?   @relation(fields: [labelId], references: [id], onDelete: Restrict)
+  title      String   @db.VarChar(300)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  assets ReleaseAsset[]
+
+  @@index([customerId])
+  @@index([artistId])
+  @@index([labelId])
+  @@map("audio_releases")
+}
+
+model VideoRelease {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  customerId String   @map("customer_id") @db.Uuid
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  artistId   String?  @map("artist_id") @db.Uuid
+  artist     Artist?  @relation(fields: [artistId], references: [id], onDelete: Restrict)
+  labelId    String?  @map("label_id") @db.Uuid
+  label      Label?   @relation(fields: [labelId], references: [id], onDelete: Restrict)
+  title      String   @db.VarChar(300)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  assets ReleaseAsset[]
+
+  @@index([customerId])
+  @@index([artistId])
+  @@index([labelId])
+  @@map("video_releases")
+}
+
+/// Metadata for a stored file. Belongs to exactly one audio or one video
+/// release (checked in the database).
+model ReleaseAsset {
+  id               String        @id @default(uuid(7)) @db.Uuid
+  audioReleaseId   String?       @map("audio_release_id") @db.Uuid
+  audioRelease     AudioRelease? @relation(fields: [audioReleaseId], references: [id], onDelete: Restrict)
+  videoReleaseId   String?       @map("video_release_id") @db.Uuid
+  videoRelease     VideoRelease? @relation(fields: [videoReleaseId], references: [id], onDelete: Restrict)
+  /// Generated by the server. Never built from a client-supplied path.
+  storageKey       String        @unique @map("storage_key") @db.VarChar(1024)
+  originalFilename String        @map("original_filename") @db.VarChar(255)
+  contentType      String        @map("content_type") @db.VarChar(255)
+  sizeBytes        BigInt        @map("size_bytes")
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([audioReleaseId])
+  @@index([videoReleaseId])
+  @@map("release_assets")
+}

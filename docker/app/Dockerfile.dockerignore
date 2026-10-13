@@ -11,6 +11,7 @@ node_modules
 out
 *.tsbuildinfo
 next-env.d.ts
+src/generated
 
 # Local data, VCS and tooling.
 backups

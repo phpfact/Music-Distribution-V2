@@ -1,0 +1,177 @@
+// Control-plane database: platform-wide tenant metadata.
+//
+// One database for the whole platform (POSTGRES_DB). It records which tenants
+// exist and where their data lives. Tenant business records (users, customers,
+// releases) never belong here; they live in each tenant's own database, whose
+// schema is prisma/tenant/schema.prisma.
+//
+// The connection is configured in prisma/control.config.ts, not in this file.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../../src/generated/prisma/control"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TenantStatus {
+  pending
+  provisioning
+  active
+  failed
+  suspended
+  deprovisioning
+
+  @@map("tenant_status")
+}
+
+/// State of a tenant database's schema relative to prisma/tenant/migrations.
+enum TenantSchemaStatus {
+  pending
+  current
+  failed
+
+  @@map("tenant_schema_status")
+}
+
+enum TenantDomainType {
+  subdomain
+  custom
+
+  @@map("tenant_domain_type")
+}
+
+enum ProvisioningRunStatus {
+  running
+  succeeded
+  failed
+
+  @@map("provisioning_run_status")
+}
+
+enum ProvisioningStep {
+  create_database
+  create_database_user
+  grant_privileges
+  apply_migrations
+  create_initial_admin
+  register_domain
+  verify
+
+  @@map("provisioning_step")
+}
+
+enum AuditActorType {
+  system
+  super_admin
+  tenant_user
+
+  @@map("audit_actor_type")
+}
+
+model Plan {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  code      String   @unique @db.VarChar(50)
+  name      String   @db.VarChar(100)
+  /// The plan given to newly registered tenants.
+  isDefault Boolean  @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  tenants Tenant[]
+
+  @@map("plans")
+}
+
+model Tenant {
+  id           String       @id @default(uuid(7)) @db.Uuid
+  name         String       @db.VarChar(200)
+  /// Lower-case DNS label (checked in the database, see the init migration).
+  slug         String       @unique @db.VarChar(63)
+  status       TenantStatus @default(pending)
+  /// Why the tenant is in this status. Safe to display; detail goes to the logs.
+  statusReason String?      @map("status_reason") @db.VarChar(500)
+  contactEmail String       @map("contact_email") @db.VarChar(320)
+
+  planId String @map("plan_id") @db.Uuid
+  plan   Plan   @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  // Allocated during provisioning, so empty until then.
+  databaseName      String? @unique @map("database_name") @db.VarChar(63)
+  databaseUser      String? @unique @map("database_user") @db.VarChar(63)
+  /// A reference to the credential in secret storage. Never the secret itself.
+  databaseSecretRef String? @map("database_secret_ref") @db.VarChar(255)
+
+  schemaStatus     TenantSchemaStatus @default(pending) @map("schema_status")
+  /// Name of the newest tenant migration applied to this tenant's database.
+  schemaVersion    String?            @map("schema_version") @db.VarChar(255)
+  schemaMigratedAt DateTime?          @map("schema_migrated_at") @db.Timestamptz(3)
+
+  activatedAt DateTime? @map("activated_at") @db.Timestamptz(3)
+  suspendedAt DateTime? @map("suspended_at") @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  domains          TenantDomain[]
+  provisioningRuns TenantProvisioningRun[]
+
+  @@index([status])
+  @@index([planId])
+  @@map("tenants")
+}
+
+model TenantDomain {
+  id        String           @id @default(uuid(7)) @db.Uuid
+  tenantId  String           @map("tenant_id") @db.Uuid
+  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  type      TenantDomainType @default(subdomain)
+  /// Lower-case (checked in the database). For `subdomain` the label under the
+  /// SaaS base domain ("acme"); for `custom` the full host name.
+  hostname  String           @db.VarChar(253)
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@unique([type, hostname])
+  @@index([tenantId])
+  @@map("tenant_domains")
+}
+
+model TenantProvisioningRun {
+  id           String                @id @default(uuid(7)) @db.Uuid
+  tenantId     String                @map("tenant_id") @db.Uuid
+  tenant       Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  /// 1 for the first run, incremented on every retry.
+  attempt      Int
+  status       ProvisioningRunStatus @default(running)
+  /// The step in progress, or the step that failed.
+  step         ProvisioningStep?
+  errorCode    String?               @map("error_code") @db.VarChar(100)
+  /// Safe to display. Never a password, connection string or other secret.
+  errorMessage String?               @map("error_message") @db.VarChar(500)
+  startedAt    DateTime              @default(now()) @map("started_at") @db.Timestamptz(3)
+  finishedAt   DateTime?             @map("finished_at") @db.Timestamptz(3)
+
+  @@unique([tenantId, attempt])
+  @@map("tenant_provisioning_runs")
+}
+
+model AuditEvent {
+  id         String         @id @default(uuid(7)) @db.Uuid
+  occurredAt DateTime       @default(now()) @map("occurred_at") @db.Timestamptz(3)
+  actorType  AuditActorType @map("actor_type")
+  actorId    String?        @map("actor_id") @db.VarChar(100)
+  /// Deliberately not a foreign key: audit rows must outlive the tenant record.
+  tenantId   String?        @map("tenant_id") @db.Uuid
+  /// What happened, e.g. "tenant.suspended".
+  action     String         @db.VarChar(100)
+  targetType String?        @map("target_type") @db.VarChar(100)
+  targetId   String?        @map("target_id") @db.VarChar(100)
+  /// Never credentials, tokens or private media URLs.
+  metadata   Json?
+  ipAddress  String?        @map("ip_address") @db.Inet
+
+  @@index([tenantId, occurredAt])
+  @@index([action, occurredAt])
+  @@map("audit_events")
+}

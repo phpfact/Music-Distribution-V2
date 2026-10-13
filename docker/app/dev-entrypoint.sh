@@ -1,6 +1,7 @@
 #!/bin/sh
 # Development entrypoint: keeps the node_modules volume in sync with the
-# bind-mounted package.json / package-lock.json, then runs the given command.
+# bind-mounted package.json / package-lock.json, generates the Prisma clients,
+# then runs the given command.
 set -eu
 
 cd /app
@@ -32,5 +33,10 @@ if [ ! -f "$stamp" ] || [ "$(cat "$stamp")" != "$(manifest_hash)" ]; then
   manifest_hash > "$stamp"
   echo "[dev] Dependencies are up to date."
 fi
+
+# The Prisma clients are generated code and git-ignored, so a fresh checkout
+# has none. Generating takes about a second and needs no database.
+echo "[dev] Generating Prisma clients..."
+npm run --silent db:generate
 
 exec "$@"
