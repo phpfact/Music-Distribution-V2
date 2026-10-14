@@ -54,6 +54,15 @@ persistent cache. Transaction save responses read authoritative state uncached.
 Background refresh validates the cookie-backed session without touching its last
 activity timestamp, so polling cannot extend the existing session idle timeout. A
 successful save invalidates the Platform layout and returns authoritative state.
+The server renders the resolved theme before hydration; System uses a CSS media
+query on the first paint. Accent values are shared by the interface and previews.
+No shared appearance cookie or local storage is read. Broadcast notifications
+contain only a refresh signal, and visible tabs refresh at most once a minute.
+An owner/version guard rejects delayed mutation responses after an account switch
+or newer background state, then refreshes the authoritative server layout. Unsaved
+drafts remain local to the page and are discarded when its owner changes. During
+an anonymous global-preference read outage, login still renders the application
+default; authenticated preference errors remain visible through the error boundary.
 
 ## Verification
 
@@ -68,3 +77,6 @@ database for per-owner persistence, resets, concurrency, permission enforcement,
 expiry/revocation/disable, singleton and FK constraints, and transactional failures.
 `tests/appearance-actions.test.ts` verifies direct-action authorization, hostile
 requests, origin protection, failure feedback, and refresh behavior.
+`tests/platform-http.test.ts` verifies that the obsolete cookie cannot affect the
+login theme and that personal settings render on the server across platform pages
+and refreshes. `tests/tenant-pages-http.test.ts` guards the Appearance route too.

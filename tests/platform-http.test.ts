@@ -688,12 +688,34 @@ describe("the pages", () => {
     expect(password && attribute(password, "autoComplete")).toBe("current-password");
   });
 
-  it("the theme is light without a preference and dark with one, rendered on the server", async () => {
-    const light = await (await request(LOGIN_PATH)).text();
-    expect(light).not.toMatch(/class="dark[ "]/);
+  it("ignores the obsolete shared theme cookie on the signed-out login page", async () => {
+    const ordinary = await (await request(LOGIN_PATH)).text();
+    const previousAccount = await (await request(LOGIN_PATH, { theme: "dark" })).text();
+    const themeClass = /class="(light|dark|system) platform-theme/;
+    expect(ordinary.match(themeClass)?.[1]).toBeDefined();
+    expect(previousAccount.match(themeClass)?.[1]).toBe(ordinary.match(themeClass)?.[1]);
+  });
 
-    const dark = await (await request(LOGIN_PATH, { theme: "dark" })).text();
-    expect(dark).toMatch(/class="dark[ "]/);
+  it("renders this authenticated owner's persisted preference before hydration and after refresh", async () => {
+    const session = await signInForSession();
+    await db().query(
+      `INSERT INTO platform_owner_appearances (owner_id, theme, accent, updated_at)
+       VALUES ($1, 'dark', 'indigo', now())
+       ON CONFLICT (owner_id) DO UPDATE SET theme = 'dark', accent = 'indigo', updated_at = now()`,
+      [theOwnerId()],
+    );
+    try {
+      for (const path of [DASHBOARD_PATH, DASHBOARD_PATH, "/platform/tenants", "/platform/settings/appearance"]) {
+        const response = await request(path, { session, theme: "light" });
+        expect(response.status).toBe(200);
+        const html = await response.text();
+        expect(html).toMatch(/class="dark platform-theme/);
+        expect(html).toContain('data-accent="indigo"');
+        expect(html).toContain('data-appearance-source="personal"');
+      }
+    } finally {
+      await db().query("DELETE FROM platform_owner_appearances WHERE owner_id = $1", [theOwnerId()]);
+    }
   });
 
   it("the dashboard also sends the security headers", async () => {

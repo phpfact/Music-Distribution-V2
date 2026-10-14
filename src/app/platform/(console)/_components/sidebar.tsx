@@ -82,6 +82,21 @@ export function Sidebar({ collapsed, onNavigate, headerAction, footer }: Sidebar
                         collapsed={collapsed}
                         onNavigate={onNavigate}
                       />
+                      {item.children && !collapsed ? (
+                        <ul className="ml-5 mt-1 space-y-1 border-l border-line pl-3" aria-label={`${item.label} pages`}>
+                          {item.children.map((child) => {
+                            const active = pathname === child.href || pathname.startsWith(`${child.href}/`);
+                            return (
+                              <li key={child.href}>
+                                <Link href={child.href} onClick={onNavigate} aria-current={active ? "page" : undefined}
+                                  className={`flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-medium transition-colors hover:bg-surface-2 ${FOCUS_RING} ${active ? "bg-accent-soft text-accent" : "text-fg-muted"}`}>
+                                  <Icon name={child.icon} className="size-3.5" />{child.label}
+                                </Link>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      ) : null}
                     </li>
                   ))}
                 </ul>
@@ -110,7 +125,7 @@ function SidebarLink({ item, active, collapsed, onNavigate }: SidebarLinkProps) 
     <Link
       href={item.href}
       onClick={onNavigate}
-      aria-current={active ? "page" : undefined}
+      aria-current={active && (collapsed || !item.children) ? "page" : undefined}
       className={`group relative flex h-11 items-center gap-3 rounded-xl text-[13px] transition-colors motion-reduce:transition-none hover:bg-surface-2 hover:text-fg ${FOCUS_RING} ${
         collapsed ? "justify-center px-0" : "px-3"
       } ${active ? "bg-accent-soft font-semibold text-accent" : "font-medium text-fg-muted"}`}

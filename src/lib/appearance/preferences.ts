@@ -30,12 +30,13 @@ export type AppearanceActionResult =
 export const DEFAULT_APPEARANCE: Appearance = { theme: "light", accent: "emerald" };
 
 /** Light colors work with white controls; dark colors work on dark surfaces. */
-export const ACCENT_OPTIONS: ReadonlyArray<{
+type AccentOption = {
   value: Appearance["accent"];
   label: string;
   light: string;
   dark: string;
-}> = [
+};
+export const ACCENT_OPTIONS: readonly [AccentOption, ...AccentOption[]] = [
   { value: "emerald", label: "Emerald", light: "#047857", dark: "#34d399" },
   { value: "indigo", label: "Indigo", light: "#4f46e5", dark: "#a5b4fc" },
   { value: "violet", label: "Violet", light: "#7c3aed", dark: "#c4b5fd" },

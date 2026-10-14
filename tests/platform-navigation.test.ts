@@ -17,9 +17,9 @@ describe("the platform navigation", () => {
     }
   });
 
-  it("offers the dashboard and tenant management so far; every other module is planned", () => {
+  it("offers dashboard, tenant management, and settings; other modules remain planned", () => {
     const available = PLATFORM_NAV_ITEMS.filter((item) => item.status === "available");
-    expect(available.map((item) => item.id)).toEqual(["dashboard", "tenants"]);
+    expect(available.map((item) => item.id)).toEqual(["dashboard", "tenants", "settings"]);
   });
 });
 
@@ -54,6 +54,7 @@ describe("findActiveNavItem", () => {
     ["/platform/roles", "roles"],
     ["/platform/subscriptions/plans/1", "subscriptions"],
     ["/platform/settings", "settings"],
+    ["/platform/settings/appearance", "settings"],
     ["/platform/support/", "support"],
   ])("finds the item for %j", (pathname, id) => {
     expect(findActiveNavItem(pathname)?.id).toBe(id);

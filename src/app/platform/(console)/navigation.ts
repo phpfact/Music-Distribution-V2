@@ -22,6 +22,7 @@ export type PlatformNavItem = {
   description: string;
   /** "planned": the route exists but only shows a coming-soon notice. */
   status: "available" | "planned";
+  children?: readonly { label: string; href: string; icon: IconName }[];
 };
 
 export type PlatformNavSection = {
@@ -84,8 +85,9 @@ export const PLATFORM_NAV_SECTIONS: readonly PlatformNavSection[] = [
         label: "Settings",
         href: "/platform/settings",
         icon: "settings",
-        description: "Configure platform-level settings.",
-        status: "planned",
+        description: "Personalize your workspace and manage platform appearance.",
+        status: "available",
+        children: [{ label: "Appearance", href: "/platform/settings/appearance", icon: "sun" }],
       },
       {
         id: "support",

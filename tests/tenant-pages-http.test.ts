@@ -42,6 +42,12 @@ describe("/platform/tenants with filters", () => {
   });
 });
 
+describe("/platform/settings/appearance", () => {
+  it.each(NO_SESSIONS)("with %s: 307 to login without disclosing personal settings", async (_name, session) => {
+    await expectSentToLogin(await get("/platform/settings/appearance", session));
+  });
+});
+
 describe("/platform/tenants/<id>", () => {
   it.each(NO_SESSIONS)("with %s: 307 to the login page, for any id", async (_name, session) => {
     for (const id of [randomUUID(), "not-a-uuid"]) {

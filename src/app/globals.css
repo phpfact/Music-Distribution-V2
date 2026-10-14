@@ -1,42 +1,60 @@
 @import "tailwindcss";
 
-/*
- * Dark mode is chosen by a `dark` class (the platform's theme toggle), not the
- * system setting: `dark:` applies inside any element carrying that class.
- */
-@custom-variant dark (&:where(.dark, .dark *));
+/* System mode is resolved by CSS on the first paint, before hydration. */
+@custom-variant dark {
+  &:where(.dark, .dark *) { @slot; }
+  @media (prefers-color-scheme: dark) {
+    &:where(.system, .system *) { @slot; }
+  }
+}
 
-/*
- * Semantic colour tokens for the platform console, so the components can say
- * `bg-surface` instead of repeating light/dark pairs. Light is the default;
- * `.dark` swaps the values for everything inside it.
- */
-:root {
+:root, .platform-theme {
   color-scheme: light;
-  --canvas: #fafafa;
+  --canvas: #f6f7f9;
   --surface: #ffffff;
-  --surface-2: #f4f4f5;
-  --line: #e4e4e7;
-  --fg: #18181b;
-  --fg-muted: #52525b;
-  --fg-subtle: #71717a;
-  --accent: #059669;
-  --accent-soft: rgb(16 185 129 / 0.1);
+  --surface-2: #f1f3f6;
+  --line: #e3e7ed;
+  --fg: #182230;
+  --fg-muted: #526071;
+  --fg-subtle: #697586;
+  --accent-light: #047857;
+  --accent-dark: #34d399;
+  --accent: var(--accent-light);
+  --accent-soft: color-mix(in srgb, var(--accent) 9%, transparent);
   --accent-fg: #ffffff;
+  --card-shadow: 0 2px 8px rgb(16 24 40 / 0.025), 0 12px 24px rgb(16 24 40 / 0.015);
 }
 
 .dark {
   color-scheme: dark;
-  --canvas: #09090b;
-  --surface: #111113;
-  --surface-2: #1c1c1f;
-  --line: #27272a;
-  --fg: #f4f4f5;
-  --fg-muted: #a1a1aa;
-  --fg-subtle: #8a8a93;
-  --accent: #34d399;
-  --accent-soft: rgb(52 211 153 / 0.12);
-  --accent-fg: #052e1f;
+  --canvas: #101419;
+  --surface: #171c23;
+  --surface-2: #222933;
+  --line: #303946;
+  --fg: #eef2f6;
+  --fg-muted: #b6c0cc;
+  --fg-subtle: #9ba8b8;
+  --accent: var(--accent-dark);
+  --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+  --accent-fg: #101419;
+  --card-shadow: 0 2px 8px rgb(0 0 0 / 0.06), 0 12px 24px rgb(0 0 0 / 0.035);
+}
+
+@media (prefers-color-scheme: dark) {
+  .system {
+    color-scheme: dark;
+    --canvas: #101419;
+    --surface: #171c23;
+    --surface-2: #222933;
+    --line: #303946;
+    --fg: #eef2f6;
+    --fg-muted: #b6c0cc;
+    --fg-subtle: #9ba8b8;
+    --accent: var(--accent-dark);
+    --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+    --accent-fg: #101419;
+    --card-shadow: 0 2px 8px rgb(0 0 0 / 0.06), 0 12px 24px rgb(0 0 0 / 0.035);
+  }
 }
 
 @theme inline {
@@ -50,4 +68,5 @@
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
   --color-accent-fg: var(--accent-fg);
+  --shadow-card: var(--card-shadow);
 }
