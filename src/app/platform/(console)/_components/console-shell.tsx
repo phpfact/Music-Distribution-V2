@@ -21,6 +21,10 @@ type ConsoleShellProps = {
 /**
  * The frame around every console page: sidebar, mobile drawer and top bar.
  * It lives in the layout, so its state survives client-side navigation.
+ * Input: owner username, saved sidebar collapse state, and page content.
+ * Output: responsive navigation and content constrained by the resolved width.
+ * Use case: apply the same saved content-width preference throughout the console.
+ * Created: 2026-10-14. Last modified: 2026-10-14.
  */
 export function ConsoleShell({ username, initialCollapsed, children }: ConsoleShellProps) {
   const [collapsed, setCollapsed] = useState(initialCollapsed);
@@ -159,7 +163,13 @@ export function ConsoleShell({ username, initialCollapsed, children }: ConsoleSh
           tabIndex={-1}
           className="relative flex-1 overflow-y-auto focus:outline-none"
         >
-          <div className="mx-auto w-full max-w-[96rem] px-4 py-7 sm:px-6 lg:px-9 lg:py-9">{children}</div>
+          {/* Full Width removes only the content cap, keeping responsive gutters. */}
+          <div
+            style={{ maxWidth: "var(--platform-content-max-width, 96rem)" }}
+            className="mx-auto w-full px-4 py-7 sm:px-6 lg:px-9 lg:py-9"
+          >
+            {children}
+          </div>
         </main>
       </div>
     </div>

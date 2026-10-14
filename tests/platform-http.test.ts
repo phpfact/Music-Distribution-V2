@@ -699,9 +699,9 @@ describe("the pages", () => {
   it("renders this authenticated owner's persisted preference before hydration and after refresh", async () => {
     const session = await signInForSession();
     await db().query(
-      `INSERT INTO platform_owner_appearances (owner_id, theme, accent, updated_at)
-       VALUES ($1, 'dark', 'indigo', now())
-       ON CONFLICT (owner_id) DO UPDATE SET theme = 'dark', accent = 'indigo', updated_at = now()`,
+      `INSERT INTO platform_owner_appearances (owner_id, theme, accent, width, updated_at)
+       VALUES ($1, 'dark', 'indigo', 'full', now())
+       ON CONFLICT (owner_id) DO UPDATE SET theme = 'dark', accent = 'indigo', width = 'full', updated_at = now()`,
       [theOwnerId()],
     );
     try {
@@ -712,10 +712,55 @@ describe("the pages", () => {
         expect(html).toMatch(/class="dark platform-theme/);
         expect(html).toContain('data-accent="indigo"');
         expect(html).toContain('data-appearance-source="personal"');
+        expect(html).toContain('data-content-width="full"');
+        expect(html).toContain('--platform-content-max-width:none');
+        expect(html).toContain('max-width:var(--platform-content-max-width, 96rem)');
       }
     } finally {
       await db().query("DELETE FROM platform_owner_appearances WHERE owner_id = $1", [theOwnerId()]);
     }
+  });
+
+  it("restores all content-width options from the server after navigating and refreshing", async () => {
+    const session = await signInForSession();
+    try {
+      for (const [width, maximum] of [["default", "96rem"], ["full", "none"], ["focused", "72rem"]]) {
+        await db().query(
+          `INSERT INTO platform_owner_appearances (owner_id, theme, accent, width)
+           VALUES ($1, 'light', 'emerald', $2::appearance_width)
+           ON CONFLICT (owner_id) DO UPDATE SET width = EXCLUDED.width`,
+          [theOwnerId(), width],
+        );
+        for (const path of [DASHBOARD_PATH, "/platform/tenants", "/platform/settings/appearance", DASHBOARD_PATH]) {
+          const response = await request(path, { session });
+          expect(response.status).toBe(200);
+          const html = await response.text();
+          expect(html).toContain(`data-content-width="${width}"`);
+          expect(html).toContain(`--platform-content-max-width:${maximum}`);
+        }
+      }
+    } finally {
+      await db().query("DELETE FROM platform_owner_appearances WHERE owner_id = $1", [theOwnerId()]);
+    }
+  });
+
+  it("renders reload feedback only for the currently authenticated account", async () => {
+    const session = await signInForSession();
+    const appearancePath = "/platform/settings/appearance";
+    const message = "The platform default and your appearance are saved.";
+    const notice = "appearance-global-applied";
+    const ownResponse = await request(`${appearancePath}?notice=${notice}&noticeOwner=${theOwnerId()}`, { session });
+    expect(ownResponse.status).toBe(200);
+    expect(await ownResponse.text()).toContain(message);
+
+    // A success URL left by another login must not become this owner's notice.
+    const foreignResponse = await request(`${appearancePath}?notice=${notice}&noticeOwner=00000000-0000-0000-0000-000000000000`, { session });
+    expect(foreignResponse.status).toBe(200);
+    expect(await foreignResponse.text()).not.toContain(message);
+
+    const unknownResponse = await request(`${appearancePath}?notice=unsupported&noticeOwner=${theOwnerId()}`, { session });
+    expect(unknownResponse.status).toBe(200);
+    expect(await unknownResponse.text()).not.toContain(message);
   });
 
   it("the dashboard also sends the security headers", async () => {

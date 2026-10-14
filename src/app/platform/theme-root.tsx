@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { ACCENT_OPTIONS, type AppearanceState } from "@/lib/appearance/preferences";
+import { ACCENT_OPTIONS, WIDTH_OPTIONS, type AppearanceState } from "@/lib/appearance/preferences";
 import { refreshAppearanceAction } from "./(console)/settings/appearance/actions";
 
 type ThemeContextValue = {
@@ -22,7 +22,13 @@ export function notifyAppearanceSaved() {
   channel.close();
 }
 
-/** The database result is also the first paint: no shared theme cookie or local cache. */
+/**
+ * Render authenticated database appearance, including content width, on first paint.
+ * Input: request-resolved appearance state and platform page children.
+ * Output: a themed provider and CSS variables consumed by the console layout.
+ * Use case: preserve appearance through reloads, navigation, and account switches.
+ * Created: 2026-10-14. Last modified: 2026-10-14.
+ */
 export function ThemeRoot({ initialState, children }: { initialState: AppearanceState; children: ReactNode }) {
   const [state, setState] = useState(initialState);
   const [previousInitial, setPreviousInitial] = useState(initialState);
@@ -90,11 +96,21 @@ export function ThemeRoot({ initialState, children }: { initialState: Appearance
 
   const value = useMemo(() => ({ state, acceptState, captureVersion }), [state, acceptState, captureVersion]);
   const accent = ACCENT_OPTIONS.find((option) => option.value === state.appearance.accent) ?? ACCENT_OPTIONS[0];
+  const width = WIDTH_OPTIONS.find((option) => option.value === state.appearance.width) ?? WIDTH_OPTIONS[0];
   return (
     <ThemeContext.Provider value={value}>
-      <div data-appearance-source={state.source} data-accent={state.appearance.accent}
-        style={{ "--accent-light": accent.light, "--accent-dark": accent.dark } as CSSProperties}
-        className={`${state.appearance.theme} platform-theme min-h-dvh bg-canvas text-fg`}>
+      {/* Keep width and accent presets centralized for the server-rendered layout. */}
+      <div
+        data-appearance-source={state.source}
+        data-accent={state.appearance.accent}
+        data-content-width={state.appearance.width}
+        style={{
+          "--accent-light": accent.light,
+          "--accent-dark": accent.dark,
+          "--platform-content-max-width": width.maxWidth,
+        } as CSSProperties}
+        className={`${state.appearance.theme} platform-theme min-h-dvh bg-canvas text-fg`}
+      >
         {children}
       </div>
     </ThemeContext.Provider>
