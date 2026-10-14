@@ -146,11 +146,27 @@ describe("global defaults and safe resets", () => {
     expect((await db.query("SELECT * FROM platform_owner_appearances WHERE owner_id = $1", [b.owner.id])).rows).toStrictEqual(otherBefore);
   });
 
-  it("concurrent global and personal applies keep a complete committed appearance and isolate peers", async () => {
+  it("serializes concurrent global and personal applies with an existing override", async () => {
     await apply(a, DARK);
     await apply(b, DARK);
     const results = await Promise.all([apply(a, LIGHT, "global"), apply(a, DARK)]);
-    expect(results.every((result) => result.ok)).toBe(true);
+    // Each transaction must return its own complete selection, even when another
+    // request for the same account is waiting to commit a conflicting selection.
+    expect(results[0]).toMatchObject({ ok: true, state: { appearance: LIGHT } });
+    expect(results[1]).toMatchObject({ ok: true, state: { appearance: DARK } });
+    const final = await getAppearanceState(a.owner.id);
+    expect(final.global).toStrictEqual(LIGHT);
+    expect([LIGHT, DARK]).toContainEqual(final.personal);
+    expect(final.appearance).toStrictEqual(final.personal);
+    expect(await getAppearanceState(b.owner.id)).toMatchObject({ personal: DARK, appearance: DARK });
+  });
+
+  it("serializes concurrent global apply and personal creation when no override exists", async () => {
+    await apply(b, DARK);
+    expect(await getAppearanceState(a.owner.id)).toMatchObject({ personal: null });
+    const results = await Promise.all([apply(a, LIGHT, "global"), apply(a, DARK)]);
+    expect(results[0]).toMatchObject({ ok: true, state: { appearance: LIGHT } });
+    expect(results[1]).toMatchObject({ ok: true, state: { appearance: DARK } });
     const final = await getAppearanceState(a.owner.id);
     expect(final.global).toStrictEqual(LIGHT);
     expect([LIGHT, DARK]).toContainEqual(final.personal);

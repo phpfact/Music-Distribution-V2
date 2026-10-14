@@ -44,8 +44,11 @@ An additive migration gives existing administrative Platform Owners the explicit
 administrator role. An operator can set it false for an owner who may customize
 only their own appearance. Global apply and reset check this persisted permission
 inside the write transaction, even for direct manipulated requests. Disabled,
-revoked, idle, or expired sessions cannot save. Owner and session row locks ensure
-revocation or owner disable is serialized with each preference write.
+revoked, idle, or expired sessions cannot save. Each write takes an exclusive
+initiating-owner row lock and a shared session row lock. Owner disable and session
+revocation wait for the write; same-owner personal/global operations also serialize
+before reading or changing override existence. This prevents a global apply from
+missing a concurrently created personal row and returning a conflicting setting.
 
 Server Actions retain Next.js origin/host protection and saves additionally reject
 missing, malformed, or cross-site origins. All request keys, themes, accents,
@@ -89,7 +92,8 @@ database for per-owner persistence, resets, concurrency, permission enforcement,
 expiry/revocation/disable, singleton and FK constraints, and transactional failures.
 Global-apply regressions cover an initiating owner with an old personal override,
 no new override for an inheriting owner, untouched peer overrides, concurrent
-personal/global applies, and rollback of both dependent preference writes on an
+personal/global applies with existing and absent initiating overrides (each result
+must reflect its selected complete appearance), and rollback of both writes on an
 audit or override-write failure. Width coverage includes all supported values,
 unsupported/missing request values, persisted per-owner isolation, resets, and
 default width for legacy inserts.

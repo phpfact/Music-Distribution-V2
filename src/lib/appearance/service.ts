@@ -71,8 +71,9 @@ export const getAppearanceState = cache(async (ownerId?: string): Promise<Appear
  * Output: Authoritative saved state or safe validation/authorization feedback.
  * Use case: Personal apply/reset, administrator global apply, and global reset.
  * Global apply updates only the initiating owner's existing personal override;
- * global reset leaves every personal override intact. Session row locks serialize
- * revocation and owner disable with the write, including after a page was rendered.
+ * global reset leaves every personal override intact. An exclusive owner row lock
+ * serializes that owner's writes before checking override existence; a shared
+ * session lock still protects against revocation after a page was rendered.
  * Author: Mr. Sachin Sharma
  * Created date: 2026-10-14
  * Last modified date: 2026-10-14
@@ -92,6 +93,10 @@ export async function saveAppearance(
   }
 
   return getControlDb().$transaction(async (tx): Promise<AppearanceActionResult> => {
+    // Every appearance write first locks its initiating owner exclusively. This
+    // serializes personal creates/resets with global apply, so updateMany cannot
+    // miss a concurrently created override and return an unexpected old setting.
+    // Keep only a shared session lock: revocation still waits until this commits.
     const owners = await tx.$queryRaw<{ canManageAppearance: boolean }[]>`
       SELECT o."can_manage_appearance" AS "canManageAppearance"
       FROM "platform_owners" o
@@ -101,7 +106,7 @@ export async function saveAppearance(
         AND o."status" = 'active'
         AND s."expires_at" > CURRENT_TIMESTAMP
         AND s."last_used_at" > CURRENT_TIMESTAMP - ${SESSION_IDLE_TIMEOUT_MS} * INTERVAL '1 millisecond'
-      FOR SHARE OF o, s`;
+      FOR UPDATE OF o FOR SHARE OF s`;
     const owner = owners[0];
     if (!owner) {
       return { ok: false, error: "Your session has expired. Sign in again to save appearance settings." };
