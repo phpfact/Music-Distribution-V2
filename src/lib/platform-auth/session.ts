@@ -102,9 +102,13 @@ export async function createSession(
 /**
  * The session a cookie value belongs to, or null. A session is valid while it
  * is within its absolute lifetime, has been used within the idle timeout, and
- * its owner is active. Never returns the password hash.
+ * its owner is active. Never returns the password hash. Background preference
+ * refreshes pass touch:false so polling does not extend the idle lifetime.
  */
-export async function validateSession(token: string): Promise<PlatformSession | null> {
+export async function validateSession(
+  token: string,
+  options: { touch?: boolean } = {},
+): Promise<PlatformSession | null> {
   // Anything that cannot be a token is rejected without asking the database.
   if (!TOKEN_PATTERN.test(token)) return null;
 
@@ -126,7 +130,7 @@ export async function validateSession(token: string): Promise<PlatformSession | 
   if (!session) return null;
 
   const touchBefore = new Date(now.getTime() - SESSION_TOUCH_INTERVAL_MS);
-  if (session.lastUsedAt < touchBefore) {
+  if (options.touch !== false && session.lastUsedAt < touchBefore) {
     try {
       await db.platformOwnerSession.updateMany({
         where: { id: session.id, lastUsedAt: { lt: touchBefore } },

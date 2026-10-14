@@ -16,7 +16,9 @@ export type AuditAction =
   | "tenant.admin_password_reset"
   | "tenant.database_password_rotated"
   | "tenant.database_password_updated"
-  | "tenant.domain_verified";
+  | "tenant.domain_verified"
+  | "appearance.applied"
+  | "appearance.reset";
 
 type AuditMetadataValue = string | number | boolean | null | string[];
 

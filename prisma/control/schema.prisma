@@ -268,6 +268,26 @@ model AuditEvent {
   @@map("audit_events")
 }
 
+/// Themes supported by the Platform Panel.
+enum AppearanceTheme {
+  light
+  dark
+  system
+
+  @@map("appearance_theme")
+}
+
+enum AppearanceAccent {
+  emerald
+  indigo
+  violet
+  blue
+  rose
+  amber
+
+  @@map("appearance_accent")
+}
+
 model PlatformOwner {
   id           String              @id @default(uuid(7)) @db.Uuid
   /// Lower-case (checked in the database).
@@ -278,7 +298,12 @@ model PlatformOwner {
   createdAt    DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt    DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  sessions PlatformOwnerSession[]
+  /// Existing platform owners are administrators. Set false to allow personal
+  /// appearance settings while denying changes to the platform default.
+  canManageAppearance Boolean @default(true) @map("can_manage_appearance")
+
+  sessions           PlatformOwnerSession[]
+  personalAppearance PlatformOwnerAppearance?
 
   @@map("platform_owners")
 }
@@ -297,4 +322,27 @@ model PlatformOwnerSession {
   @@index([ownerId])
   @@index([expiresAt])
   @@map("platform_owner_sessions")
+}
+
+/// One personal override per authenticated platform owner. Deleting this row
+/// resets only that owner to the global appearance (or application default).
+model PlatformOwnerAppearance {
+  ownerId   String           @id @map("owner_id") @db.Uuid
+  owner     PlatformOwner    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  theme     AppearanceTheme
+  accent    AppearanceAccent
+  updatedAt DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("platform_owner_appearances")
+}
+
+/// Exactly one platform default, enforced by a database CHECK on id.
+/// Personal overrides are never rewritten by a global apply or reset.
+model PlatformAppearance {
+  id        String           @id @default("platform") @db.VarChar(32)
+  theme     AppearanceTheme
+  accent    AppearanceAccent
+  updatedAt DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("platform_appearance")
 }

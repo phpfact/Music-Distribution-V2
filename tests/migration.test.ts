@@ -60,6 +60,7 @@ describe("[R1] the migration creates the platform owner schema", () => {
       username: { data_type: "character varying", is_nullable: "NO", length: 64 },
       password_hash: { data_type: "character varying", is_nullable: "NO", length: 255 },
       status: { data_type: "USER-DEFINED", is_nullable: "NO", length: null },
+      can_manage_appearance: { data_type: "boolean", is_nullable: "NO", length: null },
       created_at: { data_type: "timestamp with time zone", is_nullable: "NO", length: null },
       updated_at: { data_type: "timestamp with time zone", is_nullable: "NO", length: null },
     });
