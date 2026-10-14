@@ -37,7 +37,9 @@ services:
           memory: ${APP_MEMORY_LIMIT:-512m}
 
   # One-off job, not a running service: applies pending migrations to the
-  # control plane and to every tenant database, then exits.
+  # control plane and to every tenant database, then exits. `make prod-seed`
+  # runs the seed script in the same image; the platform owner credentials are
+  # passed to that one run only and are deliberately not listed here.
   migrate:
     profiles: ["migrate"]
     build:

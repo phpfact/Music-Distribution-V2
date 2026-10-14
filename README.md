@@ -91,11 +91,14 @@ dependencies into a volume. Later starts take a few seconds.
 ```
 src/                     Next.js application (App Router)
   app/api/health/        liveness (/api/health) and readiness (/api/health/ready)
+  app/platform/          platform owner area: login page, dashboard, sign-out
   lib/env.ts             runtime configuration and validation
   lib/postgres.ts        bounded connection pool (control-plane database)
   lib/db/control.ts      Prisma client for the control-plane database
   lib/db/tenant.ts       Prisma client for one tenant's database
   lib/redis.ts           shared Redis client
+  lib/platform-auth/     platform owner sign-in: user names, password hashing,
+                         sessions, rate limiting
   generated/prisma/      generated Prisma clients (git-ignored)
 prisma/
   control/               control-plane schema and its migrations
@@ -104,6 +107,9 @@ prisma/
   tenant.config.ts       Prisma CLI configuration for one tenant database
   connection.ts          builds the CLI's connection URL from POSTGRES_*
   migrate-tenants.ts     applies tenant migrations to every tenant database
+  seed.ts                creates the initial platform owner; rotates its password
+tests/                   automated tests (Vitest); support/ holds their helpers
+vitest.config.ts         test runner configuration
 docker/
   compose.yaml           base stack, shared by both environments
   compose.dev.yaml       development override (hot reload, host ports)
@@ -132,6 +138,7 @@ never copied into an image.
 | `REDIS_PASSWORD`                           | Redis password (**secret**)                     | applied on every start |
 | `REDIS_MAXMEMORY`, `REDIS_MAXMEMORY_POLICY`| memory cap and eviction policy                  | see "Redis" |
 | `PGADMIN_DEFAULT_EMAIL`, `PGADMIN_DEFAULT_PASSWORD` | initial pgAdmin login (**secret**)     | applied on first initialization only |
+| `PLATFORM_OWNER_INITIAL_USERNAME`, `PLATFORM_OWNER_INITIAL_PASSWORD` | first platform owner account (**secret**) | read only by `make db-seed` and `make db-rotate-owner-password`; see "Platform owner account" |
 | `APP_BIND_ADDRESS`, `APP_PORT`             | where the app is published on the host          | default `127.0.0.1:3000` |
 | `PGADMIN_PORT`, `REDISINSIGHT_PORT`        | GUI ports, always on 127.0.0.1                  | 5050, 5540 |
 | `POSTGRES_HOST_PORT`, `REDIS_HOST_PORT`    | **development only**, always on 127.0.0.1       | 5433, 6380 |
@@ -175,6 +182,10 @@ reinitialize anything:
 - **Redis**: the password is passed on every start, so changing
   `REDIS_PASSWORD` and running `make up` takes effect immediately. Update any
   connection saved in Redis Insight to match.
+- **Platform owner**: `make db-seed` creates the account once, in the
+  database. Editing `PLATFORM_OWNER_INITIAL_*` afterwards changes nothing; to
+  change the password run `make db-rotate-owner-password` (see "Platform owner
+  account").
 
 ## Commands
 
@@ -193,13 +204,17 @@ Run `make` for the full list. The most common ones:
 | `make db-sh` / `make psql`      | shell / `psql` in the PostgreSQL container (`db=<name>` optional) |
 | `make redis-cli`                | authenticated `redis-cli`                                       |
 | `make lint` / `make typecheck` / `make check` | ESLint, TypeScript, or both (dev stack must be running) |
+| `make test`                     | run the automated tests (dev stack must be running; see "Tests") |
 | `make db-migration name=...` / `make tenant-migration name=...` | create a migration from schema edits |
 | `make db-migrate` / `make db-status` | apply pending migrations / show what is applied            |
 | `make db-generate`              | regenerate the Prisma clients                                   |
+| `make db-seed`                  | create the initial platform owner if none exists                |
+| `make db-rotate-owner-password` | set the platform owner's password from `.env`; revokes its sessions |
 | `make backup` / `make restore FILE=...` | database backup and restore                             |
 | `make ports` / `make validate`  | check host ports / validate the Compose configuration           |
 | `make prod-build` / `prod-up` / `prod-deploy` / `prod-down` | production image and stack         |
 | `make prod-migrate`             | apply pending migrations in production                          |
+| `make prod-seed`                | create the initial platform owner in production if none exists  |
 | `make prod-ps` / `prod-logs` / `prod-health` / `prod-restart` / `prod-images` | production status   |
 | `make prod-tools-up` / `prod-tools-down` | start or remove the GUIs in production                 |
 | `make destroy-data`             | **permanently delete** this stack's volumes (typed confirmation) |
@@ -267,6 +282,38 @@ Startup order is enforced with health conditions: the app, pgAdmin and Redis
 Insight start only after the service they depend on reports healthy. Nothing
 depends on the two GUIs, so the app keeps running if one of them is down.
 
+### Tests
+
+```bash
+make test          # or, inside the container (make sh): npm test
+```
+
+The tests are written with Vitest and live in `tests/`. They run inside the
+app container, so the development stack must be running (`make up`). Nothing
+is mocked away: they use the real PostgreSQL, the real Redis and, for the
+sign-in flow, the running dev server. A run takes well under a minute.
+
+What a run does to your stack:
+
+- **A scratch database.** It creates `<POSTGRES_DB>_test`, applies the
+  control-plane migrations to it with `prisma migrate deploy`, runs the
+  migration, seed and library tests there, and drops it at the end. A copy left
+  behind by a run that was killed is dropped at the start of the next one. Only
+  a database whose name ends in `_test` is ever created or dropped.
+- **The dev server.** `tests/platform-http.test.ts` signs in and out over HTTP
+  at `http://127.0.0.1:3000` (set `E2E_BASE_URL` for another address). The dev
+  server reads the development database, so that suite adds one throwaway
+  platform owner named `e2e-<random>` there and deletes exactly that row, with
+  its sessions, when it finishes. No other row is read or changed. If the
+  server cannot be reached the suite fails; it is not skipped. If a run is
+  killed half way, the `e2e-...` owner stays behind and can be deleted by hand.
+- **Redis.** Sign-in attempts are counted in the same Redis the dev app uses.
+  The tests only use `vt-...` and `e2e-...` user names and client addresses
+  from the documentation ranges (`203.0.113.0/24`, `198.51.100.0/24`), and
+  delete exactly the counters they caused.
+
+`make test` is not part of `make check`.
+
 ## Database schema and migrations
 
 Prisma is the ORM and the migration tool. There are two schemas, because there
@@ -274,7 +321,7 @@ are two kinds of database:
 
 | Schema | Database | Contents |
 | ------ | -------- | -------- |
-| [prisma/control/schema.prisma](prisma/control/schema.prisma) | the control plane (`POSTGRES_DB`), one for the platform | `plans`, `tenants`, `tenant_domains`, `tenant_provisioning_runs`, `audit_events` |
+| [prisma/control/schema.prisma](prisma/control/schema.prisma) | the control plane (`POSTGRES_DB`), one for the platform | `plans`, `tenants`, `tenant_domains`, `tenant_provisioning_runs`, `audit_events`, `platform_owners`, `platform_owner_sessions` |
 | [prisma/tenant/schema.prisma](prisma/tenant/schema.prisma) | one per tenant | `users`, `roles`, `permissions`, `role_permissions`, `user_roles`, `customers`, `artists`, `labels`, `audio_releases`, `video_releases`, `release_assets` |
 
 Each has its own migration history and its own generated client. Tenant tables
@@ -345,6 +392,113 @@ they change schemas. Tenant logins must not own their tables or be able to
 alter them; granting them only the data privileges they need is part of
 provisioning.
 
+### Platform owner account
+
+Platform owners are the people who run the platform. They are stored in the
+control plane, never in a tenant database: `platform_owners` holds the user
+name (lower-case, 3 to 64 characters, enforced by a `CHECK` constraint), an
+Argon2id password hash and a status; `platform_owner_sessions` holds one row
+per signed-in session, with the SHA-256 of the session token rather than the
+token.
+
+The first account is created from `PLATFORM_OWNER_INITIAL_USERNAME` and
+`PLATFORM_OWNER_INITIAL_PASSWORD` in `.env` (`make init` generates the
+password; read it from `.env` to sign in):
+
+```bash
+make db-seed       # development
+make prod-seed     # production, after `make prod-migrate`
+```
+
+It only bootstraps an empty table. If any platform owner already exists it
+changes nothing and says so, whatever the two variables contain, so it is safe
+to repeat. The password must be 12 to 256 characters and not a `change-me...`
+placeholder; a configuration problem is reported by variable name and nothing
+is written.
+
+Changing the two variables later does not change the account. To change the
+password, set the new one in `.env` and run:
+
+```bash
+make db-rotate-owner-password             # development
+make db-rotate-owner-password MODE=prod   # production
+```
+
+This sets the password of the account named by
+`PLATFORM_OWNER_INITIAL_USERNAME` and deletes all of that account's sessions,
+so every browser signed in as it has to sign in again. It fails if no such
+account exists; it never creates one and never changes a user name or status.
+
+Both commands read the two variables from the env file (a value exported in
+your shell takes precedence) and pass them to that one process; Compose does
+not put them in the environment of the application container, and the
+production image contains no env file. The password is never logged. The two
+lines may be removed from `.env` once the account exists. In development that
+is the only way to keep them from the app process: the project folder,
+including `.env`, is bind-mounted into the dev container, and the Next.js dev
+server loads that file itself.
+
+### Platform owner sign-in
+
+| URL | What it is |
+| --- | ---------- |
+| `/platform/login` | the sign-in form |
+| `/platform/dashboard` | the dashboard; only for a signed-in platform owner |
+| `/platform` | redirects to the dashboard |
+
+Anyone who is not signed in is sent to the login page. After signing in the
+destination is always the dashboard: no return URL is read from the request.
+The check is made on the server, in the page, on every request.
+
+**Sessions** are kept on the server, in `platform_owner_sessions`. A session
+ends 8 hours after sign-in, or after 30 minutes without a request, whichever
+comes first. The browser holds a random token in the `md_platform_session`
+cookie: `HttpOnly`, `SameSite=Lax`, scoped to `/platform`, and `Secure` in
+production (so sign in over HTTPS, through the reverse proxy). Signing out
+deletes the session row, so a copied cookie stops working at once. So do
+`make db-rotate-owner-password` and disabling the account.
+
+**Rate limits** are counted in Redis, before the password is checked: 5
+attempts per user name and 20 per client address, each per 15 minutes. Past
+either limit every attempt is refused, the correct password included, until
+the window ends. A successful sign-in clears the count for that user name. If
+Redis is unreachable, sign-in is refused rather than left unlimited. To lift a
+block by hand:
+
+```bash
+make redis-cli
+> SCAN 0 MATCH platform-login:* COUNT 1000
+> DEL <key> [<key> ...]
+```
+
+**Client address**: the app assumes exactly one trusted reverse proxy in front
+of it in production, and takes the client address from the last entry of
+`X-Forwarded-For`. The proxy must append the address it saw to that header
+(nginx: `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;`). It
+must also pass the `Host` and `Origin` headers through unchanged: Next.js
+rejects a form submission whose `Origin` does not match the host, which is
+what protects sign-in and sign-out against cross-site requests. With more than
+one proxy, or none, the address is not reliable and the per-address limit with
+it.
+
+**Disabling an account and revoking sessions** is done in SQL (`make psql`).
+A disabled account cannot sign in and its sessions stop working immediately.
+Delete them as well, or they work again if the account is re-enabled before
+they expire:
+
+```sql
+UPDATE platform_owners SET status = 'disabled', updated_at = now() WHERE username = 'owner';
+DELETE FROM platform_owner_sessions
+  WHERE owner_id = (SELECT id FROM platform_owners WHERE username = 'owner');
+
+-- Sign every platform owner out:
+DELETE FROM platform_owner_sessions;
+```
+
+Sign-in attempts are logged as one line each (`[platform-auth] ...`). The
+password, the session token and, for a failed attempt, the submitted user name
+are never logged.
+
 ## pgAdmin
 
 Open http://127.0.0.1:5050 and sign in with `PGADMIN_DEFAULT_EMAIL` and
@@ -390,8 +544,9 @@ development only.
 
 ## Redis
 
-Redis is provided as infrastructure; the application only pings it for the
-readiness check.
+Redis is provided as infrastructure. The application pings it for the
+readiness check and keeps the platform owner sign-in attempt counters in it
+(see "Platform owner sign-in").
 
 **Persistence** is configured deliberately in
 [docker/redis/redis.conf](docker/redis/redis.conf), not assumed from the
@@ -523,9 +678,9 @@ What changes compared with development:
   with all capabilities dropped.
 - pgAdmin and Redis Insight do not start unless you ask for them.
 - The app is published on `127.0.0.1` only. CPU and memory limits apply.
-- Migrations run from a separate image (`<tag>-migrate`) that holds the Prisma
-  CLI and the migration files. It is a one-off job, never part of the running
-  stack.
+- Migrations and the seed run from a separate image (`<tag>-migrate`) that
+  holds the Prisma CLI, the migration files and the seed script. It is a
+  one-off job, never part of the running stack.
 
 ### Before the first deployment
 
@@ -542,18 +697,23 @@ What changes compared with development:
    PostgreSQL memory limit, `shared_buffers` in
    [docker/postgres/postgresql.conf](docker/postgres/postgresql.conf).
 5. Arrange off-host backups (see above) and test a restore.
+6. Check `PLATFORM_OWNER_INITIAL_USERNAME` and `PLATFORM_OWNER_INITIAL_PASSWORD`
+   in `.env`. On the first deployment, after `make prod-build` and
+   `make prod-migrate` (see "Deploy"), create the platform owner account with
+   `make prod-seed`. It is needed once; see "Platform owner account".
 
 ### Deploy
 
 ```bash
 make prod-build         # the app image and its migration image
 make prod-migrate       # apply pending database migrations
+make prod-seed          # first deployment only: create the platform owner
 make prod-up
 make prod-health
 ```
 
 `make prod-deploy` is `prod-build` followed by `prod-up`; it does not run
-migrations.
+migrations or the seed.
 
 Each build is tagged `mdnext-app:<git short SHA>`, or `local` when the project
 is not a git repository. `make prod-up` only starts an application image that

@@ -10,8 +10,9 @@ const globalForControlDb = globalThis as typeof globalThis & { __controlDb?: Con
 
 /**
  * Prisma client for the control-plane database (tenants, domains, plans,
- * provisioning runs, audit events). It runs on the bounded pool from
- * postgres.ts, so the ORM adds no connections of its own.
+ * provisioning runs, audit events, platform owners and their sessions). It
+ * runs on the bounded pool from postgres.ts, so the ORM adds no connections
+ * of its own.
  */
 export function getControlDb(): ControlDb {
   globalForControlDb.__controlDb ??= new PrismaClient({ adapter: new PrismaPg(getPool()) });

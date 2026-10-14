@@ -6,6 +6,10 @@ const nextConfig: NextConfig = {
   output: "standalone",
   poweredByHeader: false,
   reactStrictMode: true,
+  // Development only. The dev URL is http://127.0.0.1:3000 (see `make urls`);
+  // without this the dev server refuses that host its hot-reload channel, and
+  // pages opened there never become interactive.
+  allowedDevOrigins: ["127.0.0.1"],
 
   async headers() {
     return [

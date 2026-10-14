@@ -45,8 +45,9 @@ TOOLS_PORTS := PGADMIN_PORT:5050 REDISINSIGHT_PORT:5540
 SCRIPTS := docker/scripts
 
 .PHONY: help init up down stop restart build rebuild ps logs urls ports validate \
-        sh db-sh psql redis-cli typecheck lint check health backup restore \
+        sh db-sh psql redis-cli typecheck lint check test health backup restore \
         db-generate db-migration tenant-migration db-migrate db-status prod-migrate \
+        db-seed db-rotate-owner-password prod-seed \
         prod-build prod-up prod-deploy prod-down prod-restart prod-ps prod-logs \
         prod-health prod-images prod-tools-up prod-tools-down destroy-data \
         _require-env _require-dev
@@ -132,6 +133,9 @@ lint: _require-dev ## Run ESLint
 
 check: lint typecheck ## Run lint and typecheck
 
+test: _require-dev ## Run the automated tests (uses a scratch database and the running dev server)
+	@$(COMPOSE) exec -T app npm test
+
 ##@ Database schema (Prisma)
 
 db-generate: _require-dev ## Regenerate the Prisma clients after editing a schema
@@ -147,13 +151,19 @@ db-migrate: _require-env ## Apply pending migrations: control plane, then every 
 	@if [ "$(MODE)" = "prod" ]; then \
 		$(DOCKER) image inspect "$(APP_IMAGE):$(APP_TAG)-migrate" >/dev/null 2>&1 \
 			|| { echo "error: image '$(APP_IMAGE):$(APP_TAG)-migrate' not found locally. Build it (make prod-build) or pull it first."; exit 1; }; \
-		$(COMPOSE) --profile migrate run --rm --no-build migrate; \
+		$(COMPOSE) --profile migrate run --rm migrate; \
 	else \
 		$(COMPOSE) exec -T app npm run --silent db:deploy; \
 	fi
 
 db-status: _require-dev ## Show which control-plane migrations are applied
 	@$(COMPOSE) exec -T app npm run --silent db:control:status
+
+db-seed: _require-env ## Create the initial platform owner if none exists
+	@$(SCRIPTS)/seed.sh create
+
+db-rotate-owner-password: _require-env ## Set the platform owner's password from the env file; revokes its sessions
+	@$(SCRIPTS)/seed.sh rotate
 
 ##@ Health and data
 
@@ -174,6 +184,9 @@ prod-build: ## Build the production image and its migration image, tagged with A
 
 prod-migrate: ## Apply pending database migrations in production (run before prod-up)
 	@$(MAKE) --no-print-directory MODE=prod db-migrate
+
+prod-seed: ## Create the initial platform owner in production if none exists (after prod-migrate)
+	@$(MAKE) --no-print-directory MODE=prod db-seed
 
 prod-up: ## Start the production stack using the image tagged APP_TAG
 	@$(MAKE) --no-print-directory MODE=prod up

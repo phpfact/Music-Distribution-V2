@@ -56,14 +56,17 @@ EXPOSE 3000
 CMD ["node", "server.js"]
 
 # --- Migrations (one-off job) ------------------------------------------------
-# The Prisma CLI, the migration files and the tenant migration script. Needs
-# the full dependency set, which is why it is not part of the runner image.
+# The Prisma CLI, the migration files, the tenant migration script and the seed
+# script (make prod-seed). Needs the full dependency set, which is why it is not
+# part of the runner image.
 FROM base AS migrator
 ENV NODE_ENV=production \
     NPM_CONFIG_UPDATE_NOTIFIER=false
 COPY --from=deps /app/node_modules ./node_modules
 COPY package.json ./
 COPY prisma ./prisma
+# prisma/seed.ts imports the user name rules and the password hashing from here.
+COPY src/lib/platform-auth ./src/lib/platform-auth
 RUN npm run db:generate
 USER node
 CMD ["npm", "run", "db:deploy"]

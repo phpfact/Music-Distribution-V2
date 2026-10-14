@@ -11,15 +11,19 @@
     "start": "next start",
     "lint": "eslint . --max-warnings 0",
     "typecheck": "next typegen && tsc --noEmit",
+    "test": "vitest run",
     "db:generate": "prisma generate --config prisma/control.config.ts && prisma generate --config prisma/tenant.config.ts",
     "db:deploy": "npm run db:control:deploy && npm run db:tenants:deploy",
     "db:control:deploy": "prisma migrate deploy --config prisma/control.config.ts",
     "db:control:migrate": "prisma migrate dev --config prisma/control.config.ts",
     "db:control:status": "prisma migrate status --config prisma/control.config.ts",
     "db:tenants:deploy": "tsx prisma/migrate-tenants.ts",
-    "db:tenant:migrate": "prisma migrate dev --config prisma/tenant.config.ts"
+    "db:tenant:migrate": "prisma migrate dev --config prisma/tenant.config.ts",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:seed:rotate-password": "tsx prisma/seed.ts --rotate-password"
   },
   "dependencies": {
+    "@node-rs/argon2": "2.2.2",
     "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
     "next": "16.4.0",
@@ -40,6 +44,7 @@
     "prisma": "7.10.0",
     "tailwindcss": "4.3.3",
     "tsx": "4.23.15",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "vitest": "5.0.4"
   }
 }

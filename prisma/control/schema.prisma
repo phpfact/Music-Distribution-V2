@@ -1,9 +1,10 @@
-// Control-plane database: platform-wide tenant metadata.
+// Control-plane database: platform-wide tenant metadata and platform owners.
 //
 // One database for the whole platform (POSTGRES_DB). It records which tenants
-// exist and where their data lives. Tenant business records (users, customers,
-// releases) never belong here; they live in each tenant's own database, whose
-// schema is prisma/tenant/schema.prisma.
+// exist and where their data lives, and who may sign in as a platform owner.
+// Tenant business records (users, customers, releases) never belong here; they
+// live in each tenant's own database, whose schema is
+// prisma/tenant/schema.prisma.
 //
 // The connection is configured in prisma/control.config.ts, not in this file.
 
@@ -69,6 +70,13 @@ enum AuditActorType {
   tenant_user
 
   @@map("audit_actor_type")
+}
+
+enum PlatformOwnerStatus {
+  active
+  disabled
+
+  @@map("platform_owner_status")
 }
 
 model Plan {
@@ -174,4 +182,35 @@ model AuditEvent {
   @@index([tenantId, occurredAt])
   @@index([action, occurredAt])
   @@map("audit_events")
+}
+
+model PlatformOwner {
+  id           String              @id @default(uuid(7)) @db.Uuid
+  /// Lower-case (checked in the database).
+  username     String              @unique @db.VarChar(64)
+  /// Argon2id hash in PHC format. Never the password itself.
+  passwordHash String              @map("password_hash") @db.VarChar(255)
+  status       PlatformOwnerStatus @default(active)
+  createdAt    DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  sessions PlatformOwnerSession[]
+
+  @@map("platform_owners")
+}
+
+model PlatformOwnerSession {
+  id         String        @id @default(uuid(7)) @db.Uuid
+  ownerId    String        @map("owner_id") @db.Uuid
+  owner      PlatformOwner @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  /// SHA-256 (hex) of the session token. The token itself is only ever in the
+  /// owner's cookie.
+  tokenHash  String        @unique @map("token_hash") @db.Char(64)
+  createdAt  DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastUsedAt DateTime      @default(now()) @map("last_used_at") @db.Timestamptz(3)
+  expiresAt  DateTime      @map("expires_at") @db.Timestamptz(3)
+
+  @@index([ownerId])
+  @@index([expiresAt])
+  @@map("platform_owner_sessions")
 }
