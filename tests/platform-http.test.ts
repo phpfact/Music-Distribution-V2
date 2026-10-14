@@ -33,9 +33,11 @@ const ORIGIN = new URL(BASE_URL).origin;
 const LOGIN_PATH = "/platform/login";
 const DASHBOARD_PATH = "/platform/dashboard";
 const SESSION_COOKIE = "md_platform_session";
+const THEME_COOKIE = "md_platform_theme";
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
-const WELCOME = "Welcome to the Platform Owner Dashboard";
+// The stable start of the signed-in dashboard's greeting (the username follows).
+const WELCOME = "Welcome back,";
 const INVALID_CREDENTIALS = "Invalid username or password.";
 const RATE_LIMITED = "Too many sign-in attempts. Try again later.";
 
@@ -54,6 +56,8 @@ type RequestOptions = {
   body?: FormData;
   /** The value of the session cookie to send. */
   session?: string;
+  /** The value of the theme preference cookie to send. */
+  theme?: string;
   ip?: string;
   origin?: string;
   redirect?: "manual" | "follow";
@@ -61,7 +65,10 @@ type RequestOptions = {
 
 async function request(path: string, options: RequestOptions = {}): Promise<Response> {
   const headers = new Headers();
-  if (options.session !== undefined) headers.set("Cookie", `${SESSION_COOKIE}=${options.session}`);
+  const cookies: string[] = [];
+  if (options.session !== undefined) cookies.push(`${SESSION_COOKIE}=${options.session}`);
+  if (options.theme !== undefined) cookies.push(`${THEME_COOKIE}=${options.theme}`);
+  if (cookies.length > 0) headers.set("Cookie", cookies.join("; "));
   // No proxy sits in front of the dev server, so the app takes this as the client address.
   if (options.ip) headers.set("X-Forwarded-For", options.ip);
   if (options.origin) headers.set("Origin", options.origin);
@@ -174,7 +181,7 @@ async function signInForSession(session?: string): Promise<string> {
 }
 
 /** Posts the dashboard's sign-out form, as taken from a signed-in rendering of the page. */
-async function signOut(formSession: string, sendSession: string | undefined): Promise<Response> {
+async function signOut(formSession: string, sendSession: string | undefined, theme?: string): Promise<Response> {
   const page = await request(DASHBOARD_PATH, { session: formSession });
   expect(page.status).toBe(200);
   const hidden = hiddenInputs(formWith(await page.text(), "$ACTION_ID_"));
@@ -182,7 +189,7 @@ async function signOut(formSession: string, sendSession: string | undefined): Pr
 
   const body = new FormData();
   for (const [name, value] of hidden) body.append(name, value);
-  return request(DASHBOARD_PATH, { method: "POST", body, session: sendSession, origin: ORIGIN });
+  return request(DASHBOARD_PATH, { method: "POST", body, session: sendSession, theme, origin: ORIGIN });
 }
 
 /** The path a redirect points to; fails if it leaves the application's origin. */
@@ -519,6 +526,16 @@ describe("signing out", () => {
     expect((await request(DASHBOARD_PATH, { session: second })).status).toBe(200);
   });
 
+  it("keeps the theme preference: no Set-Cookie for it on sign-out", async () => {
+    const session = await signInForSession();
+
+    const response = await signOut(session, session, "dark");
+
+    expect(response.status).toBe(303);
+    expect(responseCookie(response, SESSION_COOKIE)).toBeDefined();
+    expect(responseCookie(response, THEME_COOKIE)).toBeUndefined();
+  });
+
   it("[R11] without a cookie still redirects to the login page", async () => {
     const session = await signInForSession();
 
@@ -669,6 +686,14 @@ describe("the pages", () => {
     const password = inputNamed(form, "password");
     expect(password && attribute(password, "type")).toBe("password");
     expect(password && attribute(password, "autoComplete")).toBe("current-password");
+  });
+
+  it("the theme is light without a preference and dark with one, rendered on the server", async () => {
+    const light = await (await request(LOGIN_PATH)).text();
+    expect(light).not.toMatch(/class="dark[ "]/);
+
+    const dark = await (await request(LOGIN_PATH, { theme: "dark" })).text();
+    expect(dark).toMatch(/class="dark[ "]/);
   });
 
   it("the dashboard also sends the security headers", async () => {
