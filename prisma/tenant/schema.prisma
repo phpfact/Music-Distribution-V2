@@ -42,16 +42,22 @@ enum CustomerStatus {
 }
 
 model User {
-  id         String     @id @default(uuid(7)) @db.Uuid
+  id           String     @id @default(uuid(7)) @db.Uuid
   /// Lower-case (checked in the database, see the init migration).
-  email      String     @unique @db.VarChar(320)
-  name       String     @db.VarChar(200)
-  status     UserStatus @default(active)
+  email        String     @unique @db.VarChar(320)
+  /// Login name, in the same format as platform owner user names (checked in
+  /// the database). The tenant admin has one; customer users may not.
+  username     String?    @unique @db.VarChar(64)
+  /// Argon2id hash in PHC format. Never the password itself. Empty for users
+  /// who cannot sign in with a password.
+  passwordHash String?    @map("password_hash") @db.VarChar(255)
+  name         String     @db.VarChar(200)
+  status       UserStatus @default(active)
   /// Set for a customer's users; empty for the tenant's own staff.
-  customerId String?    @map("customer_id") @db.Uuid
-  customer   Customer?  @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt  DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  customerId   String?    @map("customer_id") @db.Uuid
+  customer     Customer?  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   roles UserRole[]
 

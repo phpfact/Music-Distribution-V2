@@ -17,9 +17,9 @@ describe("the platform navigation", () => {
     }
   });
 
-  it("offers only the dashboard so far; every other module is planned", () => {
+  it("offers the dashboard and tenant management so far; every other module is planned", () => {
     const available = PLATFORM_NAV_ITEMS.filter((item) => item.status === "available");
-    expect(available.map((item) => item.id)).toEqual(["dashboard"]);
+    expect(available.map((item) => item.id)).toEqual(["dashboard", "tenants"]);
   });
 });
 

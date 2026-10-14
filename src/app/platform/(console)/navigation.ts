@@ -55,7 +55,7 @@ export const PLATFORM_NAV_SECTIONS: readonly PlatformNavSection[] = [
         href: "/platform/tenants",
         icon: "building-2",
         description: "Manage the tenants registered on the platform.",
-        status: "planned",
+        status: "available",
       },
       {
         id: "roles",

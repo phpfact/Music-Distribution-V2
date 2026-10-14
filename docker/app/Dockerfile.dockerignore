@@ -13,8 +13,9 @@ out
 next-env.d.ts
 src/generated
 
-# Local data, VCS and tooling.
+# Local data, VCS and tooling. storage/ holds files uploaded in development.
 backups
+storage
 .git
 .gitignore
 .DS_Store

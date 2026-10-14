@@ -11,12 +11,16 @@
  *
  * Tenants still being provisioned are skipped: provisioning applies the
  * migrations to a new database itself, before the tenant is activated.
+ *
+ * Each tenant is migrated on its own `database_port` (a tenant's database may
+ * sit on another PostgreSQL server port of POSTGRES_HOST than the control plane).
  */
 import { execFile } from "node:child_process";
 import { readdirSync } from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { Client } from "pg";
 import { PrismaClient } from "../src/generated/prisma/control/client";
 import { migrationDatabaseUrl } from "./connection";
 
@@ -37,10 +41,28 @@ function latestMigration(): string {
   return latest;
 }
 
-async function deploy(database: string): Promise<void> {
+async function deploy(database: string, port: number): Promise<void> {
   await run(PRISMA_CLI, ["migrate", "deploy", "--config", TENANT_CONFIG], {
-    env: { ...process.env, TENANT_DATABASE: database },
+    env: { ...process.env, TENANT_DATABASE: database, TENANT_DATABASE_PORT: String(port) },
   });
+}
+
+/**
+ * The database names on the server at `port`. `prisma migrate deploy` creates
+ * a database that does not exist; a missing tenant database is a fault to
+ * report, not something to recreate empty.
+ */
+async function databasesOn(port: number): Promise<Set<string>> {
+  const url = migrationDatabaseUrl("postgres", port);
+  const client = new Client({ connectionString: url, connectionTimeoutMillis: 5_000 });
+  client.on("error", () => undefined);
+  try {
+    await client.connect();
+    const result = await client.query<{ datname: string }>("SELECT datname FROM pg_database");
+    return new Set(result.rows.map((row) => row.datname));
+  } finally {
+    await client.end().catch(() => undefined);
+  }
 }
 
 /** The CLI's own explanation. It names the host and database, never the password. */
@@ -67,27 +89,26 @@ async function main(): Promise<number> {
   try {
     const tenants = await control.tenant.findMany({
       where: { status: { in: ["active", "suspended"] }, databaseName: { not: null } },
-      select: { id: true, slug: true, databaseName: true },
+      select: { id: true, slug: true, databaseName: true, databasePort: true },
       orderBy: { createdAt: "asc" },
     });
     console.log(`[migrate-tenants] ${tenants.length} tenant database(s), target ${version}`);
 
-    // `prisma migrate deploy` creates a database that does not exist. A missing
-    // tenant database is a fault to report, not something to recreate empty.
-    const existing = new Set(
-      (await control.$queryRaw<{ datname: string }[]>`SELECT datname FROM pg_database`).map(
-        (row) => row.datname,
-      ),
-    );
+    // Looked up once per server port, when the first tenant on it comes up.
+    const databasesByPort = new Map<number, Promise<Set<string>>>();
+    const defaultPort = Number(process.env.POSTGRES_PORT?.trim() || "5432");
 
     let failed = 0;
     for (const tenant of tenants) {
       if (!tenant.databaseName) continue;
+      const port = tenant.databasePort ?? defaultPort;
       try {
+        if (!databasesByPort.has(port)) databasesByPort.set(port, databasesOn(port));
+        const existing = await (databasesByPort.get(port) as Promise<Set<string>>);
         if (!existing.has(tenant.databaseName)) {
-          throw new Error(`database "${tenant.databaseName}" does not exist`);
+          throw new Error(`database "${tenant.databaseName}" does not exist on port ${port}`);
         }
-        await deploy(tenant.databaseName);
+        await deploy(tenant.databaseName, port);
         await control.tenant.update({
           where: { id: tenant.id },
           data: { schemaStatus: "current", schemaVersion: version, schemaMigratedAt: new Date() },

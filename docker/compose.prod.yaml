@@ -25,6 +25,10 @@ services:
       - /tmp
       # Next.js writes its image/data cache here; uid/gid 1000 is the "node" user.
       - /app/.next/cache:uid=1000,gid=1000,mode=0755
+    volumes:
+      # Uploaded files (STORAGE_ROOT), e.g. tenant profile images. The image
+      # creates /app/storage owned by "node", so a new volume inherits that.
+      - app_storage:/app/storage
     cap_drop:
       - ALL
     security_opt:
@@ -116,3 +120,6 @@ services:
       resources:
         limits:
           memory: 512m
+
+volumes:
+  app_storage:

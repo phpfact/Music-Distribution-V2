@@ -145,7 +145,14 @@ export function ConsoleShell({ username, initialCollapsed, children }: ConsoleSh
           onOpenDrawer={openDrawer}
           menuToggleRef={menuToggleRef}
         />
-        <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto focus:outline-none">
+        {/* `relative`: the containing block for absolutely positioned content
+            (sr-only text), which would otherwise be placed against the viewport
+            and stretch the page outside this scroll container. */}
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="relative flex-1 overflow-y-auto focus:outline-none"
+        >
           <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</div>
         </main>
       </div>

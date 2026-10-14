@@ -44,6 +44,25 @@ enum TenantDomainType {
   @@map("tenant_domain_type")
 }
 
+/// `active` once the DNS check has passed. A pending custom domain never
+/// blocks the tenant: its SaaS subdomain keeps working.
+enum TenantDomainStatus {
+  pending
+  active
+  failed
+
+  @@map("tenant_domain_status")
+}
+
+/// `provisioned`: the platform created the tenant's database and login.
+/// `existing`: the owner attached a database that already existed.
+enum TenantDatabaseMode {
+  provisioned
+  existing
+
+  @@map("tenant_database_mode")
+}
+
 enum ProvisioningRunStatus {
   running
   succeeded
@@ -60,6 +79,8 @@ enum ProvisioningStep {
   create_initial_admin
   register_domain
   verify
+  /// Existing-database mode only, instead of create_database_user and create_database.
+  check_database
 
   @@map("provisioning_step")
 }
@@ -94,23 +115,39 @@ model Plan {
 }
 
 model Tenant {
-  id           String       @id @default(uuid(7)) @db.Uuid
-  name         String       @db.VarChar(200)
+  id              String       @id @default(uuid(7)) @db.Uuid
+  name            String       @db.VarChar(200)
   /// Lower-case DNS label (checked in the database, see the init migration).
-  slug         String       @unique @db.VarChar(63)
-  status       TenantStatus @default(pending)
+  slug            String       @unique @db.VarChar(63)
+  status          TenantStatus @default(pending)
   /// Why the tenant is in this status. Safe to display; detail goes to the logs.
-  statusReason String?      @map("status_reason") @db.VarChar(500)
-  contactEmail String       @map("contact_email") @db.VarChar(320)
+  statusReason    String?      @map("status_reason") @db.VarChar(500)
+  /// The tenant admin's e-mail. Lower-case (checked in the database).
+  contactEmail    String       @unique @map("contact_email") @db.VarChar(320)
+  /// The tenant admin's login name, in the same format as platform owner user
+  /// names (checked in the database).
+  adminUsername   String       @unique @map("admin_username") @db.VarChar(64)
+  /// Digits with an optional leading "+" (checked in the database).
+  phone           String?      @db.VarChar(16)
+  /// Storage key of the profile image (see src/lib/storage). Never a URL.
+  profileImageKey String?      @map("profile_image_key") @db.VarChar(255)
 
   planId String @map("plan_id") @db.Uuid
   plan   Plan   @relation(fields: [planId], references: [id], onDelete: Restrict)
 
+  databaseMode      TenantDatabaseMode @default(provisioned) @map("database_mode")
   // Allocated during provisioning, so empty until then.
-  databaseName      String? @unique @map("database_name") @db.VarChar(63)
-  databaseUser      String? @unique @map("database_user") @db.VarChar(63)
-  /// A reference to the credential in secret storage. Never the secret itself.
-  databaseSecretRef String? @map("database_secret_ref") @db.VarChar(255)
+  databaseName      String?            @unique @map("database_name") @db.VarChar(63)
+  databaseUser      String?            @unique @map("database_user") @db.VarChar(63)
+  /// Port of the PostgreSQL server at POSTGRES_HOST that holds the database
+  /// (1-65535, checked in the database).
+  databasePort      Int?               @map("database_port")
+  /// The id of the credential's row in `secrets`. Never the secret itself.
+  databaseSecretRef String?            @map("database_secret_ref") @db.VarChar(255)
+
+  /// Argon2id hash (PHC format) of the tenant admin's password, kept only until
+  /// provisioning has written it into the tenant database; NULL afterwards.
+  pendingAdminPasswordHash String? @map("pending_admin_password_hash") @db.VarChar(255)
 
   schemaStatus     TenantSchemaStatus @default(pending) @map("schema_status")
   /// Name of the newest tenant migration applied to this tenant's database.
@@ -122,8 +159,9 @@ model Tenant {
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  domains          TenantDomain[]
-  provisioningRuns TenantProvisioningRun[]
+  domains           TenantDomain[]
+  provisioningRuns  TenantProvisioningRun[]
+  provisioningSteps TenantProvisioningStep[]
 
   @@index([status])
   @@index([planId])
@@ -131,15 +169,24 @@ model Tenant {
 }
 
 model TenantDomain {
-  id        String           @id @default(uuid(7)) @db.Uuid
-  tenantId  String           @map("tenant_id") @db.Uuid
-  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Restrict)
-  type      TenantDomainType @default(subdomain)
+  id                String             @id @default(uuid(7)) @db.Uuid
+  tenantId          String             @map("tenant_id") @db.Uuid
+  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  type              TenantDomainType   @default(subdomain)
   /// Lower-case (checked in the database). For `subdomain` the label under the
   /// SaaS base domain ("acme"); for `custom` the full host name.
-  hostname  String           @db.VarChar(253)
-  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  hostname          String             @db.VarChar(253)
+  status            TenantDomainStatus @default(pending)
+  /// Expected in the custom domain's DNS TXT record. Empty for subdomains.
+  verificationToken String?            @map("verification_token") @db.VarChar(64)
+  verifiedAt        DateTime?          @map("verified_at") @db.Timestamptz(3)
+  lastCheckedAt     DateTime?          @map("last_checked_at") @db.Timestamptz(3)
+  /// Why the last DNS check failed. Safe to display.
+  lastCheckError    String?            @map("last_check_error") @db.VarChar(300)
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
 
+  // A tenant has one subdomain row and at most one custom row: partial unique
+  // indexes in the tenant_management migration.
   @@unique([type, hostname])
   @@index([tenantId])
   @@map("tenant_domains")
@@ -160,8 +207,45 @@ model TenantProvisioningRun {
   startedAt    DateTime              @default(now()) @map("started_at") @db.Timestamptz(3)
   finishedAt   DateTime?             @map("finished_at") @db.Timestamptz(3)
 
+  completedSteps TenantProvisioningStep[]
+
   @@unique([tenantId, attempt])
   @@map("tenant_provisioning_runs")
+}
+
+/// A provisioning step that has succeeded for a tenant. A retry skips these.
+model TenantProvisioningStep {
+  tenantId    String                @map("tenant_id") @db.Uuid
+  tenant      Tenant                @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  step        ProvisioningStep
+  completedAt DateTime              @default(now()) @map("completed_at") @db.Timestamptz(3)
+  /// The run in which the step succeeded.
+  runId       String                @map("run_id") @db.Uuid
+  run         TenantProvisioningRun @relation(fields: [runId], references: [id], onDelete: Restrict)
+
+  @@id([tenantId, step])
+  @@index([runId])
+  @@map("tenant_provisioning_steps")
+}
+
+/// A secret encrypted with AES-256-GCM under a key derived from
+/// TENANT_SECRETS_KEY (see src/lib/secrets). The id and purpose are bound to the
+/// ciphertext as additional authenticated data, so a row cannot be moved or
+/// reused for another purpose. The plaintext is never stored.
+model Secret {
+  /// Generated by the application before encrypting: it is part of the AAD.
+  id         String   @id @db.Uuid
+  /// What the secret is for, e.g. "tenant_database_password".
+  purpose    String   @db.VarChar(50)
+  /// Which key derivation encrypted it, so the key can be rotated later.
+  keyVersion Int      @map("key_version") @db.SmallInt
+  nonce      Bytes
+  ciphertext Bytes
+  authTag    Bytes    @map("auth_tag")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("secrets")
 }
 
 model AuditEvent {

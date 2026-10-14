@@ -1,4 +1,5 @@
 import "server-only";
+import path from "node:path";
 
 /**
  * Server-side runtime configuration.
@@ -24,10 +25,26 @@ export type Env = {
     port: number;
     password: string;
   };
+  /**
+   * Master secret for the tenant secret store (src/lib/secrets). The AES key is
+   * derived from it. Losing it makes every stored tenant database password
+   * unrecoverable. Never logged.
+   */
+  tenantSecretsKey: string;
+  /** Lower-case host name; each tenant gets `<label>.<platformBaseDomain>`. */
+  platformBaseDomain: string;
+  /** Absolute directory that holds uploaded files (src/lib/storage). */
+  storageRoot: string;
 };
 
 const PLACEHOLDER_PREFIX = "change-me";
 const MIN_PRODUCTION_SECRET_LENGTH = 16;
+
+const DEFAULT_PLATFORM_BASE_DOMAIN = "localhost";
+// A basic host name check only; the full domain rules live in
+// src/lib/domains/rules.ts, which is client-safe and kept separate from env.
+const HOSTNAME_LABEL_PATTERN = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
+const HOSTNAME_MAX_LENGTH = 253;
 
 export class EnvValidationError extends Error {
   constructor(readonly problems: string[]) {
@@ -42,7 +59,8 @@ export class EnvValidationError extends Error {
   }
 }
 
-function parseEnv(source: NodeJS.ProcessEnv): Env {
+/** Exported for tests; the application uses getEnv(). */
+export function parseEnv(source: NodeJS.ProcessEnv): Env {
   // Problems name the variable only. Values are never included, so this is safe to log.
   const problems: string[] = [];
   const isProduction = source.NODE_ENV === "production";
@@ -81,6 +99,35 @@ function parseEnv(source: NodeJS.ProcessEnv): Env {
     return value;
   };
 
+  const hostname = (name: string, fallback: string): string => {
+    const value = source[name]?.trim() || fallback;
+    const labels = value.split(".");
+    const valid =
+      value.length <= HOSTNAME_MAX_LENGTH &&
+      labels.every((label) => HOSTNAME_LABEL_PATTERN.test(label)) &&
+      // A numeric last label would make it an IP address, which cannot have subdomains.
+      !/^[0-9]+$/.test(labels.at(-1) ?? "");
+    if (!valid) {
+      problems.push(
+        `${name} must be a lower-case host name such as "example.com" (no scheme, port, path or trailing dot)`,
+      );
+      return fallback;
+    }
+    return value;
+  };
+
+  // Relative paths are rejected rather than resolved: the directory would then
+  // depend on the working directory the server happens to be started from.
+  const absolutePath = (name: string, fallback: string): string => {
+    const value = source[name]?.trim();
+    if (!value) return fallback;
+    if (!path.isAbsolute(value)) {
+      problems.push(`${name} must be an absolute path`);
+      return fallback;
+    }
+    return path.resolve(value);
+  };
+
   const nodeEnv = source.NODE_ENV;
   if (nodeEnv !== "development" && nodeEnv !== "production" && nodeEnv !== "test") {
     problems.push("NODE_ENV must be one of: development, production, test");
@@ -103,6 +150,10 @@ function parseEnv(source: NodeJS.ProcessEnv): Env {
       port: integer("REDIS_PORT", 6379, 1, 65535),
       password: secret("REDIS_PASSWORD"),
     },
+    tenantSecretsKey: secret("TENANT_SECRETS_KEY"),
+    platformBaseDomain: hostname("PLATFORM_BASE_DOMAIN", DEFAULT_PLATFORM_BASE_DOMAIN),
+    // The default is /app/storage in the containers (the working directory is /app).
+    storageRoot: absolutePath("STORAGE_ROOT", path.resolve("storage")),
   };
 
   if (problems.length > 0) {

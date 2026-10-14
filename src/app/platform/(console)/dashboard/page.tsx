@@ -1,24 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requirePlatformOwner } from "@/lib/platform-auth/dal";
-import { Icon, type IconName } from "../_components/icons";
+import { Icon } from "../_components/icons";
+import { StatCard } from "../_components/stat-card";
 import { FOCUS_RING } from "../_components/styles";
 import { getNavItem, PLATFORM_NAV_ITEMS } from "../navigation";
+import { loadTenantSummary, SUMMARY_UNAVAILABLE } from "../tenants/summary";
 
 export const metadata: Metadata = { title: getNavItem("dashboard").label };
-
-type SummaryCard = {
-  label: string;
-  icon: IconName;
-};
-
-// Static copy: none of these figures is collected yet, so none is shown.
-const SUMMARY_CARDS: readonly SummaryCard[] = [
-  { label: "Total Tenants", icon: "building-2" },
-  { label: "Active Tenants", icon: "activity" },
-  { label: "Subscription Plans", icon: "credit-card" },
-  { label: "Open Support Requests", icon: "life-buoy" },
-];
 
 // Every module except the page this list is on.
 const QUICK_ACCESS = PLATFORM_NAV_ITEMS.filter((item) => item.id !== "dashboard");
@@ -26,6 +15,8 @@ const QUICK_ACCESS = PLATFORM_NAV_ITEMS.filter((item) => item.id !== "dashboard"
 export default async function PlatformDashboardPage() {
   // Checked on the server on every request; nothing below renders without it.
   const { owner } = await requirePlatformOwner();
+  // The tenant figures are real; null when they could not be read.
+  const summary = await loadTenantSummary();
 
   return (
     <div className="flex flex-col gap-8">
@@ -42,23 +33,21 @@ export default async function PlatformDashboardPage() {
           Platform summary
         </h2>
         <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {SUMMARY_CARDS.map((card) => (
-            <div key={card.label} className="rounded-xl border border-line bg-surface p-5">
-              <div className="flex items-start justify-between gap-3">
-                <dt className="text-sm font-medium text-fg-muted">{card.label}</dt>
-                <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-fg-muted">
-                  <Icon name={card.icon} className="size-5" />
-                </span>
-              </div>
-              <dd className="mt-3">
-                <span aria-hidden="true" className="text-3xl font-semibold">
-                  —
-                </span>
-                <span className="sr-only">No data</span>
-                <p className="mt-1 text-xs text-fg-subtle">Not configured yet</p>
-              </dd>
-            </div>
-          ))}
+          <StatCard
+            label="Total Tenants"
+            icon="building-2"
+            value={summary?.total ?? null}
+            note={summary ? undefined : SUMMARY_UNAVAILABLE}
+          />
+          <StatCard
+            label="Active Tenants"
+            icon="activity"
+            value={summary?.active ?? null}
+            note={summary ? undefined : SUMMARY_UNAVAILABLE}
+          />
+          {/* Not collected yet, so no figure is shown. */}
+          <StatCard label="Subscription Plans" icon="credit-card" value={null} note="Not configured yet" />
+          <StatCard label="Open Support Requests" icon="life-buoy" value={null} note="Not configured yet" />
         </dl>
       </section>
 

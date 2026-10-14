@@ -51,6 +51,12 @@ ENV NODE_ENV=production \
 COPY --from=builder --chown=node:node /app/public ./public
 COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static
+# Read at runtime by the in-app tenant migration applier (tenant provisioning);
+# the standalone output does not trace plain SQL files.
+COPY --from=builder --chown=node:node /app/prisma/tenant/migrations ./prisma/tenant/migrations
+# Mount point of the app_storage volume (STORAGE_ROOT). Created here, owned by
+# "node", so a new named volume inherits that ownership.
+RUN mkdir -p /app/storage && chown node:node /app/storage
 USER node
 EXPOSE 3000
 CMD ["node", "server.js"]

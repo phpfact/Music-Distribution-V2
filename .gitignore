@@ -18,6 +18,9 @@ src/generated/
 # Database backups contain all application data
 backups/
 
+# Uploaded files (STORAGE_ROOT in development: the project folder is bind-mounted)
+/storage/
+
 # Logs and OS/editor files
 *.log
 .DS_Store

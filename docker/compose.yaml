@@ -43,6 +43,10 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: "6379"
       REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in your env file (run 'make init')}
+      # Encrypts the tenant database passwords stored in the control plane.
+      TENANT_SECRETS_KEY: ${TENANT_SECRETS_KEY:?Set TENANT_SECRETS_KEY in your env file (run 'make init', or see .env.example)}
+      PLATFORM_BASE_DOMAIN: ${PLATFORM_BASE_DOMAIN:-localhost}
+      # STORAGE_ROOT is left at its default, /app/storage (a named volume in production).
     depends_on:
       postgres:
         condition: service_healthy

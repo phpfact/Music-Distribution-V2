@@ -8,13 +8,16 @@ export type TenantDb = PrismaClient;
 /**
  * Where one tenant's data lives and the login to reach it. Build this on the
  * server from the tenant resolved for the request (control plane plus secret
- * storage). Never fill any of it from a request body, query string or header.
+ * storage, see src/lib/tenants/database-target.ts). Never fill any of it from
+ * a request body, query string or header.
  */
 export type TenantDatabase = {
   tenantId: string;
   database: string;
   user: string;
   password: string;
+  /** Port on POSTGRES_HOST; a tenant's database may sit on another port than the control plane. */
+  port: number;
 };
 
 type Entry = { db: TenantDb; target: TenantDatabase; lastUsedAt: number };
@@ -32,7 +35,7 @@ function createTenantDb(target: TenantDatabase): TenantDb {
   const adapter = new PrismaPg(
     {
       host: postgres.host,
-      port: postgres.port,
+      port: target.port,
       database: target.database,
       user: target.user,
       password: target.password,
@@ -59,7 +62,12 @@ function close(entry: Entry): void {
 }
 
 function sameTarget(a: TenantDatabase, b: TenantDatabase): boolean {
-  return a.database === b.database && a.user === b.user && a.password === b.password;
+  return (
+    a.database === b.database &&
+    a.user === b.user &&
+    a.password === b.password &&
+    a.port === b.port
+  );
 }
 
 /**
@@ -99,4 +107,19 @@ export function getTenantDb(target: TenantDatabase): TenantDb {
   }
 
   return entry.db;
+}
+
+/**
+ * Closes the cached client of one tenant, if there is one. Called when the
+ * tenant is suspended or its database password changes, so no pooled
+ * connection keeps using the old state. Unlike LRU eviction this does not wait
+ * for the client to be idle: a request still holding it fails, which is the
+ * point after a suspension.
+ */
+export function evictTenantDb(tenantId: string): void {
+  const entries = globalForTenantDb.__tenantDbs;
+  const entry = entries?.get(tenantId);
+  if (!entries || !entry) return;
+  entries.delete(tenantId);
+  close(entry);
 }

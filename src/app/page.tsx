@@ -1,9 +1,44 @@
+import { headers } from "next/headers";
+import { notFound } from "next/navigation";
+import { resolveHost, type TenantAccess, tenantAccessOf } from "@/lib/domains/resolve";
+
 const healthLinks = [
   { href: "/api/health", label: "Liveness", detail: "/api/health" },
   { href: "/api/health/ready", label: "Readiness", detail: "/api/health/ready" },
 ];
 
-export default function HomePage() {
+/**
+ * `/` answers on every host. On the platform's own host it is the platform's
+ * start page; on a tenant host it goes through the tenant gate
+ * (src/lib/domains/resolve.ts) and shows only the tenant's status, since the
+ * tenant portal does not exist yet. Reading the Host header makes the page
+ * dynamic.
+ */
+export default async function HomePage() {
+  const resolution = await resolveHost((await headers()).get("host"));
+  if (resolution === "platform") return <PlatformHome />;
+  const gate = tenantAccessOf(resolution);
+  if (gate.access === "unknown") notFound();
+  return <TenantStatus gate={gate} />;
+}
+
+function TenantStatus({ gate }: { gate: Exclude<TenantAccess, { access: "unknown" }> }) {
+  const message =
+    gate.access === "allowed"
+      ? `${gate.tenant.name} — the tenant portal isn't available yet.`
+      : gate.access === "suspended"
+        ? "This workspace is suspended."
+        : "This workspace is being set up.";
+  return (
+    <main className="mx-auto flex min-h-dvh max-w-xl flex-col justify-center px-6 py-16">
+      <div className="rounded-xl border border-zinc-200 px-6 py-8 dark:border-zinc-800">
+        <h1 className="text-2xl font-semibold tracking-tight">{message}</h1>
+      </div>
+    </main>
+  );
+}
+
+function PlatformHome() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-xl flex-col justify-center gap-8 px-6 py-16">
       <div className="flex flex-col gap-3">

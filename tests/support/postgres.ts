@@ -81,6 +81,62 @@ export async function clearPlatformTables(db: Client): Promise<void> {
   await db.query("DELETE FROM platform_owners");
 }
 
+/**
+ * Empties the tenant tables (and `secrets`, which only tenants use so far).
+ * Only ever in a scratch database, checked as in clearPlatformTables. Audit
+ * events are kept: nothing references them.
+ */
+export async function clearTenantTables(db: Client): Promise<void> {
+  const current = await db.query<{ name: string }>("SELECT current_database() AS name");
+  const name = current.rows[0]?.name ?? "";
+  if (!name.endsWith(TEST_DATABASE_SUFFIX)) {
+    throw new Error("refusing to clear tables outside the test database");
+  }
+  await db.query("DELETE FROM tenant_provisioning_steps");
+  await db.query("DELETE FROM tenant_provisioning_runs");
+  await db.query("DELETE FROM tenant_domains");
+  await db.query("DELETE FROM tenants");
+  await db.query("DELETE FROM secrets");
+}
+
+/**
+ * Inserts a tenant on the default plan with only the required columns set,
+ * plus any of the optional ones given. Returns its id.
+ */
+export async function insertTenant(
+  db: Client,
+  tenant: {
+    slug: string;
+    contactEmail?: string;
+    adminUsername?: string;
+    phone?: string | null;
+    databaseName?: string | null;
+    databaseUser?: string | null;
+    databasePort?: number | null;
+    databaseSecretRef?: string | null;
+  },
+): Promise<string> {
+  const id = randomUUID();
+  await db.query(
+    `INSERT INTO tenants (id, name, slug, contact_email, admin_username, plan_id, phone,
+                          database_name, database_user, database_port, database_secret_ref)
+     VALUES ($1, $2, $3, $4, $5, (SELECT id FROM plans WHERE is_default LIMIT 1), $6, $7, $8, $9, $10)`,
+    [
+      id,
+      `Test ${tenant.slug}`,
+      tenant.slug,
+      tenant.contactEmail ?? `${tenant.slug}@example.com`,
+      tenant.adminUsername ?? tenant.slug,
+      tenant.phone ?? null,
+      tenant.databaseName ?? null,
+      tenant.databaseUser ?? null,
+      tenant.databasePort ?? null,
+      tenant.databaseSecretRef ?? null,
+    ],
+  );
+  return id;
+}
+
 export type OwnerRow = {
   id: string;
   username: string;
