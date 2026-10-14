@@ -25,7 +25,7 @@ const session: PlatformSession = {
   sessionId: "019ba263-00e2-7b41-9fc9-2a4b47b5e201",
   owner: { id: "019ba263-00e2-7b41-9fc9-2a4b47b5e202", username: "owner" },
 };
-const appearance = { theme: "dark", accent: "violet" } as const;
+const appearance = { theme: "dark", accent: "violet", width: "focused" } as const;
 const input = { operation: "apply", scope: "personal", appearance } as const;
 const state: AppearanceState = {
   ownerId: session.owner.id, personal: appearance, global: null, appearance,
@@ -58,8 +58,10 @@ describe("appearance Server Actions", () => {
   it("rejects a client-submitted target identity and unsupported values before a save", async () => {
     for (const malformed of [
       { ...input, ownerId: "someone-else" },
-      { ...input, appearance: { theme: "unsupported", accent: "violet" } },
-      { ...input, appearance: { theme: "dark", accent: "invalid" } },
+      { ...input, appearance: { theme: "unsupported", accent: "violet", width: "default" } },
+      { ...input, appearance: { theme: "dark", accent: "invalid", width: "default" } },
+      { ...input, appearance: { theme: "dark", accent: "violet", width: "unsupported" } },
+      { ...input, appearance: { theme: "dark", accent: "violet" } },
       { ...input, scope: "everyone" }, { ...input, operation: "delete" }, null,
     ]) expect(await updateAppearanceAction(malformed as typeof input)).toMatchObject({ ok: false });
     expect(mocks.save).not.toHaveBeenCalled();

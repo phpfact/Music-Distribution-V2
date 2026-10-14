@@ -288,6 +288,15 @@ enum AppearanceAccent {
   @@map("appearance_accent")
 }
 
+/// Responsive caps for the available Platform Panel content area.
+enum AppearanceWidth {
+  default
+  full
+  focused
+
+  @@map("appearance_width")
+}
+
 model PlatformOwner {
   id           String              @id @default(uuid(7)) @db.Uuid
   /// Lower-case (checked in the database).
@@ -331,17 +340,22 @@ model PlatformOwnerAppearance {
   owner     PlatformOwner    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   theme     AppearanceTheme
   accent    AppearanceAccent
+  /// Default preserves the existing content cap on all persisted appearances.
+  width     AppearanceWidth  @default(default)
   updatedAt DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@map("platform_owner_appearances")
 }
 
 /// Exactly one platform default, enforced by a database CHECK on id.
-/// Personal overrides are never rewritten by a global apply or reset.
+/// Global apply also updates only the initiating owner's existing override.
+/// Global reset leaves every personal override unchanged.
 model PlatformAppearance {
   id        String           @id @default("platform") @db.VarChar(32)
   theme     AppearanceTheme
   accent    AppearanceAccent
+  /// Default preserves the existing content cap on all persisted appearances.
+  width     AppearanceWidth  @default(default)
   updatedAt DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@map("platform_appearance")

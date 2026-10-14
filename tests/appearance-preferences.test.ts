@@ -2,19 +2,22 @@ import { describe, expect, it } from "vitest";
 import {
   ACCENT_OPTIONS,
   DEFAULT_APPEARANCE,
+  WIDTH_OPTIONS,
   parseAppearance,
   parseAppearanceUpdate,
   resolveAppearance,
 } from "@/lib/appearance/preferences";
 
-const personal = { theme: "dark", accent: "violet" } as const;
-const global = { theme: "system", accent: "blue" } as const;
+const personal = { theme: "dark", accent: "violet", width: "focused" } as const;
+const global = { theme: "system", accent: "blue", width: "full" } as const;
 
 describe("supported appearance values", () => {
-  it("supports only the complete, exact theme/accent combinations", () => {
+  it("supports only the complete, exact theme/accent/width combinations", () => {
     for (const theme of ["light", "dark", "system"] as const) {
       for (const { value: accent } of ACCENT_OPTIONS) {
-        expect(parseAppearance({ theme, accent })).toStrictEqual({ theme, accent });
+        for (const { value: width } of WIDTH_OPTIONS) {
+          expect(parseAppearance({ theme, accent, width })).toStrictEqual({ theme, accent, width });
+        }
       }
     }
   });
@@ -23,7 +26,13 @@ describe("supported appearance values", () => {
     null, undefined, [], "dark", {}, { theme: "dark" },
     { theme: "DARK", accent: "emerald" }, { theme: " dark", accent: "emerald" },
     { theme: "light", accent: "#047857" }, { theme: "light", accent: "Emerald" },
-    { theme: "dark", accent: "violet", ownerId: "someone-else" },
+    { theme: "dark", accent: "violet", width: "focused", ownerId: "someone-else" },
+    { theme: "dark", accent: "violet" },
+    { theme: "dark", accent: "violet", width: "wide" },
+    { theme: "dark", accent: "violet", width: "FULL" },
+    { theme: "dark", accent: "violet", width: " full" },
+    { theme: "dark", accent: "violet", width: "100vw" },
+    { theme: "dark", accent: "violet", width: null },
   ])("rejects unsupported or malformed appearance %j", (value) => {
     expect(parseAppearance(value)).toBeNull();
   });
@@ -42,6 +51,17 @@ describe("supported appearance values", () => {
       .toStrictEqual({ operation: "apply", scope: "personal", appearance: personal });
     expect(parseAppearanceUpdate({ operation: "reset", scope: "global" }))
       .toStrictEqual({ operation: "reset", scope: "global" });
+  });
+});
+
+describe("responsive width presets", () => {
+  it("defines the existing cap, available full width, and narrower focused cap centrally", () => {
+    expect(WIDTH_OPTIONS.map(({ value, label, maxWidth }) => ({ value, label, maxWidth }))).toStrictEqual([
+      { value: "default", label: "Default Width", maxWidth: "96rem" },
+      { value: "full", label: "Full Width", maxWidth: "none" },
+      { value: "focused", label: "Focused Width", maxWidth: "72rem" },
+    ]);
+    expect(DEFAULT_APPEARANCE.width).toBe("default");
   });
 });
 

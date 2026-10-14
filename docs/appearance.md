@@ -5,7 +5,11 @@ Personal overrides belong to `platform_owner_appearances.owner_id`, the authenti
 Platform Owner identity, with a unique primary key and cascading owner foreign key.
 The separate `platform_appearance` table permits only the singleton `platform` row.
 The supported themes are Light, Dark, and System; accents are Emerald, Indigo,
-Violet, Blue, Rose, and Amber. The designated application default is Light/Emerald.
+Violet, Blue, Rose, and Amber. Width presets are Default Width (96rem console
+cap), Full Width (all available content space), and Focused Width (72rem cap).
+The designated application default is Light/Emerald/Default Width. Mobile gutters
+and navigation remain responsive regardless of the chosen width. Shared presets
+live in `WIDTH_OPTIONS`; width is validated and persisted with theme and accent.
 No shared browser preference is an authoritative source for an owner's appearance.
 
 ## Resolution and reset semantics
@@ -16,9 +20,12 @@ No shared browser preference is an authoritative source for an owner's appearanc
 
 Apply to Me writes only the signed-in owner's override. Default Theme to Me removes
 only that override and inherits the global setting, or the application default if
-none exists. Apply to All changes the singleton platform default for owners without
-an override. Default Theme to All writes Light/Emerald as the global default.
-Neither global operation deletes or updates any personal record. Login uses the
+none exists. Apply to All atomically changes the singleton platform default and
+updates only the initiating owner's existing personal override to the same complete
+selection. An initiating owner without an override continues to inherit the global
+default; no new personal row is created. Other owners' personal records are never
+changed. Default Theme to All writes Light/Emerald/Default Width as the global
+default and preserves every personal override, including the initiating owner's. Login uses the
 global/application default because no authenticated personal identity exists yet.
 System follows the operating system only while the resolved theme is System.
 Appearance scope covers the Platform Panel; tenant business users live in separate
@@ -47,8 +54,10 @@ same transaction as each successful write. Errors use safe feedback and do not
 report success on a failed write. No private record of another owner is returned.
 
 Writes use atomic upserts/deletes: distinct users cannot overwrite one another;
-repeated applies are idempotent in effect. Concurrent writes to the same scope
-resolve in commit order. Reads are memoized only during one React render/request, so layout and settings
+repeated applies are idempotent in effect. Global apply, the initiating owner's
+existing override update, and the audit event share one transaction: any failure
+rolls back all three. Concurrent personal and global writes retain complete
+appearances; overlapping rows resolve in commit order. Reads are memoized only during one React render/request, so layout and settings
 share one lookup while refresh actions observe other tabs/devices without a
 persistent cache. Transaction save responses read authoritative state uncached.
 Background refresh validates the cookie-backed session without touching its last
@@ -68,13 +77,22 @@ default; authenticated preference errors remain visible through the error bounda
 
 `npm run db:generate` regenerates the control client after schema changes. Deploy
 `prisma/control/migrations/20261014140000_platform_appearance` with the existing
-control migration workflow before serving the updated application. The migration
-adds tables, enums, and one permission column without modifying existing records.
+control migration workflow before serving the updated application. The initial
+migration adds tables, enums, and one permission column without discarding records.
+Then deploy `20261014180000_appearance_content_width`: it adds the `appearance_width`
+enum and required width columns with a `default` value, preserving the theme/accent
+of every existing personal/global record.
 
 `tests/appearance-preferences.test.ts` covers strict value parsing and precedence.
 `tests/appearance-service.test.ts` uses the project's migrated scratch PostgreSQL
 database for per-owner persistence, resets, concurrency, permission enforcement,
 expiry/revocation/disable, singleton and FK constraints, and transactional failures.
+Global-apply regressions cover an initiating owner with an old personal override,
+no new override for an inheriting owner, untouched peer overrides, concurrent
+personal/global applies, and rollback of both dependent preference writes on an
+audit or override-write failure. Width coverage includes all supported values,
+unsupported/missing request values, persisted per-owner isolation, resets, and
+default width for legacy inserts.
 `tests/appearance-actions.test.ts` verifies direct-action authorization, hostile
 requests, origin protection, failure feedback, and refresh behavior.
 `tests/platform-http.test.ts` verifies that the obsolete cookie cannot affect the

@@ -18,16 +18,25 @@ const GLOBAL_ID = "platform";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 type AppearanceDb = Pick<ControlDb, "platformOwner" | "platformAppearance">;
 
+/**
+ * Description: Read the current account and global appearance without private peers.
+ * Input: A control database/transaction and an optional server-authenticated owner ID.
+ * Output: The complete resolved appearance, its source, and global permission.
+ * Use case: First render, background refresh, and uncached post-transaction results.
+ * Author: Mr. Sachin Sharma
+ * Created date: 2026-10-14
+ * Last modified date: 2026-10-14
+ */
 async function readState(db: AppearanceDb, ownerId?: string): Promise<AppearanceState> {
   const [globalRow, owner] = await Promise.all([
-    db.platformAppearance.findUnique({ where: { id: GLOBAL_ID }, select: { theme: true, accent: true } }),
+    db.platformAppearance.findUnique({ where: { id: GLOBAL_ID }, select: { theme: true, accent: true, width: true } }),
     ownerId && UUID_PATTERN.test(ownerId)
       ? db.platformOwner.findUnique({
           where: { id: ownerId, status: "active" },
           select: {
             id: true,
             canManageAppearance: true,
-            personalAppearance: { select: { theme: true, accent: true } },
+            personalAppearance: { select: { theme: true, accent: true, width: true } },
           },
         })
       : null,
@@ -43,15 +52,30 @@ async function readState(db: AppearanceDb, ownerId?: string): Promise<Appearance
   };
 }
 
-/** Callers supply only a server-authenticated identity; no ID is accepted by actions. */
+/**
+ * Description: Deduplicate authoritative appearance reads within one render/request.
+ * Input: An optional identity already verified by the server session mechanism.
+ * Output: The requesting owner's complete resolved appearance state.
+ * Use case: Platform layout and Appearance page share one request-local read.
+ * Author: Mr. Sachin Sharma
+ * Created date: 2026-10-14
+ * Last modified date: 2026-10-14
+ */
 export const getAppearanceState = cache(async (ownerId?: string): Promise<AppearanceState> => {
   return readState(getControlDb(), ownerId);
 });
 
 /**
- * Authorize again inside the write transaction, including session expiry and
- * permission changes after the render. Row locks serialize owner disable and
- * session revocation with the write. Global operations never touch overrides.
+ * Description: Persist one authorized appearance change atomically with its audit.
+ * Input: The validated server session, an untrusted action input, and optional IP.
+ * Output: Authoritative saved state or safe validation/authorization feedback.
+ * Use case: Personal apply/reset, administrator global apply, and global reset.
+ * Global apply updates only the initiating owner's existing personal override;
+ * global reset leaves every personal override intact. Session row locks serialize
+ * revocation and owner disable with the write, including after a page was rendered.
+ * Author: Mr. Sachin Sharma
+ * Created date: 2026-10-14
+ * Last modified date: 2026-10-14
  */
 export async function saveAppearance(
   session: PlatformSession,
@@ -99,11 +123,23 @@ export async function saveAppearance(
     } else {
       // A reset writes the designated default explicitly; all overrides remain.
       const appearance = update.operation === "reset" ? DEFAULT_APPEARANCE : update.appearance;
+      // The singleton primary key and upsert prevent duplicate global records.
       await tx.platformAppearance.upsert({
         where: { id: GLOBAL_ID },
         create: { id: GLOBAL_ID, ...appearance },
         update: appearance,
       });
+
+      if (update.operation === "apply") {
+        // A personal override takes precedence over the global default. Updating
+        // only this existing row makes Apply to All immediately affect its actor
+        // while preserving every other owner's appearance and avoiding a new
+        // personal override for an actor who already inherits the global setting.
+        await tx.platformOwnerAppearance.updateMany({
+          where: { ownerId: session.owner.id },
+          data: update.appearance,
+        });
+      }
     }
 
     await recordAudit(tx, {
