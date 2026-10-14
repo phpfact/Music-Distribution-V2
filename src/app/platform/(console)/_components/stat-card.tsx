@@ -18,27 +18,27 @@ const NUMBER_FORMAT = new Intl.NumberFormat("en-US");
  */
 export function StatCard({ label, icon, value, note }: StatCardProps) {
   return (
-    <div className="rounded-xl border border-line bg-surface p-5">
+    <div className="relative min-w-0 overflow-hidden rounded-2xl border border-line bg-surface p-5 shadow-xs sm:p-6">
       <div className="flex items-start justify-between gap-3">
-        <dt className="text-sm font-medium text-fg-muted">{label}</dt>
-        <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-surface-2 text-fg-muted">
-          <Icon name={icon} className="size-5" />
+        <dt className="pt-1 text-sm font-medium text-fg-muted">{label}</dt>
+        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
+          <Icon name={icon} className="size-[18px]" />
         </span>
       </div>
-      <dd className="mt-3">
+      <dd className="mt-4">
         {value === null ? (
           <>
-            <span aria-hidden="true" className="text-3xl font-semibold">
+            <span aria-hidden="true" className="text-4xl font-semibold tracking-tight">
               —
             </span>
             <span className="sr-only">No data</span>
           </>
         ) : (
-          <span className="text-3xl font-semibold tabular-nums">
+          <span className="text-4xl font-semibold tracking-tight tabular-nums">
             {NUMBER_FORMAT.format(value)}
           </span>
         )}
-        {note ? <p className="mt-1 text-xs text-fg-subtle">{note}</p> : null}
+        {note ? <p className="mt-2 text-xs leading-5 text-fg-subtle">{note}</p> : null}
       </dd>
     </div>
   );

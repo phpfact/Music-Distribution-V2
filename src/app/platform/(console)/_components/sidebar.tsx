@@ -27,8 +27,8 @@ export function Sidebar({ collapsed, onNavigate, headerAction, footer }: Sidebar
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div
-        className={`flex h-16 shrink-0 items-center gap-2 border-b border-line ${
-          collapsed ? "justify-center px-2" : "px-4"
+        className={`flex h-20 shrink-0 items-center gap-2 ${
+          collapsed ? "justify-center px-2" : "px-5"
         }`}
       >
         <Link
@@ -37,13 +37,13 @@ export function Sidebar({ collapsed, onNavigate, headerAction, footer }: Sidebar
           aria-label={collapsed ? "Music Distribution — Platform Administration" : undefined}
           className={`flex min-w-0 items-center gap-3 rounded-lg ${FOCUS_RING}`}
         >
-          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent text-accent-fg">
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent text-accent-fg shadow-sm">
             <Icon name="disc-3" className="size-5" />
           </span>
           {collapsed ? null : (
             <span className="flex min-w-0 flex-col">
-              <span className="truncate text-sm font-semibold text-fg">Music Distribution</span>
-              <span className="truncate text-xs text-fg-subtle">Platform Administration</span>
+              <span className="truncate text-sm font-semibold tracking-tight text-fg">Music Distribution</span>
+              <span className="mt-0.5 truncate text-[11px] text-fg-subtle">Platform Administration</span>
             </span>
           )}
         </Link>
@@ -53,7 +53,7 @@ export function Sidebar({ collapsed, onNavigate, headerAction, footer }: Sidebar
       {/* Collapsed, the tooltips stick out to the right: nothing may clip them. */}
       <nav
         aria-label="Platform"
-        className={`min-h-0 flex-1 px-3 py-4 ${collapsed ? "overflow-visible" : "overflow-y-auto"}`}
+        className={`min-h-0 flex-1 px-3 py-5 ${collapsed ? "overflow-visible" : "overflow-y-auto"}`}
       >
         <div className={`flex flex-col ${collapsed ? "gap-3" : "gap-6"}`}>
           {PLATFORM_NAV_SECTIONS.map((section, index) => {
@@ -68,7 +68,7 @@ export function Sidebar({ collapsed, onNavigate, headerAction, footer }: Sidebar
                   className={
                     collapsed
                       ? "sr-only"
-                      : "mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-fg-subtle"
+                      : "mb-2.5 px-3 text-[10px] font-semibold uppercase tracking-[0.13em] text-fg-subtle"
                   }
                 >
                   {section.label}
@@ -111,18 +111,18 @@ function SidebarLink({ item, active, collapsed, onNavigate }: SidebarLinkProps) 
       href={item.href}
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
-      className={`group relative flex h-10 items-center gap-3 rounded-lg text-sm transition-colors motion-reduce:transition-none hover:bg-surface-2 hover:text-fg ${FOCUS_RING} ${
+      className={`group relative flex h-11 items-center gap-3 rounded-xl text-[13px] transition-colors motion-reduce:transition-none hover:bg-surface-2 hover:text-fg ${FOCUS_RING} ${
         collapsed ? "justify-center px-0" : "px-3"
-      } ${active ? "bg-accent-soft font-semibold text-fg" : "font-medium text-fg-muted"}`}
+      } ${active ? "bg-accent-soft font-semibold text-accent" : "font-medium text-fg-muted"}`}
     >
       {/* The active item is marked by more than its colour. */}
       {active ? (
         <span
           aria-hidden="true"
-          className="absolute top-1/2 left-0 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-accent"
+          className="absolute top-1/2 left-0 h-5 w-[3px] -translate-y-1/2 rounded-full bg-accent"
         />
       ) : null}
-      <Icon name={item.icon} className={`size-5 shrink-0 ${active ? "text-accent" : ""}`} />
+      <Icon name={item.icon} className={`size-[18px] shrink-0 ${active ? "text-accent" : "text-fg-subtle"}`} />
       <span className={collapsed ? "sr-only" : "min-w-0 flex-1 truncate"}>
         {item.label}
         {planned ? <span className="sr-only"> (coming soon)</span> : null}
@@ -130,7 +130,7 @@ function SidebarLink({ item, active, collapsed, onNavigate }: SidebarLinkProps) 
       {planned && !collapsed ? (
         <span
           aria-hidden="true"
-          className="ml-auto shrink-0 rounded-full border border-line px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-fg-subtle uppercase"
+          className="ml-auto shrink-0 rounded-md bg-surface-2 px-1.5 py-0.5 text-[9px] font-medium text-fg-subtle"
         >
           Soon
         </span>

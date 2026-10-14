@@ -88,20 +88,26 @@ export function ConsoleShell({ username, initialCollapsed, children }: ConsoleSh
       <aside
         id={asideId}
         className={`hidden shrink-0 flex-col border-r border-line bg-surface transition-[width] duration-200 motion-reduce:transition-none lg:flex ${
-          collapsed ? "w-[4.5rem]" : "w-64 overflow-hidden"
+          collapsed ? "w-[4.5rem]" : "w-[17rem] overflow-hidden"
         }`}
       >
         <Sidebar
           collapsed={collapsed}
           footer={
             <div className="shrink-0 border-t border-line p-3">
+              {collapsed ? null : (
+                <div className="mx-1 mb-3 flex items-center gap-2.5 rounded-xl border border-line bg-canvas px-3 py-3">
+                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent"><Icon name="shield-check" className="size-4" /></span>
+                  <div className="min-w-0"><p className="truncate text-xs font-semibold">Owner workspace</p><p className="mt-0.5 text-[11px] text-fg-subtle">Platform administration</p></div>
+                </div>
+              )}
               <button
                 type="button"
                 onClick={toggleCollapsed}
                 aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
                 aria-expanded={!collapsed}
                 aria-controls={asideId}
-                className={`flex h-10 w-full items-center gap-3 rounded-lg text-sm font-medium text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg ${FOCUS_RING} ${
+                className={`flex h-10 w-full items-center gap-3 rounded-xl text-xs font-medium text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg ${FOCUS_RING} ${
                   collapsed ? "justify-center px-0" : "px-3"
                 }`}
               >
@@ -153,7 +159,7 @@ export function ConsoleShell({ username, initialCollapsed, children }: ConsoleSh
           tabIndex={-1}
           className="relative flex-1 overflow-y-auto focus:outline-none"
         >
-          <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</div>
+          <div className="mx-auto w-full max-w-[96rem] px-4 py-7 sm:px-6 lg:px-9 lg:py-9">{children}</div>
         </main>
       </div>
     </div>

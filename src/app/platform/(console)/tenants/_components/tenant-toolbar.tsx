@@ -5,7 +5,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { TENANT_SEARCH_MAX_LENGTH, type TenantListStatusFilter } from "@/lib/tenants/rules";
 import { Icon } from "../../_components/icons";
 import { Spinner } from "../../_components/spinner";
-import { inputClass, selectClass } from "../../_components/ui";
+import { buttonClass, inputClass, selectClass } from "../../_components/ui";
 import { tenantFilterHref } from "../list-query";
 import { useListTransition } from "./list-transition";
 
@@ -63,11 +63,17 @@ export function TenantToolbar({ q, status }: TenantToolbarProps) {
     );
   }
 
+  function clearFilters() {
+    if (timer.current) clearTimeout(timer.current);
+    setSearch("");
+    navigate(tenantFilterHref(searchParams, { q: "", status: "all" }));
+  }
+
   return (
     <div
       role="search"
       aria-label="Tenants"
-      className="flex flex-col gap-3 sm:flex-row sm:items-center"
+      className="flex flex-col gap-3 border-t border-line px-5 py-4 sm:flex-row sm:items-center sm:px-6"
     >
       <div className="relative min-w-0 flex-1">
         <label htmlFor={searchId} className="sr-only">
@@ -87,8 +93,9 @@ export function TenantToolbar({ q, status }: TenantToolbarProps) {
           autoComplete="off"
           spellCheck={false}
           aria-controls="tenant-results"
-          className={inputClass(false, "pl-9")}
+          className={inputClass(false, "bg-canvas/50 pl-9 pr-9")}
         />
+        <span className="pointer-events-none absolute top-1/2 right-3 grid size-4 -translate-y-1/2 place-items-center text-accent">{pending ? <Spinner /> : null}</span>
       </div>
       <div className="flex items-center gap-3">
         <label htmlFor={statusId} className="sr-only">
@@ -99,7 +106,7 @@ export function TenantToolbar({ q, status }: TenantToolbarProps) {
           value={status}
           onChange={(event) => onStatusChange(event.target.value)}
           aria-controls="tenant-results"
-          className={selectClass(false, "sm:w-48")}
+          className={selectClass(false, "bg-canvas/50 sm:w-44")}
         >
           <option value="all">All statuses</option>
           <optgroup label="Account status">
@@ -111,10 +118,11 @@ export function TenantToolbar({ q, status }: TenantToolbarProps) {
             <option value="failed">Failed</option>
           </optgroup>
         </select>
-        {/* Fixed width, so the controls do not shift when it appears. */}
-        <span className="grid size-5 shrink-0 place-items-center text-fg-muted">
-          {pending ? <Spinner /> : null}
-        </span>
+        {search !== "" || status !== "all" ? (
+          <button type="button" onClick={clearFilters} className={buttonClass("ghost", "sm")}>
+            <Icon name="x" className="size-3.5" />Clear
+          </button>
+        ) : null}
         <span aria-live="polite" className="sr-only">
           {pending ? "Loading results" : ""}
         </span>

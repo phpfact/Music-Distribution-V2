@@ -9,6 +9,7 @@ import { Icon } from "../_components/icons";
 import { Notice } from "../_components/notice";
 import { StatCard } from "../_components/stat-card";
 import { StatusBadge } from "../_components/status-badge";
+import { FOCUS_RING } from "../_components/styles";
 import { buttonClass } from "../_components/ui";
 import { getNavItem } from "../navigation";
 import { DatabaseStateBadge, DomainStatusBadge, ExistingDatabaseTag } from "./_components/badges";
@@ -40,14 +41,14 @@ export default async function PlatformTenantsPage({ searchParams }: PageProps) {
     <TenantFlashProvider>
       <div className="flex flex-col gap-8">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div className="flex min-w-0 flex-col gap-2">
-            <p className="text-xs font-medium tracking-wider text-accent uppercase">
+          <div className="flex min-w-0 flex-col gap-3">
+            <p className="text-[11px] font-semibold tracking-[0.15em] text-accent uppercase">
               Platform management
             </p>
-            <h1 className="text-2xl font-semibold tracking-tight break-words sm:text-3xl">
+            <h1 className="text-3xl font-semibold tracking-tight break-words sm:text-4xl">
               Tenant Management
             </h1>
-            <p className="text-fg-muted">
+            <p className="max-w-xl text-sm leading-6 text-fg-muted">
               Create, review and manage the tenants registered on the platform.
             </p>
           </div>
@@ -70,19 +71,19 @@ export default async function PlatformTenantsPage({ searchParams }: PageProps) {
               label="Total tenants"
               icon="building-2"
               value={summary?.total ?? null}
-              note={summary ? undefined : SUMMARY_UNAVAILABLE}
+              note={summary ? "Registered on your platform" : SUMMARY_UNAVAILABLE}
             />
             <StatCard
               label="Active"
               icon="activity"
               value={summary?.active ?? null}
-              note={summary ? undefined : SUMMARY_UNAVAILABLE}
+              note={summary ? "Accounts marked active" : SUMMARY_UNAVAILABLE}
             />
             <StatCard
               label="Suspended"
               icon="ban"
               value={summary?.suspended ?? null}
-              note={summary ? undefined : SUMMARY_UNAVAILABLE}
+              note={summary ? "Access currently suspended" : SUMMARY_UNAVAILABLE}
             />
             <StatCard
               label="Pending setup"
@@ -95,16 +96,20 @@ export default async function PlatformTenantsPage({ searchParams }: PageProps) {
                   <span className="font-medium text-red-700 dark:text-red-400">
                     {summary.failed} failed
                   </span>
-                ) : undefined
+                ) : "Awaiting provisioning"
               }
             />
           </dl>
         </section>
 
-        <section aria-labelledby="tenant-list" className="flex flex-col gap-4">
-          <h2 id="tenant-list" className="sr-only">
-            Tenants
-          </h2>
+        <section aria-labelledby="tenant-list" className="min-w-0 overflow-hidden rounded-2xl border border-line bg-surface shadow-xs">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-5 sm:px-6">
+            <div className="flex items-center gap-3">
+              <h2 id="tenant-list" className="text-base font-semibold tracking-tight">Tenant directory</h2>
+              <span className="rounded-md border border-line bg-canvas px-2 py-0.5 text-xs font-medium tabular-nums text-fg-muted">{list.total}</span>
+            </div>
+            <p className="text-xs text-fg-subtle">{query.q || query.status !== "all" ? "Filtered results" : "All registered tenants"} · Newest first</p>
+          </div>
           <TenantListTransition>
             <TenantToolbar q={query.q} status={query.status} />
             <TenantListResults>
@@ -168,14 +173,14 @@ function TenantResults({ list, query }: { list: TenantListPage; query: TenantLis
   return (
     <>
       <TenantTable rows={list.rows} />
-      <ul className="grid gap-3 md:grid-cols-2 xl:hidden">
+      <ul className="grid gap-4 px-5 pt-5 md:grid-cols-2 xl:hidden">
         {list.rows.map((row) => (
           <li key={row.id}>
             <TenantCard row={row} />
           </li>
         ))}
       </ul>
-      {list.pageCount > 1 ? <Pagination list={list} query={query} /> : null}
+      <Pagination list={list} query={query} />
     </>
   );
 }
@@ -227,28 +232,25 @@ function CreatedCell({ row }: { row: TenantListRow }) {
   );
 }
 
-const TH = "px-4 py-3 font-medium";
-const TD = "px-4 py-3 align-middle";
+const TH = "px-5 py-3.5 text-[11px] font-semibold tracking-wide";
+const TD = "px-5 py-4 align-middle";
 
 /**
- * xl and up: below that, next to the sidebar, the eight columns would only fit
+ * xl and up: below that, next to the sidebar, the seven columns would only fit
  * by scrolling sideways and the row actions would sit off-screen.
  */
 function TenantTable({ rows }: { rows: TenantListRow[] }) {
   return (
-    <div className="hidden overflow-x-auto rounded-xl border border-line bg-surface xl:block">
-      <table className="w-full min-w-[60rem] text-left text-sm">
+    <div className="hidden overflow-x-auto xl:block">
+      <table className="w-full min-w-[58rem] text-left text-xs">
         <caption className="sr-only">Tenants, newest first</caption>
-        <thead className="border-b border-line text-xs text-fg-muted">
+        <thead className="border-y border-line bg-canvas/80 text-fg-muted">
           <tr>
-            <th scope="col" className={`${TH} w-14`}>
-              <span className="sr-only">Picture</span>
-            </th>
             <th scope="col" className={TH}>
               Tenant
             </th>
             <th scope="col" className={TH}>
-              Email
+              Contact
             </th>
             <th scope="col" className={TH}>
               Domain
@@ -269,17 +271,19 @@ function TenantTable({ rows }: { rows: TenantListRow[] }) {
         </thead>
         <tbody className="divide-y divide-line">
           {rows.map((row) => (
-            <tr key={row.id} className="transition-colors hover:bg-surface-2/50">
-              <td className={`${TD} pr-0`}>
-                <Avatar name={row.name} src={avatarSrc(row)} size="sm" />
-              </td>
+            <tr key={row.id} className="transition-colors motion-reduce:transition-none hover:bg-accent-soft/40">
               <td className={`${TD} max-w-56`}>
-                <p className="truncate font-medium text-fg">{row.name}</p>
-                <p className="truncate text-fg-muted">@{row.username}</p>
+                <div className="flex items-center gap-3">
+                  <Avatar name={row.name} src={avatarSrc(row)} size="sm" />
+                  <div className="min-w-0">
+                    <Link href={`${TENANTS_PATH}/${row.id}`} className={`block truncate rounded-sm text-sm font-semibold text-fg hover:text-accent ${FOCUS_RING}`}>{row.name}</Link>
+                    <p className="mt-0.5 truncate text-xs text-fg-subtle">@{row.username}</p>
+                  </div>
+                </div>
               </td>
               <td className={`${TD} max-w-64`}>
                 <p className="truncate text-fg">{row.email}</p>
-                {row.phone ? <p className="truncate text-fg-muted">{row.phone}</p> : null}
+                {row.phone ? <p className="mt-0.5 truncate text-fg-subtle">{row.phone}</p> : null}
               </td>
               <td className={`${TD} max-w-64`}>
                 <DomainCell row={row} />
@@ -309,13 +313,13 @@ function TenantCard({ row }: { row: TenantListRow }) {
   return (
     <article
       aria-label={row.name}
-      className="flex flex-col gap-4 rounded-xl border border-line bg-surface p-4"
+      className="flex flex-col gap-5 rounded-xl border border-line bg-canvas/40 p-4"
     >
       <div className="flex items-start gap-3">
         <Avatar name={row.name} src={avatarSrc(row)} />
         <div className="min-w-0 flex-1">
-          <p className="truncate font-medium text-fg">{row.name}</p>
-          <p className="truncate text-sm text-fg-muted">@{row.username}</p>
+          <Link href={`${TENANTS_PATH}/${row.id}`} className={`block truncate rounded-sm font-semibold text-fg hover:text-accent ${FOCUS_RING}`}>{row.name}</Link>
+          <p className="mt-0.5 truncate text-xs text-fg-subtle">@{row.username}</p>
         </div>
         <TenantStatusCell row={row} />
       </div>
@@ -341,7 +345,7 @@ function TenantCard({ row }: { row: TenantListRow }) {
           <CreatedCell row={row} />
         </dd>
       </dl>
-      <div className="border-t border-line pt-3">
+      <div className="border-t border-line pt-4">
         <TenantRowActions tenantId={row.id} tenantName={row.name} status={row.status} />
       </div>
     </article>
@@ -356,7 +360,7 @@ function Pagination({ list, query }: { list: TenantListPage; query: TenantListQu
   return (
     <nav
       aria-label="Pagination"
-      className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+      className="flex flex-col gap-3 border-t border-line px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6"
     >
       <p className="text-sm text-fg-muted">
         {range ? (
@@ -367,10 +371,11 @@ function Pagination({ list, query }: { list: TenantListPage; query: TenantListQu
           </>
         ) : null}
       </p>
-      <div className="flex gap-2">
+      {list.pageCount > 1 ? <div className="flex items-center gap-2">
+        <span className="mr-2 text-xs tabular-nums text-fg-subtle">Page {list.page} of {list.pageCount}</span>
         <PageLink href={previous} icon="chevron-left" label="Previous" />
         <PageLink href={next} icon="chevron-right" label="Next" />
-      </div>
+      </div> : null}
     </nav>
   );
 }
@@ -424,12 +429,12 @@ function EmptyState({
   action: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center rounded-xl border border-line bg-surface px-6 py-12 text-center">
-      <span className="grid size-10 place-items-center rounded-lg bg-surface-2 text-fg-muted">
-        <Icon name={icon} className="size-5" />
+    <div className="flex flex-col items-center border-t border-line px-6 py-16 text-center">
+      <span className="grid size-16 place-items-center rounded-2xl border border-line bg-accent-soft text-accent">
+        <Icon name={icon} className="size-7" />
       </span>
-      <p className="mt-4 font-medium">{title}</p>
-      <p className="mt-1 max-w-sm text-sm text-fg-muted">{text}</p>
+      <p className="mt-5 font-semibold">{title}</p>
+      <p className="mt-2 max-w-sm text-sm leading-6 text-fg-muted">{text}</p>
       <div className="mt-6">{action}</div>
     </div>
   );

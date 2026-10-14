@@ -1,21 +1,15 @@
 "use client";
 
 import { useActionState, useEffect, useId, useRef, useState } from "react";
+import { Icon } from "../(console)/_components/icons";
+import { Spinner } from "../(console)/_components/spinner";
+import { FOCUS_RING } from "../(console)/_components/styles";
+import { buttonClass, inputClass } from "../(console)/_components/ui";
 import { loginAction, type LoginFormState } from "./actions";
 
 const initialState: LoginFormState = { username: "" };
 
-const INPUT_CLASS =
-  "h-11 w-full rounded-lg border bg-white px-3 text-base outline-none transition-colors focus-visible:border-emerald-600 focus-visible:ring-2 focus-visible:ring-emerald-600/30 dark:bg-zinc-900";
-const INPUT_BORDER_CLASS = "border-zinc-300 dark:border-zinc-700";
-const INPUT_ERROR_BORDER_CLASS = "border-red-600 dark:border-red-500";
 const FIELD_ERROR_CLASS = "text-sm text-red-600 dark:text-red-400";
-
-function inputClass(hasError: boolean, extra = ""): string {
-  return [INPUT_CLASS, hasError ? INPUT_ERROR_BORDER_CLASS : INPUT_BORDER_CLASS, extra]
-    .filter(Boolean)
-    .join(" ");
-}
 
 type LoginFormProps = { usernameMaxLength: number; passwordMaxLength: number };
 
@@ -55,7 +49,7 @@ export function LoginForm({ usernameMaxLength, passwordMaxLength }: LoginFormPro
         </div>
       ) : null}
 
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-2">
         <label htmlFor={usernameId} className="text-sm font-medium">
           Username
         </label>
@@ -73,7 +67,8 @@ export function LoginForm({ usernameMaxLength, passwordMaxLength }: LoginFormPro
           autoFocus
           aria-invalid={usernameError ? true : undefined}
           aria-describedby={usernameError ? usernameErrorId : undefined}
-          className={inputClass(Boolean(usernameError))}
+          placeholder="Enter your username"
+          className={inputClass(Boolean(usernameError), "h-12 px-3.5 text-base")}
         />
         {usernameError ? (
           <p id={usernameErrorId} className={FIELD_ERROR_CLASS}>
@@ -82,7 +77,7 @@ export function LoginForm({ usernameMaxLength, passwordMaxLength }: LoginFormPro
         ) : null}
       </div>
 
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-2">
         <label htmlFor={passwordId} className="text-sm font-medium">
           Password
         </label>
@@ -96,15 +91,16 @@ export function LoginForm({ usernameMaxLength, passwordMaxLength }: LoginFormPro
             maxLength={passwordMaxLength}
             aria-invalid={passwordError ? true : undefined}
             aria-describedby={passwordError ? passwordErrorId : undefined}
+            placeholder="Enter your password"
             // Right padding keeps the text clear of the toggle.
-            className={inputClass(Boolean(passwordError), "pr-16")}
+            className={inputClass(Boolean(passwordError), "h-12 px-3.5 pr-16 text-base")}
           />
           <button
             type="button"
             aria-pressed={passwordVisible}
             aria-controls={passwordId}
             onClick={() => setPasswordVisible((visible) => !visible)}
-            className="absolute inset-y-0 right-0 rounded-r-lg px-3 text-sm font-medium text-zinc-600 hover:text-zinc-900 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-emerald-600 dark:text-zinc-400 dark:hover:text-zinc-100"
+            className={`absolute inset-y-1 right-1 rounded-md px-3 text-xs font-semibold text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg ${FOCUS_RING}`}
           >
             {passwordVisible ? "Hide" : "Show"}
           </button>
@@ -119,9 +115,11 @@ export function LoginForm({ usernameMaxLength, passwordMaxLength }: LoginFormPro
       <button
         type="submit"
         disabled={pending}
-        className="h-11 w-full rounded-lg bg-zinc-900 font-medium text-white transition-colors hover:bg-zinc-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
+        className={`${buttonClass("primary")} mt-1 h-12 w-full`}
       >
+        {pending ? <Spinner /> : null}
         {pending ? "Signing in…" : "Sign in"}
+        {pending ? null : <Icon name="arrow-right" className="size-4" />}
       </button>
     </form>
   );

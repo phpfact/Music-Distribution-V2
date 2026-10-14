@@ -8,11 +8,11 @@ import { FOCUS_RING } from "./styles";
 export type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
 export type ButtonSize = "sm" | "md";
 
-const BUTTON_BASE = `inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg font-medium transition-colors ${FOCUS_RING} disabled:cursor-not-allowed disabled:opacity-60 aria-disabled:pointer-events-none aria-disabled:opacity-60`;
+const BUTTON_BASE = `inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-lg font-medium transition-colors motion-reduce:transition-none ${FOCUS_RING} disabled:cursor-not-allowed disabled:opacity-60 aria-disabled:pointer-events-none aria-disabled:opacity-60`;
 
 const BUTTON_VARIANTS: Record<ButtonVariant, string> = {
-  primary: "bg-accent text-accent-fg hover:bg-accent/90",
-  secondary: "border border-line bg-surface text-fg hover:bg-surface-2",
+  primary: "border border-transparent bg-accent text-accent-fg shadow-sm hover:bg-accent/90",
+  secondary: "border border-line bg-surface text-fg shadow-xs hover:bg-surface-2",
   // In dark mode a light red with dark text, as the accent does: white on a
   // mid red would fall below the contrast needed for small text.
   danger:
@@ -39,7 +39,7 @@ export function buttonClass(variant: ButtonVariant, size: ButtonSize = "md"): st
  * look filled-in rather than editable.
  */
 export const INPUT_BASE =
-  "w-full rounded-lg border bg-surface px-3 text-sm text-fg outline-none transition-colors placeholder:text-fg-subtle focus-visible:ring-2 read-only:bg-surface-2 read-only:text-fg-muted disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-fg-subtle disabled:opacity-70";
+  "w-full rounded-lg border bg-surface px-3 text-sm text-fg shadow-xs outline-none transition-colors motion-reduce:transition-none placeholder:text-fg-subtle focus-visible:ring-2 read-only:bg-surface-2 read-only:text-fg-muted disabled:cursor-not-allowed disabled:bg-surface-2 disabled:text-fg-subtle disabled:opacity-70";
 
 // An invalid field keeps its red border while focused, so the error stays visible.
 const INPUT_BORDER = "border-line focus-visible:border-accent focus-visible:ring-accent/30";

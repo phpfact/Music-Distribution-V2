@@ -23,7 +23,7 @@ export function Topbar({ username, drawerId, drawerOpen, onOpenDrawer, menuToggl
   const current = findActiveNavItem(usePathname());
 
   return (
-    <header className="flex h-16 shrink-0 items-center gap-3 border-b border-line bg-canvas/80 px-4 backdrop-blur sm:px-6 lg:px-8">
+    <header className="flex h-20 shrink-0 items-center gap-3 border-b border-line bg-surface/80 px-4 backdrop-blur sm:px-6 lg:px-9">
       <button
         ref={menuToggleRef}
         type="button"
@@ -38,7 +38,7 @@ export function Topbar({ username, drawerId, drawerOpen, onOpenDrawer, menuToggl
       </button>
 
       <nav aria-label="Breadcrumb" className="min-w-0">
-        <ol className="flex min-w-0 items-center gap-2 text-sm">
+        <ol className="flex min-w-0 items-center gap-2.5 text-sm">
           <li className="hidden items-center gap-2 sm:flex">
             <Link
               href={getNavItem("dashboard").href}
@@ -46,9 +46,7 @@ export function Topbar({ username, drawerId, drawerOpen, onOpenDrawer, menuToggl
             >
               Platform
             </Link>
-            <span aria-hidden="true" className="text-fg-subtle">
-              ›
-            </span>
+            <Icon name="chevron-right" className="size-3.5 text-fg-subtle" />
           </li>
           <li className="min-w-0">
             <span aria-current="page" className="block truncate font-semibold text-fg">
@@ -58,8 +56,9 @@ export function Topbar({ username, drawerId, drawerOpen, onOpenDrawer, menuToggl
         </ol>
       </nav>
 
-      <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
+      <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
         <ThemeToggle />
+        <span aria-hidden="true" className="h-6 w-px bg-line" />
         <ProfileMenu username={username} />
       </div>
     </header>
