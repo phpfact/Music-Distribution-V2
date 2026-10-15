@@ -162,3 +162,60 @@ Order: understand requirement → inspect module → understand architecture/beh
 - Don't touch unrelated functionality, refactor unnecessarily, or rewrite/restructure/replace working code.
 - Don't change DB structure, APIs, naming conventions or architecture unless the requirement needs it.
 - Stay focused on the requested task.
+
+## Secondary Menu Navigation Rules
+
+- _Mandatory Secondary Menu:_ Every module containing a long form, create/edit page, settings page, or any page with multiple sections must use a secondary menu to navigate between its sections. Do not restrict this behavior to any specific module or page.
+- _Context-Aware Navigation:_ The secondary menu must dynamically display the sections relevant to the currently opened page. Do not display irrelevant sections.
+- _Click-to-Scroll:_ Clicking a secondary menu item must smoothly scroll the main content to the corresponding section and position its heading correctly within the visible area.
+- _Scroll-to-Menu Synchronization:_ While the user manually scrolls up or down, the secondary menu must automatically highlight the section currently visible in the main content.
+- _Bidirectional Synchronization:_ Menu clicks and manual scrolling must remain synchronized at all times. The active menu item must accurately reflect the current section.
+- _Sticky Secondary Menu:_ Keep the secondary menu accessible while the main content scrolls. The menu must remain properly positioned without overlapping the primary navigation, page header, or content.
+- _Dynamic Section Handling:_ Automatically support all relevant sections, including sections added, removed, expanded, or collapsed, without breaking navigation or active-section detection.
+- _Consistent and Reusable Implementation:_ Implement this behavior using a reusable component or shared solution wherever applicable. Do not create separate, inconsistent implementations for individual modules.
+- _Layout and Usability:_ Maintain a clean, minimal, premium UI with proper spacing, alignment, and responsive behavior. The secondary menu must never obscure form fields, section headings, validation messages, or other content.
+- _Strict Requirement:_ Whenever a page meets the above criteria, the secondary menu and synchronized scroll behavior are mandatory. Do not omit this functionality from any applicable module.
+
+## Mandatory Conversation Language Rule
+
+- _User Input Language:_ The user may provide input in Hinglish, Hindi, English, or any other language.
+- _AI Response Language:_ You must communicate directly with the user exclusively in Hinglish. Every question, clarification, suggestion, recommendation, and conversational response directed to the user must be written only in Hinglish.
+- _Questions and Suggestions:_ If you need to ask the user any question, request clarification, offer suggestions, or discuss implementation decisions, you must do so only in Hinglish.
+- _Scope of This Rule:_ This rule applies strictly to conversations and direct communication between the user and the AI.
+- _Terminal and AI Tool Output:_ Whenever you need to provide input to a terminal, command-line interface, another AI tool, or an AI coding agent, the instructions, questions, prompts, and other text must also be written in Hinglish.
+- _Strict Compliance:_ Never switch to Hindi-only or English-only communication when interacting directly with the user. Always use Hinglish for all user-facing conversational communication, regardless of the language used in the user's input.
+
+## Mandatory Sensitive Information Masking Rule
+
+- _Never Display Sensitive Information in Plain Text by Default:_ Any sensitive or security-related information must be masked by default wherever it is displayed in the application's UI.
+
+- _Sensitive Information Includes, but Is Not Limited To:_ Usernames, email addresses, phone numbers, passwords, OTPs, authentication tokens, API keys, database names, database usernames, database passwords, connection strings, secret keys, and any other confidential or security-related information.
+
+- _Mandatory Eye Icon:_ Every UI field or display element containing sensitive information must include an eye-shaped SVG button to toggle visibility.
+
+- _Show/Hide Functionality:_ By default, sensitive information must remain masked. When the user clicks the eye SVG button, the information becomes visible. Clicking the button again must immediately mask the information.
+
+- _Consistent Implementation:_ Apply this rule consistently across all applicable modules, pages, forms, tables, detail views, settings pages, configuration screens, and other UI components. Do not restrict this behavior to any specific module.
+
+- _Preserve Existing Functionality:_ Masking and visibility toggling must not interfere with existing application functionality, form submissions, data processing, or validation.
+
+- _Strict Requirement:_ No sensitive information may be displayed in plain text by default. Every applicable UI element must provide the eye SVG toggle for explicitly revealing and hiding the information.
+
+## Mandatory Category-Wise Form Organization
+
+- Group all form fields by their purpose into appropriate categories in the secondary menu.
+- Personal details (name, title, full name, profile, etc.) must be under _Personal Information_; bank-related fields under _Bank Information_, and similarly for other categories.
+- Apply this rule consistently across all applicable modules and forms. Never mix unrelated fields in the same category.
+
+## Mandatory Form Field Rules
+
+- _Required Fields:_ Display a red asterisk (\*) next to every required field label.
+- _Searchable Selects:_ Almost all select/dropdown fields must include a search input so users can quickly find and select options. Exclude search only where it is unnecessary or impractical.
+
+## Mandatory Count Transparency & Details Popup Rule
+
+- _Clickable Counts:_ Every count, calculation, total, statistic, or calculated value displayed anywhere in the application must be clickable and open a clear, user-friendly details popup.
+- _Show Exact Records:_ The popup must display the exact records contributing to that count or calculation. For example, clicking “10 Successful” after an Excel upload must show the 10 successful records, and clicking “5 Failed” must show the 5 failed records.
+- _Explain Calculations:_ For user counts, domain counts, widget statistics, and other calculated values, the popup must clearly show which records are included and how the displayed value was calculated.
+- _Easy Verification:_ Present the details in a well-organized, easy-to-understand format so users can independently verify the accuracy of every count and calculation.
+- _Strict Requirement:_ Apply this behavior consistently across all applicable modules, dashboards, widgets, reports, tables, charts, and upload results. Never display a count or calculated value without providing access to its supporting details through a popup.
