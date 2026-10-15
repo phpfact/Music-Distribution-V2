@@ -219,3 +219,30 @@ Order: understand requirement → inspect module → understand architecture/beh
 - _Explain Calculations:_ For user counts, domain counts, widget statistics, and other calculated values, the popup must clearly show which records are included and how the displayed value was calculated.
 - _Easy Verification:_ Present the details in a well-organized, easy-to-understand format so users can independently verify the accuracy of every count and calculation.
 - _Strict Requirement:_ Apply this behavior consistently across all applicable modules, dashboards, widgets, reports, tables, charts, and upload results. Never display a count or calculated value without providing access to its supporting details through a popup.
+
+## Mandatory Category-Wise Form Organization
+
+- Group all form fields by their purpose into appropriate categories in the secondary menu.
+- Personal details (name, title, full name, profile, etc.) must be under _Personal Information_; bank-related fields under _Bank Information_, and similarly for other categories.
+- Apply this rule consistently across all applicable modules and forms. Never mix unrelated fields in the same category.
+
+## Mandatory Form Field Rules
+
+- _Required Fields:_ Display a red asterisk (\*) next to every required field label.
+- _Searchable Selects:_ Almost all select/dropdown fields must include a search input so users can quickly find and select options. Exclude search only where it is unnecessary or impractical.
+
+## Mandatory Count Transparency & Details Popup Rule
+
+- _Clickable Counts:_ Every count, calculation, total, statistic, or calculated value displayed anywhere in the application must be clickable and open a clear, user-friendly details popup.
+- _Show Exact Records:_ The popup must display the exact records contributing to that count or calculation. For example, clicking “10 Successful” after an Excel upload must show the 10 successful records, and clicking “5 Failed” must show the 5 failed records.
+- _Explain Calculations:_ For user counts, domain counts, widget statistics, and other calculated values, the popup must clearly show which records are included and how the displayed value was calculated.
+- _Easy Verification:_ Present the details in a well-organized, easy-to-understand format so users can independently verify the accuracy of every count and calculation.
+- _Strict Requirement:_ Apply this behavior consistently across all applicable modules, dashboards, widgets, reports, tables, charts, and upload results. Never display a count or calculated value without providing access to its supporting details through a popup.
+
+  ## Mandatory Shadcn UI & Theme Appearance Rules
+
+- _Shadcn UI Only:_ Use Shadcn UI components throughout the dashboard. Do not create custom Tailwind CSS components when an appropriate Shadcn UI component is available. Leverage Shadcn's built-in features and capabilities wherever possible.
+- _Default Theme:_ Use Shadcn's official black-and-white, neutral appearance by default, matching its standard light theme.
+- _Appearance Customization:_ Users must be able to change their dashboard appearance through the Appearance settings in their own panel.
+- _Strict Theme Compatibility:_ Every component must fully support Light Mode, Dark Mode, and user-selected appearance themes without visual inconsistencies or broken functionality.
+- _Consistent Implementation:_ Apply theme settings across all applicable components, forms, tables, dialogs, popups, dropdowns, menus, charts, and dashboard pages. Never hardcode colors or create components that bypass the theme system.
