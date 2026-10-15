@@ -70,7 +70,10 @@ export type CreateTenantField =
   | "databasePort"
   | "subdomain"
   | "customDomain"
-  | "credentialMode"
+  // One Auto-Generate / Manual switch per form section (see CredentialModes).
+  | "loginMode"
+  | "databaseCredentialMode"
+  | "subdomainMode"
   | "databaseMode";
 
 export type CreateTenantFieldErrors = Partial<Record<CreateTenantField, string>>;
@@ -79,8 +82,25 @@ export type CredentialMode = "auto" | "manual";
 export type DatabaseMode = "provisioned" | "existing";
 
 /**
- * Raw form values, untrimmed. In `auto` mode the master password, database
- * password and port are ignored (generated or defaulted on the server).
+ * Which sections of the create form the owner left on Auto-Generate. Each
+ * section is independent, so e.g. the login can be generated while the
+ * database credentials are typed by hand.
+ *
+ * - `login`: the admin username and master password.
+ * - `database`: the database name, user, password and port.
+ * - `subdomain`: the SaaS subdomain label.
+ */
+export type CredentialModes = {
+  login: CredentialMode;
+  database: CredentialMode;
+  subdomain: CredentialMode;
+};
+
+/**
+ * Raw form values, untrimmed. A section in `auto` mode has its secrets
+ * ignored: with `loginMode` auto the master password is generated here, and
+ * with `databaseCredentialMode` auto the database password and port are
+ * generated or defaulted here, whatever the request contains.
  */
 export type CreateTenantInput = {
   fullName: string;
@@ -94,7 +114,9 @@ export type CreateTenantInput = {
   databasePort: string;
   subdomain: string;
   customDomain: string;
-  credentialMode: string;
+  loginMode: string;
+  databaseCredentialMode: string;
+  subdomainMode: string;
   databaseMode: string;
   profileImage: { bytes: Uint8Array } | null;
 };
@@ -118,7 +140,7 @@ export type CreateTenantDeps = {
 const CREATE_LIMIT = { limit: 20, windowSeconds: 60 * 60 };
 
 type ValidTenant = {
-  credentialMode: CredentialMode;
+  modes: CredentialModes;
   databaseMode: DatabaseMode;
   fullName: string;
   phone: string | null;
@@ -157,14 +179,23 @@ function validateInput(
     return undefined;
   };
 
-  const credentialMode = parseCredentialMode(input.credentialMode);
-  if (!credentialMode) fieldErrors.credentialMode = "Choose Auto generate or Manual entry.";
+  // Step 1: the three section modes. Each one is checked on its own so the
+  // error lands under the switch of the section it belongs to.
+  const MODE_REQUIRED = "Choose Auto-Generate or Manual.";
+  const loginMode = parseCredentialMode(input.loginMode);
+  if (!loginMode) fieldErrors.loginMode = MODE_REQUIRED;
+  const databaseCredentialMode = parseCredentialMode(input.databaseCredentialMode);
+  if (!databaseCredentialMode) fieldErrors.databaseCredentialMode = MODE_REQUIRED;
+  const subdomainMode = parseCredentialMode(input.subdomainMode);
+  if (!subdomainMode) fieldErrors.subdomainMode = MODE_REQUIRED;
+
+  // Step 2: the database mode. Only the Database section's own switch matters:
+  // the owner has to supply the existing database's login, so it cannot be generated.
   const databaseMode = parseDatabaseMode(input.databaseMode);
   if (!databaseMode) {
     fieldErrors.databaseMode = "Choose whether to create a new database or use an existing one.";
-  } else if (databaseMode === "existing" && credentialMode === "auto") {
-    // The owner has to supply the existing database's login, so nothing can be generated.
-    fieldErrors.databaseMode = "Switch to Manual entry to attach an existing database.";
+  } else if (databaseMode === "existing" && databaseCredentialMode === "auto") {
+    fieldErrors.databaseMode = "Switch the Database section to Manual to attach an existing database.";
   }
 
   const fullName = check("fullName", validateFullName(input.fullName));
@@ -182,15 +213,25 @@ function validateInput(
     validateDatabaseIdentifier(input.databaseUser, "user", { reservedNames }),
   );
 
-  // Auto: generated here and never taken from the request, whatever it contains.
+  // Secrets of a section on Auto are generated here and never taken from the
+  // request, whatever it contains. A section on Manual must supply its own.
+  // An invalid mode (already reported above) is treated like Auto so that no
+  // further, misleading password errors are added for it.
   let masterPassword: string | undefined;
-  let databasePassword: string | undefined;
-  let databasePort: number | undefined;
-  if (credentialMode === "manual") {
+  if (loginMode === "manual") {
     masterPassword = check(
       "masterPassword",
       validateMasterPassword(input.masterPassword, username ?? input.username),
     );
+  } else {
+    masterPassword = generateMasterPassword(username ?? "");
+  }
+
+  let databasePassword: string | undefined;
+  let databasePort: number | undefined;
+  if (databaseCredentialMode === "manual") {
+    // An existing login keeps whatever password it already has; a new one
+    // must meet the stronger new-database rule.
     databasePassword = check(
       "databasePassword",
       databaseMode === "existing"
@@ -199,7 +240,6 @@ function validateInput(
     );
     databasePort = check("databasePort", parsePort(input.databasePort, env.postgres.port));
   } else {
-    masterPassword = generateMasterPassword(username ?? "");
     databasePassword = generateDatabasePassword();
     databasePort = env.postgres.port;
   }
@@ -219,7 +259,12 @@ function validateInput(
   return {
     ok: true,
     value: {
-      credentialMode: credentialMode as CredentialMode,
+      // All three are set here: any missing mode returned a field error above.
+      modes: {
+        login: loginMode as CredentialMode,
+        database: databaseCredentialMode as CredentialMode,
+        subdomain: subdomainMode as CredentialMode,
+      },
       databaseMode: databaseMode as DatabaseMode,
       fullName: fullName as string,
       phone: phone ?? null,
@@ -248,18 +293,43 @@ export const TAKEN_MESSAGES: Record<NameKind, string> = {
   databaseUser: "Another tenant already uses this database user. Choose another one.",
 };
 
-// In auto mode the owner did not type these: they were previewed, and someone
-// took them in the meantime.
-const GENERATED_FIELDS: ReadonlySet<NameKind> = new Set([
-  "username",
-  "subdomain",
-  "databaseName",
-  "databaseUser",
-]);
+// The previewable names and the form section whose switch decides whether the
+// owner typed them (Manual) or took the preview (Auto).
+type GeneratedName = "username" | "subdomain" | "databaseName" | "databaseUser";
+const GENERATED_FIELD_SECTIONS: Record<GeneratedName, keyof CredentialModes> = {
+  username: "login",
+  subdomain: "subdomain",
+  databaseName: "database",
+  databaseUser: "database",
+};
 
+/**
+ * Description: Tell whether a name was generated (previewed) rather than typed by the owner.
+ * Input: The name kind that conflicted and the validated tenant with its section modes.
+ * Output: True when the name belongs to a section left on Auto-Generate.
+ * Use case: A generated name someone took in the meantime gets "regenerate" wording.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-15. Last modified: 2026-10-15.
+ */
+function isGeneratedName(kind: NameKind, tenant: ValidTenant): kind is GeneratedName {
+  // Email and custom domain are always typed, so they never count as generated.
+  if (!(kind in GENERATED_FIELD_SECTIONS)) return false;
+  return tenant.modes[GENERATED_FIELD_SECTIONS[kind as GeneratedName]] === "auto";
+}
+
+/**
+ * Description: Build the field error for a name that another tenant or the server already uses.
+ * Input: The conflicting name kind and the validated tenant.
+ * Output: "<value> is no longer available — regenerate." for generated names, else the fixed message.
+ * Use case: Availability checks and unique-constraint races during creation.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14. Last modified: 2026-10-15.
+ */
 function takenMessage(kind: NameKind, tenant: ValidTenant): string {
-  if (tenant.credentialMode === "auto" && GENERATED_FIELDS.has(kind)) {
-    return `${tenant[kind as "username" | "subdomain" | "databaseName" | "databaseUser"]} is no longer available — regenerate.`;
+  // The owner did not type a generated name: it was previewed and someone took
+  // it in the meantime, so the fix is to regenerate, not to "choose another".
+  if (isGeneratedName(kind, tenant)) {
+    return `${tenant[kind]} is no longer available — regenerate.`;
   }
   return TAKEN_MESSAGES[kind];
 }
@@ -291,7 +361,9 @@ async function checkAvailability(
     ]);
   } catch (error) {
     console.error(`[tenants] availability check failed: ${describeError(error)}`);
-    if (error instanceof ProvisioningError && tenant.credentialMode === "manual") {
+    // Only a port the owner typed (Database section on Manual) can be the
+    // cause they can fix; the configured default port is an outage instead.
+    if (error instanceof ProvisioningError && tenant.modes.database === "manual") {
       return {
         ok: false,
         result: {
@@ -308,17 +380,17 @@ async function checkAvailability(
 
   const fieldErrors: CreateTenantFieldErrors = {};
   for (const kind of taken) fieldErrors[kind] = takenMessage(kind, tenant);
+  // Names already present on the database server itself (not in the control
+  // plane): generated names say "regenerate", typed names say "choose another".
   if (!fieldErrors.databaseName && onServer.databaseName) {
-    fieldErrors.databaseName =
-      tenant.credentialMode === "auto"
-        ? takenMessage("databaseName", tenant)
-        : "A database with this name already exists on the server. Choose another name.";
+    fieldErrors.databaseName = isGeneratedName("databaseName", tenant)
+      ? takenMessage("databaseName", tenant)
+      : "A database with this name already exists on the server. Choose another name.";
   }
   if (!fieldErrors.databaseUser && onServer.databaseUser) {
-    fieldErrors.databaseUser =
-      tenant.credentialMode === "auto"
-        ? takenMessage("databaseUser", tenant)
-        : "A role with this name already exists on the server. Choose another name.";
+    fieldErrors.databaseUser = isGeneratedName("databaseUser", tenant)
+      ? takenMessage("databaseUser", tenant)
+      : "A role with this name already exists on the server. Choose another name.";
   }
   if (Object.keys(fieldErrors).length > 0) {
     return { ok: false, result: { ok: false, reason: "validation", fieldErrors } };
@@ -482,7 +554,9 @@ export async function createTenant(
         targetId: tenantId,
         // Which options were used, never the values.
         metadata: {
-          credentialMode: tenant.credentialMode,
+          loginMode: tenant.modes.login,
+          databaseCredentialMode: tenant.modes.database,
+          subdomainMode: tenant.modes.subdomain,
           databaseMode: tenant.databaseMode,
           hasCustomDomain: tenant.customDomain !== null,
         },
@@ -502,8 +576,9 @@ export async function createTenant(
     return { ok: false, reason: "unavailable", message: UNAVAILABLE_MESSAGE };
   }
 
-  // 9. The generated password goes back once and is not kept anywhere.
-  return tenant.credentialMode === "auto"
+  // 9. A generated master password (login section on Auto) goes back once
+  // and is not kept anywhere; a typed one is never echoed back.
+  return tenant.modes.login === "auto"
     ? { ok: true, tenantId, generatedMasterPassword: tenant.masterPassword }
     : { ok: true, tenantId };
 }

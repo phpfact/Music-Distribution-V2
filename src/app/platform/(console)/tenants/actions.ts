@@ -90,7 +90,10 @@ export async function createTenantAction(
       databasePort: field("databasePort"),
       subdomain: field("subdomain"),
       customDomain: field("customDomain"),
-      credentialMode: field("credentialMode"),
+      // One Auto-Generate / Manual switch per form section.
+      loginMode: field("loginMode"),
+      databaseCredentialMode: field("databaseCredentialMode"),
+      subdomainMode: field("subdomainMode"),
       databaseMode: field("databaseMode"),
       profileImage,
     },

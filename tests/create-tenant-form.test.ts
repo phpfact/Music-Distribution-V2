@@ -1,7 +1,8 @@
 /**
  * The create-tenant form's pure logic (src/app/platform/(console)/tenants/new/form-model.ts):
- * the two credential modes, the FormData sent to createTenantAction, the
- * client-side validation and its summary, and the browser-side generators.
+ * the per-section Auto-Generate / Manual switches, the FormData sent to
+ * createTenantAction, the client-side validation and its summary, and the
+ * browser-side generators.
  */
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -13,14 +14,18 @@ import {
   clearPasswords,
   clearRejectedPasswords,
   CREATE_TENANT_FIELDS,
+  currentIdentifiers,
   effectiveDatabaseMode,
   errorsAfterModeSwitch,
   type FormValues,
   generateDatabasePassword,
+  generatedSummary,
   generateMasterPassword,
   initialFormValues,
+  NOT_GENERATED_YET,
+  sectionOfField,
   summarizeErrors,
-  switchCredentialMode,
+  switchSectionMode,
   validateConnection,
   validateField,
   validateForm,
@@ -62,12 +67,12 @@ function filled(values: FormValues): FormValues {
   };
 }
 
-/** A complete, valid manual form. */
+/** A complete, valid form with every section on Manual. */
 function manualForm(): FormValues {
   const values = filled(initialFormValues(PORT));
   return {
     ...values,
-    mode: "manual",
+    modes: { login: "manual", database: "manual", domain: "manual" },
     manual: {
       username: "acme",
       subdomain: "acme",
@@ -90,9 +95,10 @@ afterEach(() => {
 });
 
 describe("initialFormValues", () => {
-  it("starts in Auto generate with nothing generated and the default port for Manual entry", () => {
+  it("starts every section on Auto-Generate with nothing generated and the default port for Manual", () => {
     const values = initialFormValues(PORT);
-    expect(values.mode).toBe("auto");
+    expect(values.modes).toEqual({ login: "auto", database: "auto", domain: "auto" });
+    expect(values.prefilledFromPreview).toEqual({ login: false, database: false, domain: false });
     expect(values.generated).toBeNull();
     expect(values.manual.databaseMode).toBe("provisioned");
     expect(values.manual.databasePort).toBe("5432");
@@ -101,75 +107,132 @@ describe("initialFormValues", () => {
   });
 });
 
-describe("switchCredentialMode", () => {
-  it("fills only the EMPTY manual identifiers from the preview on the first switch", () => {
+describe("switchSectionMode", () => {
+  it("moves only the switched section and fills only ITS empty identifiers on the first switch", () => {
     const start = withPreview();
     const typed: FormValues = {
       ...start,
-      manual: { ...start.manual, username: "my-own-name", databaseName: "  " },
+      manual: { ...start.manual, databaseName: "my_own_db", databaseUser: "  " },
     };
-    const { values, prefilled } = switchCredentialMode(typed, "manual");
+    const { values, prefilled } = switchSectionMode(typed, "database", "manual");
 
-    expect(values.mode).toBe("manual");
-    expect(values.manual.username).toBe("my-own-name");
-    expect(values.manual.subdomain).toBe(PREVIEW.subdomain);
-    expect(values.manual.databaseName).toBe(PREVIEW.databaseName);
+    expect(values.modes).toEqual({ login: "auto", database: "manual", domain: "auto" });
+    expect(values.manual.databaseName).toBe("my_own_db");
     expect(values.manual.databaseUser).toBe(PREVIEW.databaseUser);
-    expect(prefilled).toEqual(["subdomain", "databaseName", "databaseUser"]);
+    // Other sections' drafts are untouched.
+    expect(values.manual.username).toBe("");
+    expect(values.manual.subdomain).toBe("");
+    expect(prefilled).toEqual(["databaseUser"]);
+    expect(values.prefilledFromPreview).toEqual({ login: false, database: true, domain: false });
+  });
+
+  it("prefills the login and domain sections from the preview on their own switches", () => {
+    const login = switchSectionMode(withPreview(), "login", "manual");
+    expect(login.prefilled).toEqual(["username"]);
+    expect(login.values.manual.username).toBe(PREVIEW.username);
+    const domain = switchSectionMode(login.values, "domain", "manual");
+    expect(domain.prefilled).toEqual(["subdomain"]);
+    expect(domain.values.manual.subdomain).toBe(PREVIEW.subdomain);
   });
 
   it("never copies or invents passwords, and keeps the manual port", () => {
-    const { values } = switchCredentialMode(withPreview(), "manual");
+    let values = withPreview();
+    values = switchSectionMode(values, "login", "manual").values;
+    values = switchSectionMode(values, "database", "manual").values;
     expect(values.manual.masterPassword).toBe("");
     expect(values.manual.databasePassword).toBe("");
     expect(values.manual.databasePort).toBe("5432");
   });
 
-  it("prefills only once: a field emptied later stays empty on the next switch", () => {
-    const first = switchCredentialMode(withPreview(), "manual").values;
+  it("prefills a section only once: a field emptied later stays empty on the next switch", () => {
+    const first = switchSectionMode(withPreview(), "login", "manual").values;
     const emptied: FormValues = { ...first, manual: { ...first.manual, username: "" } };
-    const backToAuto = switchCredentialMode(emptied, "auto").values;
+    const backToAuto = switchSectionMode(emptied, "login", "auto").values;
     const regenerated: FormValues = { ...backToAuto, generated: { ...PREVIEW, username: "other" } };
-    const second = switchCredentialMode(regenerated, "manual");
+    const second = switchSectionMode(regenerated, "login", "manual");
 
     expect(second.prefilled).toEqual([]);
     expect(second.values.manual.username).toBe("");
   });
 
   it("without a preview fills nothing, and a later switch with a preview still can", () => {
-    const early = switchCredentialMode(initialFormValues(PORT), "manual");
+    const early = switchSectionMode(initialFormValues(PORT), "domain", "manual");
     expect(early.prefilled).toEqual([]);
-    expect(early.values.prefilledFromPreview).toBe(false);
+    expect(early.values.prefilledFromPreview.domain).toBe(false);
 
-    const later = switchCredentialMode(withPreview(switchCredentialMode(early.values, "auto").values), "manual");
-    expect(later.prefilled).toEqual(["username", "subdomain", "databaseName", "databaseUser"]);
+    const back = switchSectionMode(early.values, "domain", "auto").values;
+    const later = switchSectionMode(withPreview(back), "domain", "manual");
+    expect(later.prefilled).toEqual(["subdomain"]);
   });
 
-  it("restores every typed manual value after a round trip through Auto generate", () => {
+  it("restores every typed manual value after a round trip through Auto-Generate", () => {
     const typed = withPreview(manualForm());
-    const roundTrip = switchCredentialMode(switchCredentialMode(typed, "auto").values, "manual").values;
-    expect(roundTrip.manual).toEqual(typed.manual);
-    expect(roundTrip.shared).toEqual(typed.shared);
+    let values = typed;
+    for (const section of ["login", "database", "domain"] as const) {
+      values = switchSectionMode(switchSectionMode(values, section, "auto").values, section, "manual").values;
+    }
+    expect(values.manual).toEqual(typed.manual);
+    expect(values.shared).toEqual(typed.shared);
   });
 
-  it("keeps the shared fields in both modes", () => {
+  it("keeps the shared fields whatever the switches say", () => {
     const typed = manualForm();
-    const auto = switchCredentialMode(typed, "auto").values;
+    const auto = switchSectionMode(typed, "login", "auto").values;
     expect(auto.shared).toEqual(typed.shared);
   });
 
-  it("does nothing when the mode does not change", () => {
+  it("does nothing when the section is already in that mode", () => {
     const values = withPreview();
-    expect(switchCredentialMode(values, "auto")).toEqual({ values, prefilled: [] });
+    expect(switchSectionMode(values, "database", "auto")).toEqual({ values, prefilled: [] });
   });
 });
 
 describe("effectiveDatabaseMode", () => {
-  it("allows an existing database only in Manual entry", () => {
+  it("allows an existing database only with the Database section on Manual", () => {
     const manual = manualForm();
     const existing: FormValues = { ...manual, manual: { ...manual.manual, databaseMode: "existing" } };
     expect(effectiveDatabaseMode(existing)).toBe("existing");
-    expect(effectiveDatabaseMode({ ...existing, mode: "auto" })).toBe("provisioned");
+    expect(effectiveDatabaseMode({ ...existing, modes: { ...existing.modes, database: "auto" } })).toBe(
+      "provisioned",
+    );
+    // The other sections' switches do not matter.
+    expect(
+      effectiveDatabaseMode({ ...existing, modes: { login: "auto", database: "manual", domain: "auto" } }),
+    ).toBe("existing");
+  });
+});
+
+describe("currentIdentifiers", () => {
+  it("takes each identifier from its own section's source", () => {
+    const values: FormValues = {
+      ...withPreview(manualForm()),
+      modes: { login: "auto", database: "manual", domain: "auto" },
+    };
+    expect(currentIdentifiers(values)).toEqual({
+      username: PREVIEW.username,
+      subdomain: PREVIEW.subdomain,
+      databaseName: "acme_db",
+      databaseUser: "acme_app",
+    });
+  });
+});
+
+describe("generatedSummary", () => {
+  it("lists only the identifiers of sections on Auto-Generate, with the full subdomain host", () => {
+    const allAuto = withPreview(filled(initialFormValues(PORT)));
+    expect(generatedSummary(allAuto, "example.com")).toEqual({
+      username: PREVIEW.username,
+      subdomainHost: `${PREVIEW.subdomain}.example.com`,
+      databaseName: PREVIEW.databaseName,
+      databaseUser: PREVIEW.databaseUser,
+    });
+
+    const mixed: FormValues = { ...withPreview(manualForm()), modes: { login: "manual", database: "auto", domain: "manual" } };
+    expect(generatedSummary(mixed, "example.com")).toEqual({
+      databaseName: PREVIEW.databaseName,
+      databaseUser: PREVIEW.databaseUser,
+    });
+    expect(generatedSummary(manualForm(), "example.com")).toEqual({});
   });
 });
 
@@ -193,10 +256,12 @@ describe("buildCreateFormData", () => {
     }
   });
 
-  it("submits the typed values in Manual entry", () => {
+  it("submits the typed values with every section on Manual", () => {
     const data = entries(buildCreateFormData(manualForm(), null));
     expect(data).toEqual({
-      credentialMode: "manual",
+      loginMode: "manual",
+      databaseCredentialMode: "manual",
+      subdomainMode: "manual",
       databaseMode: "provisioned",
       fullName: "Acme Music",
       phone: "+44 20 7946 0958",
@@ -212,12 +277,16 @@ describe("buildCreateFormData", () => {
     });
   });
 
-  it("in Auto generate submits the previewed identifiers and never a typed password or port", () => {
-    const typed = withPreview(manualForm());
-    const auto = switchCredentialMode(typed, "auto").values;
-    const data = buildCreateFormData(auto, null);
+  it("with every section on Auto submits the previewed identifiers and never a typed password or port", () => {
+    let values = withPreview(manualForm());
+    for (const section of ["login", "database", "domain"] as const) {
+      values = switchSectionMode(values, section, "auto").values;
+    }
+    const data = buildCreateFormData(values, null);
 
-    expect(data.get("credentialMode")).toBe("auto");
+    expect(data.get("loginMode")).toBe("auto");
+    expect(data.get("databaseCredentialMode")).toBe("auto");
+    expect(data.get("subdomainMode")).toBe("auto");
     expect(data.get("databaseMode")).toBe("provisioned");
     expect(data.get("username")).toBe(PREVIEW.username);
     expect(data.get("subdomain")).toBe(PREVIEW.subdomain);
@@ -231,13 +300,46 @@ describe("buildCreateFormData", () => {
     expect(all).not.toContain(DB_PASSWORD);
   });
 
-  it("sends an existing database only from Manual entry", () => {
+  it("mixes sources per section: generated login, typed database, generated subdomain", () => {
+    const values: FormValues = {
+      ...withPreview(manualForm()),
+      modes: { login: "auto", database: "manual", domain: "auto" },
+    };
+    const data = buildCreateFormData(values, null);
+
+    expect(data.get("loginMode")).toBe("auto");
+    expect(data.get("databaseCredentialMode")).toBe("manual");
+    expect(data.get("subdomainMode")).toBe("auto");
+    expect(data.get("username")).toBe(PREVIEW.username);
+    expect(data.get("subdomain")).toBe(PREVIEW.subdomain);
+    expect(data.get("databaseName")).toBe("acme_db");
+    // The login's typed password stays in the browser; the database's is sent.
+    expect(data.has("masterPassword")).toBe(false);
+    expect(data.get("databasePassword")).toBe(DB_PASSWORD);
+    expect(data.get("databasePort")).toBe("5432");
+  });
+
+  it("sends the master password only with the login on Manual", () => {
+    const values: FormValues = {
+      ...withPreview(manualForm()),
+      modes: { login: "manual", database: "auto", domain: "auto" },
+    };
+    const data = buildCreateFormData(values, null);
+    expect(data.get("masterPassword")).toBe(MASTER);
+    expect(data.has("databasePassword")).toBe(false);
+    expect(data.has("databasePort")).toBe(false);
+  });
+
+  it("sends an existing database only with the Database section on Manual", () => {
     const manual = manualForm();
     const existing: FormValues = { ...manual, manual: { ...manual.manual, databaseMode: "existing" } };
     expect(buildCreateFormData(existing, null).get("databaseMode")).toBe("existing");
-    expect(buildCreateFormData({ ...withPreview(existing), mode: "auto" }, null).get("databaseMode")).toBe(
-      "provisioned",
-    );
+    expect(
+      buildCreateFormData(
+        { ...withPreview(existing), modes: { ...existing.modes, database: "auto" } },
+        null,
+      ).get("databaseMode"),
+    ).toBe("provisioned");
   });
 
   it("adds the profile image as the File itself, and nothing without one", () => {
@@ -253,7 +355,10 @@ describe("validateForm", () => {
   });
 
   it("reports every missing required field at once", () => {
-    const errors = validateForm({ ...initialFormValues(PORT), mode: "manual" }, CTX);
+    const errors = validateForm(
+      { ...initialFormValues(PORT), modes: { login: "manual", database: "manual", domain: "manual" } },
+      CTX,
+    );
     expect(Object.keys(errors).sort()).toEqual(
       [
         "databaseName",
@@ -268,12 +373,23 @@ describe("validateForm", () => {
     );
   });
 
-  it("in Auto generate only asks for the preview, never for passwords", () => {
+  it("with every section on Auto only asks for the preview (once per section), never for passwords", () => {
     const named = filled(initialFormValues(PORT));
-    expect(Object.keys(validateForm(named, CTX))).toEqual(["username"]);
+    const errors = validateForm(named, CTX);
+    expect(Object.keys(errors)).toEqual(["username", "databaseName", "subdomain"]);
+    expect(errors.username).toBe(NOT_GENERATED_YET);
     expect(validateForm(withPreview(named), CTX)).toEqual({});
     // Without a valid name the full name's own error says what to do.
     expect(validateForm(initialFormValues(PORT), CTX).username).toBeUndefined();
+  });
+
+  it("validates only the Manual sections' typed values in a mixed form", () => {
+    const named = withPreview(filled(initialFormValues(PORT)));
+    const mixed: FormValues = { ...named, modes: { login: "auto", database: "manual", domain: "auto" } };
+    // The database section is on Manual with nothing typed: only its fields are reported.
+    expect(Object.keys(validateForm(mixed, CTX)).sort()).toEqual(
+      ["databaseName", "databasePassword", "databaseUser"].sort(),
+    );
   });
 
   it("applies the new-database password rule only to a new database", () => {
@@ -352,6 +468,12 @@ describe("summarizeErrors", () => {
     expect(summarizeErrors({})).toEqual([]);
   });
 
+  it("puts each section's switch in that section", () => {
+    expect(sectionOfField("loginMode")).toBe("login");
+    expect(sectionOfField("databaseCredentialMode")).toBe("database");
+    expect(sectionOfField("subdomainMode")).toBe("domain");
+  });
+
   it("places every form field in a section", () => {
     const all = Object.fromEntries(CREATE_TENANT_FIELDS.map((field) => [field, "x"]));
     const total = summarizeErrors(all).reduce((sum, section) => sum + section.count, 0);
@@ -360,10 +482,24 @@ describe("summarizeErrors", () => {
 });
 
 describe("errors and passwords after a result", () => {
-  it("drops the mode-dependent errors on a mode switch and keeps the shared ones", () => {
-    expect(
-      errorsAfterModeSwitch({ fullName: "a", email: "b", username: "c", masterPassword: "d", databasePort: "e" }),
-    ).toEqual({ fullName: "a", email: "b" });
+  it("drops only the switched section's mode-dependent errors", () => {
+    const errors = { fullName: "a", email: "b", username: "c", masterPassword: "d", databasePort: "e", subdomain: "f" };
+    expect(errorsAfterModeSwitch(errors, "login")).toEqual({ fullName: "a", email: "b", databasePort: "e", subdomain: "f" });
+    expect(errorsAfterModeSwitch(errors, "database")).toEqual({
+      fullName: "a",
+      email: "b",
+      username: "c",
+      masterPassword: "d",
+      subdomain: "f",
+    });
+    expect(errorsAfterModeSwitch({ ...errors, customDomain: "g" }, "domain")).toEqual({
+      fullName: "a",
+      email: "b",
+      username: "c",
+      masterPassword: "d",
+      databasePort: "e",
+      customDomain: "g",
+    });
   });
 
   it("clears only a password the server rejected", () => {

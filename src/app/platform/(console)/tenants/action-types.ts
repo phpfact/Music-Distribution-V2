@@ -46,7 +46,7 @@ export type CreateTenantActionState =
   | {
       status: "created";
       tenantId: string;
-      /** Auto mode only: shown once, never stored. */
+      /** Login section on Auto-Generate only: shown once, never stored. */
       generatedMasterPassword?: string;
     };
 

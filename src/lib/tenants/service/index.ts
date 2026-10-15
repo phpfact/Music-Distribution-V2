@@ -21,6 +21,7 @@ export {
   type CreateTenantInput,
   type CreateTenantResult,
   type CredentialMode,
+  type CredentialModes,
   createTenant,
   type DatabaseMode,
   startProvisioning,

@@ -33,9 +33,11 @@ import {
   Field,
   hintId,
 } from "../../../_components/field";
+import { FormActions, RequiredLegend } from "../../../_components/form-actions";
 import { FormSection } from "../../../_components/form-section";
 import { Icon } from "../../../_components/icons";
 import { Notice } from "../../../_components/notice";
+import { SensitiveInput } from "../../../_components/sensitive-input";
 import { Spinner } from "../../../_components/spinner";
 import { FOCUS_RING } from "../../../_components/styles";
 import type {
@@ -399,139 +401,145 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
         <legend className="sr-only">Tenant details</legend>
 
         {/* 1. Profile */}
-        <FormSection number={1} title="Profile">
-          <div className="grid gap-5 sm:grid-cols-2">
-            <Field
-              label="Full name"
-              htmlFor={fid("fullName")}
-              required
-              error={errors.fullName}
+        <FormSection
+          icon="user"
+          title="Profile"
+          description="Who the tenant is and how they are shown in the console."
+        >
+          {/* Profile image on the left, the name and phone beside it (as on the create form). */}
+          <div className="flex flex-col gap-6 md:flex-row md:items-start">
+            <div
+              role="group"
+              aria-labelledby={fid("profileImage-label")}
+              className="flex shrink-0 flex-col gap-2 md:w-48 md:items-center md:text-center"
             >
-              <Input
-                id={fid("fullName")}
-                type="text"
-                value={values.fullName}
-                maxLength={FULL_NAME_MAX_LENGTH}
-                autoComplete="off"
-                onChange={(event) => setField("fullName", event.target.value)}
-                onBlur={() => validateOnBlur("fullName")}
-                {...describedBy(fid("fullName"), { error: errors.fullName })}
-              />
-            </Field>
-            <Field
-              label="Phone"
-              htmlFor={fid("phone")}
-              hint="Include the country code, e.g. +44 20 7946 0958"
-              error={errors.phone}
-            >
-              <Input
-                id={fid("phone")}
-                type="tel"
-                value={values.phone}
-                maxLength={PHONE_MAX_LENGTH}
-                autoComplete="off"
-                onChange={(event) => setField("phone", event.target.value)}
-                onBlur={() => validateOnBlur("phone")}
-                {...describedBy(fid("phone"), {
-                  hint: true,
-                  error: errors.phone,
-                })}
-              />
-            </Field>
-          </div>
-
-          <div
-            role="group"
-            aria-labelledby={fid("profileImage-label")}
-            className="flex min-w-0 flex-col gap-1.5"
-          >
-            <p
-              id={fid("profileImage-label")}
-              className="text-sm font-medium text-fg"
-            >
-              Profile image
-            </p>
-            <div className="flex flex-wrap items-center gap-4">
-              <Avatar
-                name={values.fullName || tenant.fullName}
-                src={previewSrc}
-                size="lg"
-              />
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  id={fid("profileImage")}
-                  onClick={() => fileInputRef.current?.click()}
-                  {...describedBy(fid("profileImage"), {
-                    hint: true,
-                    error: imageError,
-                  })}
-                  variant="outline"
-                  size="sm"
-                >
-                  <Icon name="upload" className="size-4" />
-                  {hasImage ? "Change" : "Upload image"}
-                </Button>
-                {hasImage ? (
-                  <Button
-                    type="button"
-                    onClick={removeImage}
-                    variant="ghost"
-                    size="sm"
-                  >
-                    <Icon name="trash-2" className="size-4" />
-                    Remove
-                  </Button>
-                ) : null}
-                {image.action !== "keep" && storedImage ? (
-                  <Button
-                    type="button"
-                    onClick={keepImage}
-                    variant="ghost"
-                    size="sm"
-                  >
-                    <Icon name="rotate-ccw" className="size-4" />
-                    Keep current image
-                  </Button>
-                ) : null}
-              </div>
-              {/* Visually hidden and out of the tab order: the buttons above drive it. */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept={PROFILE_IMAGE_ACCEPT}
-                tabIndex={-1}
-                aria-hidden="true"
-                onChange={handleImageChange}
-                className="sr-only"
-              />
-            </div>
-            <p
-              id={hintId(fid("profileImage"))}
-              className="text-xs text-fg-subtle"
-            >
-              PNG, JPEG or WebP, up to 2 MB
-            </p>
-            <p
-              aria-live="polite"
-              className="text-xs text-fg-muted empty:hidden"
-            >
-              {imageStatus}
-            </p>
-            {imageError ? (
               <p
-                id={errorId(fid("profileImage"))}
-                className="text-sm text-destructive"
+                id={fid("profileImage-label")}
+                className="text-sm font-medium text-fg"
               >
-                {imageError}
+                Profile image
               </p>
-            ) : null}
+              <div className="flex flex-wrap items-center gap-4 md:flex-col">
+                <Avatar
+                  name={values.fullName || tenant.fullName}
+                  src={previewSrc}
+                  size="lg"
+                />
+                <div className="flex flex-wrap gap-2 md:justify-center">
+                  <Button
+                    type="button"
+                    id={fid("profileImage")}
+                    onClick={() => fileInputRef.current?.click()}
+                    {...describedBy(fid("profileImage"), {
+                      hint: true,
+                      error: imageError,
+                    })}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <Icon name="upload" className="size-4" />
+                    {hasImage ? "Change" : "Upload image"}
+                  </Button>
+                  {hasImage ? (
+                    <Button
+                      type="button"
+                      onClick={removeImage}
+                      variant="ghost"
+                      size="sm"
+                    >
+                      <Icon name="trash-2" className="size-4" />
+                      Remove
+                    </Button>
+                  ) : null}
+                  {image.action !== "keep" && storedImage ? (
+                    <Button
+                      type="button"
+                      onClick={keepImage}
+                      variant="ghost"
+                      size="sm"
+                    >
+                      <Icon name="rotate-ccw" className="size-4" />
+                      Keep current image
+                    </Button>
+                  ) : null}
+                </div>
+                {/* Visually hidden and out of the tab order: the buttons above drive it. */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={PROFILE_IMAGE_ACCEPT}
+                  tabIndex={-1}
+                  aria-hidden="true"
+                  onChange={handleImageChange}
+                  className="sr-only"
+                />
+              </div>
+              <p
+                id={hintId(fid("profileImage"))}
+                className="text-xs text-fg-subtle"
+              >
+                PNG, JPEG or WebP, up to 2 MB
+              </p>
+              <p
+                aria-live="polite"
+                className="text-xs text-fg-muted empty:hidden"
+              >
+                {imageStatus}
+              </p>
+              {imageError ? (
+                <p
+                  id={errorId(fid("profileImage"))}
+                  className="text-sm text-destructive"
+                >
+                  {imageError}
+                </p>
+              ) : null}
+            </div>
+            <div className="grid flex-1 gap-5 sm:grid-cols-2">
+              <Field
+                label="Full name"
+                htmlFor={fid("fullName")}
+                required
+                error={errors.fullName}
+              >
+                <Input
+                  id={fid("fullName")}
+                  type="text"
+                  value={values.fullName}
+                  maxLength={FULL_NAME_MAX_LENGTH}
+                  autoComplete="off"
+                  onChange={(event) => setField("fullName", event.target.value)}
+                  onBlur={() => validateOnBlur("fullName")}
+                  {...describedBy(fid("fullName"), { error: errors.fullName })}
+                />
+              </Field>
+              <Field
+                label="Phone"
+                htmlFor={fid("phone")}
+                hint="Include the country code, e.g. +44 20 7946 0958"
+                error={errors.phone}
+              >
+                <Input
+                  id={fid("phone")}
+                  type="tel"
+                  value={values.phone}
+                  maxLength={PHONE_MAX_LENGTH}
+                  autoComplete="off"
+                  onChange={(event) => setField("phone", event.target.value)}
+                  onBlur={() => validateOnBlur("phone")}
+                  {...describedBy(fid("phone"), {
+                    hint: true,
+                    error: errors.phone,
+                  })}
+                />
+              </Field>
+            </div>
           </div>
         </FormSection>
 
         {/* 2. Login */}
         <FormSection
-          number={2}
+          icon="key-round"
           title="Login"
           description="Passwords are changed with Reset master password on the tenant page."
         >
@@ -542,15 +550,13 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
               required
               error={errors.username}
             >
-              <Input
+              {/* Masked like every username in the console; the eye reveals it. */}
+              <SensitiveInput
                 id={fid("username")}
-                type="text"
+                noun="username"
                 value={values.username}
                 maxLength={TENANT_USERNAME_MAX_LENGTH}
-                autoComplete="off"
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
+                hasError={Boolean(errors.username)}
                 onChange={(event) => setField("username", event.target.value)}
                 onBlur={() => validateOnBlur("username")}
                 {...describedBy(fid("username"), { error: errors.username })}
@@ -579,7 +585,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
         </FormSection>
 
         {/* 3. Domain */}
-        <FormSection number={3} title="Domain" description={domainNote}>
+        <FormSection icon="globe" title="Domain" description={domainNote}>
           <div className="grid gap-5 sm:grid-cols-2">
             <Field
               label="SaaS subdomain"
@@ -654,20 +660,15 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
         </FormSection>
       </fieldset>
 
-      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-        <Button asChild variant="outline" className="w-full sm:w-auto">
+      <FormActions note={<RequiredLegend />}>
+        <Button asChild variant="outline">
           <Link href={detailsHref}>Cancel</Link>
         </Button>
-        <Button
-          type="submit"
-          disabled={locked || busy}
-          variant="default"
-          className="w-full sm:w-auto"
-        >
-          {busy ? <Spinner size="sm" /> : null}
+        <Button type="submit" disabled={locked || busy} variant="default">
+          {busy ? <Spinner size="sm" /> : <Icon name="check" className="size-4" />}
           {busy ? "Saving…" : "Save changes"}
         </Button>
-      </div>
+      </FormActions>
     </form>
   );
 }

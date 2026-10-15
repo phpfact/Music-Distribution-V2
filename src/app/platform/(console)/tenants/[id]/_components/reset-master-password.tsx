@@ -18,7 +18,7 @@ import {
   validateMasterPassword,
 } from "@/lib/tenants/rules";
 import { ConfirmDialog } from "../../../_components/confirm-dialog";
-import { CopyButton } from "../../../_components/copy-button";
+import { SensitiveValue } from "../../../_components/sensitive-value";
 import { errorId, Field } from "../../../_components/field";
 import { Icon } from "../../../_components/icons";
 import { PasswordInput } from "../../../_components/password-input";
@@ -310,12 +310,14 @@ function GeneratedPasswordDialog({
             Copy it now. It won&apos;t be shown again.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-3 rounded-lg border border-warning/30 bg-warning/10 p-4 sm:flex-row sm:items-center">
-          <code className="min-w-0 flex-1 font-mono text-sm break-all text-foreground">
-            {password}
-          </code>
+        {/* Masked until the eye button is used; Copy works either way. */}
+        <div className="rounded-lg border border-warning/30 bg-warning/10 p-4">
           {password !== null ? (
-            <CopyButton value={password} label="Copy master password" />
+            <SensitiveValue
+              value={password}
+              noun="master password"
+              copyLabel="Copy master password"
+            />
           ) : null}
         </div>
         <DialogFooter>

@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { getEnv } from "@/lib/env";
 import { requirePlatformOwner } from "@/lib/platform-auth/dal";
-import { Icon } from "../../_components/icons";
-import { FOCUS_RING } from "../../_components/styles";
+import { PageHeader } from "../../_components/page-header";
 import { CreateTenantForm } from "./create-tenant-form";
 
 export const metadata: Metadata = { title: "Create tenant" };
@@ -27,25 +25,15 @@ export default async function CreateTenantPage() {
   // the console scrolls inside its own container, and without a positioned
   // ancestor they would stretch the document below it.
   return (
-    <div className="relative flex w-full max-w-3xl flex-col gap-8">
-      <header className="flex min-w-0 flex-col gap-2">
-        <Link
-          href="/platform/tenants"
-          className={`inline-flex w-fit items-center gap-1.5 rounded-md text-sm font-medium text-fg-muted transition-colors hover:text-fg ${FOCUS_RING}`}
-        >
-          <Icon name="arrow-left" className="size-4" />
-          Tenants
-        </Link>
-        <p className="mt-2 text-xs font-medium tracking-wider text-primary uppercase">
-          Platform management
-        </p>
-        <h1 className="text-2xl font-semibold tracking-tight break-words sm:text-3xl">
-          Create tenant
-        </h1>
-        <p className="text-fg-muted">
-          Set up a new tenant with its own admin login, database and subdomain.
-        </p>
-      </header>
+    // Centred and capped so the two-column fields stay readable on wide screens.
+    <div className="relative mx-auto flex w-full max-w-4xl flex-col gap-8">
+      <PageHeader
+        backHref="/platform/tenants"
+        backLabel="Tenants"
+        eyebrow="Platform management"
+        title="Create tenant"
+        description="Set up a new tenant with its own admin login, database and subdomain. Each section can generate its values for you or take what you type."
+      />
 
       <CreateTenantForm
         baseDomain={platformBaseDomain}

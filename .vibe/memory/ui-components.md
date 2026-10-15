@@ -23,6 +23,24 @@ those versions and the existing CSS-first Tailwind configuration.
 - Preserve reduced motion, visible focus, accessible names, error announcements,
   pending-state duplicate guards and keyboard/focus behavior.
 
+## Console wrappers added for the tenant layout refresh (2026-10-15)
+
+Composed from the shared primitives in `src/app/platform/(console)/_components/`
+(details and rationale in `tenant-management.md`):
+
+- `RevealToggle`: the one eye button ("Show <noun>" / "Hide <noun>",
+  `aria-pressed`, `aria-controls`). `PasswordInput` now uses it (same markup
+  and names as before, e.g. "Show password").
+- `SensitiveInput`: `type="text"` input masked with `-webkit-text-security`
+  until revealed; for usernames and database identifiers (never a password
+  field, so password managers ignore it).
+- `SensitiveValue`: read-only fixed-length mask with reveal and optional Copy.
+- `ModeSwitch`: segmented "Auto-Generate | Manual" Radix radio group.
+- `FormSection`: now `icon` (tinted tile) instead of a number badge, plus an
+  `action` slot in the header. Only the tenant forms use it.
+- `FormActions` + `RequiredLegend`: sticky bottom action bar for long forms.
+- `PageHeader`: back link, eyebrow, h1, description and actions.
+
 ## Current status and verification
 
 2026-10-15: Migrated authentication, dashboard, all tenant screens, Appearance,
@@ -79,3 +97,7 @@ illustrates multiple draft palettes rather than inheriting the active mode.
 
 - 2026-10-15: User explicitly waived browser verification and requested completion
   using the passing automated checks; no rendered-browser results are claimed.
+- 2026-10-15: Added RevealToggle, SensitiveInput, SensitiveValue, ModeSwitch,
+  FormActions/RequiredLegend and PageHeader; FormSection takes an icon and an
+  action slot; PasswordInput reuses RevealToggle (no behaviour change). Lint,
+  types and the full suite pass; rendered in the in-app browser.

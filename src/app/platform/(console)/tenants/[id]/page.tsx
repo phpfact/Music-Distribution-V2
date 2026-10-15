@@ -11,6 +11,7 @@ import { Avatar } from "../../_components/avatar";
 import { CopyButton } from "../../_components/copy-button";
 import { Icon, type IconName } from "../../_components/icons";
 import { Notice } from "../../_components/notice";
+import { SensitiveValue } from "../../_components/sensitive-value";
 import { Spinner } from "../../_components/spinner";
 import { StatusBadge, ToneBadge } from "../../_components/status-badge";
 import { FOCUS_RING } from "../../_components/styles";
@@ -114,10 +115,8 @@ export default async function TenantDetailsPage({
                 </h1>
                 <StatusBadge status={tenant.status} />
               </div>
+              {/* The username is masked in the Admin login card, so it is not repeated here. */}
               <p className="text-sm break-words text-fg-muted">
-                @{tenant.login.username}
-                <span aria-hidden="true"> · </span>
-                <span className="sr-only">, </span>
                 Created{" "}
                 <time dateTime={tenant.createdAt}>
                   {formatDate(tenant.createdAt)}
@@ -210,7 +209,8 @@ function DetailCard({ id, title, icon, actions, children }: DetailCardProps) {
   return (
     <section aria-labelledby={titleId}>
       <Card className="h-full min-w-0 gap-0 py-0">
-        <CardHeader className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4">
+        {/* min-h keeps headers with and without buttons the same height, so side-by-side cards line up. */}
+        <CardHeader className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3">
           <CardTitle
             id={titleId}
             role="heading"
@@ -465,7 +465,9 @@ function LoginCard({ tenant }: { tenant: TenantDetails }) {
       }
     >
       <DetailList>
-        <DetailRow label="Username">{tenant.login.username}</DetailRow>
+        <DetailRow label="Username">
+          <SensitiveValue value={tenant.login.username} noun="username" />
+        </DetailRow>
         <DetailRow label="Email">{tenant.login.email}</DetailRow>
         <DetailRow label="Two-factor authentication">
           <span className="text-fg-muted">
@@ -515,14 +517,14 @@ function DatabaseCard({ tenant }: { tenant: TenantDetails }) {
         </DetailRow>
         <DetailRow label="Name">
           {database.name ? (
-            <span className="font-mono">{database.name}</span>
+            <SensitiveValue value={database.name} noun="database name" />
           ) : (
             <Missing />
           )}
         </DetailRow>
         <DetailRow label="User">
           {database.user ? (
-            <span className="font-mono">{database.user}</span>
+            <SensitiveValue value={database.user} noun="database user" />
           ) : (
             <Missing />
           )}

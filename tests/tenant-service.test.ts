@@ -35,7 +35,7 @@ import {
   type TenantSummary,
   testDatabaseConnection,
 } from "@/lib/tenants/service";
-import { validateMasterPassword, validateTenantUsername } from "@/lib/tenants/rules";
+import { validateMasterPassword, validateNewDatabasePassword, validateTenantUsername } from "@/lib/tenants/rules";
 import { closeAppDatabase, closeAppRedis } from "./support/app-connections";
 import { captureConsole } from "./support/console";
 import { clearTenantTables, connectToTestDatabase, insertOwner, insertTenant } from "./support/postgres";
@@ -151,7 +151,9 @@ function manualInput(label: string, overrides: Partial<CreateTenantInput> = {}):
     databasePort: "",
     subdomain: `test-${label}-${token}`.replaceAll("_", "-"),
     customDomain: "",
-    credentialMode: "manual",
+    loginMode: "manual",
+    databaseCredentialMode: "manual",
+    subdomainMode: "manual",
     databaseMode: "provisioned",
     profileImage: null,
     ...overrides,
@@ -279,7 +281,9 @@ describe("createTenant", () => {
         databasePort: "1",
         subdomain: preview.values.subdomain,
         customDomain: ` ${customDomain.toUpperCase()}. `,
-        credentialMode: "auto",
+        loginMode: "auto",
+        databaseCredentialMode: "auto",
+        subdomainMode: "auto",
         databaseMode: "provisioned",
         profileImage: null,
       },
@@ -344,7 +348,13 @@ describe("createTenant", () => {
         actor_type: "super_admin",
         actor_id: ownerId,
         ip: "203.0.113.9",
-        metadata: { credentialMode: "auto", databaseMode: "provisioned", hasCustomDomain: true },
+        metadata: {
+          loginMode: "auto",
+          databaseCredentialMode: "auto",
+          subdomainMode: "auto",
+          databaseMode: "provisioned",
+          hasCustomDomain: true,
+        },
       },
     ]);
 
@@ -396,7 +406,9 @@ describe("createTenant", () => {
       databasePort: "",
       subdomain: "",
       customDomain: "",
-      credentialMode: "manual",
+      loginMode: "manual",
+      databaseCredentialMode: "manual",
+      subdomainMode: "manual",
       databaseMode: "provisioned",
       profileImage: null,
     };
@@ -421,7 +433,9 @@ describe("createTenant", () => {
   it("rejects unknown modes and invalid optional fields", async () => {
     const result = await createTenant(
       manualInput("modes", {
-        credentialMode: "sometimes",
+        loginMode: "sometimes",
+        databaseCredentialMode: "sometimes",
+        subdomainMode: "sometimes",
         databaseMode: "borrowed",
         phone: "12",
         databasePort: "70000",
@@ -431,20 +445,63 @@ describe("createTenant", () => {
     );
     if (result.ok || result.reason !== "validation") throw new Error(JSON.stringify(result));
     expect(Object.keys(result.fieldErrors).sort()).toStrictEqual(
-      ["credentialMode", "customDomain", "databaseMode", "phone"].sort(),
+      ["loginMode", "databaseCredentialMode", "subdomainMode", "customDomain", "databaseMode", "phone"].sort(),
     );
   });
 
-  it("rejects an existing database in auto mode", async () => {
+  it("rejects an existing database with the Database section on Auto", async () => {
     const result = await createTenant(
-      manualInput("autoexisting", { credentialMode: "auto", databaseMode: "existing" }),
+      manualInput("autoexisting", { databaseCredentialMode: "auto", databaseMode: "existing" }),
       actor(),
     );
     expect(result).toMatchObject({
       ok: false,
       reason: "validation",
-      fieldErrors: { databaseMode: "Switch to Manual entry to attach an existing database." },
+      fieldErrors: { databaseMode: "Switch the Database section to Manual to attach an existing database." },
     });
+  });
+
+  it("mixes section modes: generated master password, typed database credentials", async () => {
+    const input = manualInput("mixlogin", {
+      loginMode: "auto",
+      // Ignored: the login section is on Auto, so the server generates the password.
+      masterPassword: "ignored-master",
+      databasePort: String(postgresPort()),
+    });
+    const result = await createTenant(input, actor());
+    if (!result.ok) throw new Error(JSON.stringify(result));
+    const password = result.generatedMasterPassword ?? "";
+    secrets.add(password);
+    expect(validateMasterPassword(password, input.username).ok).toBe(true);
+
+    const row = await tenantRow(result.tenantId);
+    expect(row).toMatchObject({ database_name: input.databaseName, database_port: postgresPort() });
+    expect(await verifyPassword(row?.pending_admin_password_hash ?? "", password)).toBe(true);
+    expect(await readSecret(row?.database_secret_ref ?? "", "tenant_database_password")).toBe(
+      input.databasePassword,
+    );
+    secrets.add(row?.pending_admin_password_hash ?? "");
+  });
+
+  it("mixes section modes: typed master password, generated database secrets, no password returned", async () => {
+    const input = manualInput("mixdb", {
+      databaseCredentialMode: "auto",
+      // Ignored: the database section is on Auto, so the password and port are generated.
+      databasePassword: "ignored-database",
+      databasePort: "1",
+    });
+    const result = await createTenant(input, actor());
+    if (!result.ok) throw new Error(JSON.stringify(result));
+    expect(Object.keys(result).sort()).toStrictEqual(["ok", "tenantId"]);
+
+    const row = await tenantRow(result.tenantId);
+    expect(row).toMatchObject({ database_port: postgresPort() });
+    expect(await verifyPassword(row?.pending_admin_password_hash ?? "", input.masterPassword)).toBe(true);
+    const stored = await readSecret(row?.database_secret_ref ?? "", "tenant_database_password");
+    secrets.add(stored);
+    expect(stored).not.toBe("ignored-database");
+    expect(validateNewDatabasePassword(stored).ok).toBe(true);
+    secrets.add(row?.pending_admin_password_hash ?? "");
   });
 
   it("rejects a manual port no PostgreSQL server answers on", async () => {
@@ -514,12 +571,21 @@ describe("createTenant: names already taken", () => {
   });
 
   it("tells the owner to regenerate when a previewed value was taken meanwhile", async () => {
-    const input = manualInput("regen", { username: existing.username, credentialMode: "auto" });
+    const input = manualInput("regen", {
+      username: existing.username,
+      subdomain: existing.subdomain,
+      loginMode: "auto",
+    });
     const result = await createTenant(input, actor());
     expect(result).toMatchObject({
       ok: false,
       reason: "validation",
-      fieldErrors: { username: `${existing.username} is no longer available — regenerate.` },
+      fieldErrors: {
+        // The login section is on Auto: its username was previewed.
+        username: `${existing.username} is no longer available — regenerate.`,
+        // The domain section is on Manual: the owner typed the subdomain.
+        subdomain: "This subdomain is already taken. Choose another one.",
+      },
     });
   });
 

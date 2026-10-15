@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { requirePlatformOwner } from "@/lib/platform-auth/dal";
 import { getTenantForEdit } from "@/lib/tenants/service";
-import { Icon } from "../../../_components/icons";
-import { FOCUS_RING } from "../../../_components/styles";
+import { PageHeader } from "../../../_components/page-header";
 import { TENANTS_PATH } from "../../list-query";
 import { EditTenantForm } from "./edit-tenant-form";
 
@@ -48,26 +46,15 @@ export default async function EditTenantPage({ params }: PageProps) {
   const detailsHref = `${TENANTS_PATH}/${tenant.id}`;
 
   return (
-    <div className="flex w-full max-w-3xl flex-col gap-8">
-      <header className="flex min-w-0 flex-col gap-2">
-        <Link
-          href={detailsHref}
-          className={`inline-flex w-fit items-center gap-1.5 rounded-md text-sm font-medium text-fg-muted transition-colors hover:text-fg ${FOCUS_RING}`}
-        >
-          <Icon name="arrow-left" className="size-4" />
-          <span className="break-all">{tenant.fullName}</span>
-        </Link>
-        <p className="mt-2 text-xs font-medium tracking-wider text-primary uppercase">
-          Platform management
-        </p>
-        <h1 className="text-2xl font-semibold tracking-tight break-words sm:text-3xl">
-          Edit tenant
-        </h1>
-        <p className="text-fg-muted">
-          Change the tenant&apos;s profile, admin login and domains. Credentials
-          are changed on the tenant page.
-        </p>
-      </header>
+    // Centred and capped like the create page, so both forms look the same.
+    <div className="relative mx-auto flex w-full max-w-4xl flex-col gap-8">
+      <PageHeader
+        backHref={detailsHref}
+        backLabel={tenant.fullName}
+        eyebrow="Platform management"
+        title="Edit tenant"
+        description="Change the tenant's profile, admin login and domains. Credentials are changed on the tenant page."
+      />
 
       <EditTenantForm tenant={tenant} />
     </div>

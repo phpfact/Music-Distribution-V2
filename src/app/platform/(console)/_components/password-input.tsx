@@ -1,10 +1,9 @@
 "use client";
 
-import { Eye, EyeOff } from "lucide-react";
 import { useState, type ComponentPropsWithRef } from "react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { RevealToggle } from "./reveal-toggle";
 
 type PasswordInputProps = Omit<
   ComponentPropsWithRef<"input">,
@@ -32,7 +31,6 @@ export function PasswordInput({
   ...inputProps
 }: PasswordInputProps) {
   const [visible, setVisible] = useState(false);
-  const accessibleName = visible ? "Hide password" : "Show password";
 
   return (
     <div className="relative">
@@ -48,20 +46,15 @@ export function PasswordInput({
         aria-invalid={hasError || inputProps["aria-invalid"] || undefined}
         className={cn(className, "pr-12")}
       />
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        aria-label={accessibleName}
-        title={accessibleName}
-        aria-pressed={visible}
-        aria-controls={id}
+      {/* The same eye button as every other masked value in the console. */}
+      <RevealToggle
+        visible={visible}
+        onToggle={() => setVisible((current) => !current)}
+        noun="password"
+        controls={id}
         disabled={disabled}
-        onClick={() => setVisible((current) => !current)}
-        className="absolute top-1/2 right-1 size-8 -translate-y-1/2 text-muted-foreground"
-      >
-        {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-      </Button>
+        className="absolute top-1/2 right-1 -translate-y-1/2"
+      />
     </div>
   );
 }

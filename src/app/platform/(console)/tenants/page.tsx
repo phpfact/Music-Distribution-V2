@@ -39,6 +39,7 @@ import {
 import { Avatar } from "../_components/avatar";
 import { Icon } from "../_components/icons";
 import { Notice } from "../_components/notice";
+import { PageHeader } from "../_components/page-header";
 import { StatCard } from "../_components/stat-card";
 import { StatusBadge } from "../_components/status-badge";
 import { FOCUS_RING } from "../_components/styles";
@@ -97,25 +98,19 @@ export default async function PlatformTenantsPage({ searchParams }: PageProps) {
   return (
     <TenantFlashProvider>
       <div className="flex flex-col gap-8">
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div className="flex min-w-0 flex-col gap-3">
-            <p className="text-[11px] font-semibold tracking-[0.15em] text-primary uppercase">
-              Platform management
-            </p>
-            <h1 className="text-3xl font-semibold tracking-tight break-words sm:text-4xl">
-              Tenant Management
-            </h1>
-            <p className="max-w-xl text-sm leading-6 text-fg-muted">
-              Create, review and manage the tenants registered on the platform.
-            </p>
-          </div>
-          <Button asChild variant="default" className="self-start sm:self-auto">
-            <Link href={NEW_TENANT_PATH}>
-              <Icon name="plus" className="size-4" />
-              Create tenant
-            </Link>
-          </Button>
-        </header>
+        <PageHeader
+          eyebrow="Platform management"
+          title="Tenant Management"
+          description="Create, review and manage the tenants registered on the platform."
+          actions={
+            <Button asChild variant="default">
+              <Link href={NEW_TENANT_PATH}>
+                <Icon name="plus" className="size-4" />
+                Create tenant
+              </Link>
+            </Button>
+          }
+        />
 
         {notice ? <Notice variant="success">{notice}</Notice> : null}
         <TenantFlashNotice />
@@ -330,10 +325,14 @@ function TenantStatusCell({ row }: { row: TenantListRow }) {
 function DomainCell({ row }: { row: TenantListRow }) {
   return (
     <div className="flex min-w-0 flex-col gap-1">
-      <span className="break-all text-fg">{row.subdomainHost ?? "—"}</span>
+      <span className="text-fg [overflow-wrap:anywhere]">
+        {row.subdomainHost ?? "—"}
+      </span>
       {row.customDomain ? (
         <span className="flex flex-wrap items-center gap-1.5 text-fg-muted">
-          <span className="break-all">{row.customDomain.host}</span>
+          <span className="[overflow-wrap:anywhere]">
+            {row.customDomain.host}
+          </span>
           {row.customDomain.status !== "active" ? (
             <DomainStatusBadge status={row.customDomain.status} compact />
           ) : null}
@@ -380,7 +379,7 @@ const TH = "px-5 py-3.5 text-[11px] font-semibold tracking-wide";
 const TD = "px-5 py-4 align-middle whitespace-normal";
 
 /**
- * xl and up: below that, next to the sidebar, the seven columns would only fit
+ * xl and up: below that, next to the sidebar, the six columns would only fit
  * by scrolling sideways and the row actions would sit off-screen.
  *
  * Input: The existing typed arguments and component state.
@@ -411,9 +410,6 @@ function TenantTable({ rows }: { rows: TenantListRow[] }) {
             <TableHead scope="col" className={TH}>
               Status
             </TableHead>
-            <TableHead scope="col" className={TH}>
-              Created
-            </TableHead>
             <TableHead scope="col" className={`${TH} text-right`}>
               <span className="sr-only">Actions</span>
             </TableHead>
@@ -428,6 +424,7 @@ function TenantTable({ rows }: { rows: TenantListRow[] }) {
               <TableCell className={`${TD} max-w-56`}>
                 <div className="flex items-center gap-3">
                   <Avatar name={row.name} src={avatarSrc(row)} size="sm" />
+                  {/* Name and creation date; the admin username is a credential and is not listed. */}
                   <div className="min-w-0">
                     <Link
                       href={`${TENANTS_PATH}/${row.id}`}
@@ -435,8 +432,8 @@ function TenantTable({ rows }: { rows: TenantListRow[] }) {
                     >
                       {row.name}
                     </Link>
-                    <p className="mt-0.5 truncate text-xs text-fg-subtle">
-                      @{row.username}
+                    <p className="mt-0.5 text-xs text-fg-subtle">
+                      Created <CreatedCell row={row} />
                     </p>
                   </div>
                 </div>
@@ -447,7 +444,7 @@ function TenantTable({ rows }: { rows: TenantListRow[] }) {
                   <p className="mt-0.5 truncate text-fg-subtle">{row.phone}</p>
                 ) : null}
               </TableCell>
-              <TableCell className={`${TD} max-w-64`}>
+              <TableCell className={`${TD} max-w-72`}>
                 <DomainCell row={row} />
               </TableCell>
               <TableCell className={TD}>
@@ -455,9 +452,6 @@ function TenantTable({ rows }: { rows: TenantListRow[] }) {
               </TableCell>
               <TableCell className={TD}>
                 <TenantStatusCell row={row} />
-              </TableCell>
-              <TableCell className={`${TD} text-fg-muted`}>
-                <CreatedCell row={row} />
               </TableCell>
               <TableCell className={`${TD} text-right`}>
                 <TenantRowActions
@@ -492,16 +486,14 @@ function TenantCard({ row }: { row: TenantListRow }) {
       <CardContent className="flex flex-col gap-5 p-4">
         <div className="flex items-start gap-3">
           <Avatar name={row.name} src={avatarSrc(row)} />
-          <div className="min-w-0 flex-1">
+          {/* Name only: the admin username is a credential and is not listed. */}
+          <div className="min-w-0 flex-1 self-center">
             <Link
               href={`${TENANTS_PATH}/${row.id}`}
               className={`block truncate rounded-sm font-semibold text-fg hover:text-primary ${FOCUS_RING}`}
             >
               {row.name}
             </Link>
-            <p className="mt-0.5 truncate text-xs text-fg-subtle">
-              @{row.username}
-            </p>
           </div>
           <TenantStatusCell row={row} />
         </div>

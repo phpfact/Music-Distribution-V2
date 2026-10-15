@@ -15,7 +15,6 @@ import {
   useSyncExternalStore,
 } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -36,10 +35,13 @@ import {
 } from "@/lib/tenants/rules";
 import { Avatar } from "../../_components/avatar";
 import { describedBy, errorId, Field, hintId } from "../../_components/field";
+import { FormActions, RequiredLegend } from "../../_components/form-actions";
 import { FormSection } from "../../_components/form-section";
-import { Icon, type IconName } from "../../_components/icons";
+import { Icon } from "../../_components/icons";
+import { ModeSwitch } from "../../_components/mode-switch";
 import { Notice } from "../../_components/notice";
 import { PasswordInput } from "../../_components/password-input";
+import { SensitiveInput } from "../../_components/sensitive-input";
 import { Spinner } from "../../_components/spinner";
 import { ToneBadge } from "../../_components/status-badge";
 import { FOCUS_RING } from "../../_components/styles";
@@ -56,6 +58,7 @@ import type {
 } from "../action-types";
 import { ConnectionChecks } from "./connection-checks";
 import {
+  anySectionAuto,
   buildCreateFormData,
   checkProfileImageFile,
   clearPasswords,
@@ -67,13 +70,19 @@ import {
   errorsAfterModeSwitch,
   type FormValues,
   GENERATED_FIELDS,
+  type GeneratedSummary,
+  generatedSummary,
   generateDatabasePassword,
   generateMasterPassword,
   initialFormValues,
   type ManualField,
+  type ModeSection,
+  SECTION_GENERATED_FIELDS,
+  SECTION_MODE_FIELD,
+  sectionOfField,
   type SharedField,
   summarizeErrors,
-  switchCredentialMode,
+  switchSectionMode,
   validateConnection,
   validateField,
   validateForm,
@@ -87,7 +96,7 @@ const PREVIEW_DELAY_MS = 500;
 const INITIAL_STATE: CreateTenantActionState = { status: "idle" };
 
 const PREVIEW_FAILED =
-  "Values could not be generated right now. Try again, or switch to Manual entry.";
+  "Values could not be generated right now. Try again, or switch this section to Manual.";
 const CONNECTION_FAILED =
   "The connection could not be tested right now. Try again.";
 
@@ -110,14 +119,19 @@ type ImageState = {
 
 const NO_IMAGE: ImageState = { file: null, url: null, error: null };
 
-const CREDENTIAL_OPTIONS: {
-  value: CredentialMode;
-  label: string;
-  icon: IconName;
-}[] = [
-  { value: "auto", label: "Auto generate", icon: "wand" },
-  { value: "manual", label: "Manual entry", icon: "pencil" },
-];
+/** No section has shown its "prefilled from the preview" note yet. */
+const NO_PREFILL_NOTES: Record<ModeSection, boolean> = {
+  login: false,
+  database: false,
+  domain: false,
+};
+
+/** The accessible name of each section's Auto-Generate / Manual switch. */
+const SWITCH_LABELS: Record<ModeSection, string> = {
+  login: "How the admin login is set",
+  database: "How the database is set",
+  domain: "How the subdomain is set",
+};
 
 const DATABASE_OPTIONS: {
   value: DatabaseMode;
@@ -135,6 +149,24 @@ const DATABASE_OPTIONS: {
     description: "Attach a database that already exists on the server.",
   },
 ];
+
+/**
+ * Description: Focus an element, or the checked option when the element is a radio group.
+ * Input: The element an error link points at.
+ * Output: Focus moved to it (a radio group's container is not focusable itself).
+ * Use case: Error summary links that land on a section's Auto-Generate / Manual switch.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-15. Last modified: 2026-10-15.
+ */
+function focusElement(element: HTMLElement) {
+  if (element.getAttribute("role") === "radiogroup") {
+    element
+      .querySelector<HTMLElement>('[role="radio"][data-state="checked"]')
+      ?.focus();
+    return;
+  }
+  element.focus();
+}
 
 // True once React runs in the browser. Until then the submit button stays
 // disabled, so a click before hydration cannot fall back to a native GET submit.
@@ -199,10 +231,10 @@ type BodyProps = CreateTenantFormProps & {
 };
 
 /**
- * Description: Render the existing creation state machine with shared input and mode controls.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Render the creation state machine with one Auto-Generate / Manual switch per section.
+ * Input: The server configuration (base domain, default port, host) and the reset callbacks.
+ * Output: The create form, or the success panel once the tenant is recorded.
+ * Use case: The platform owner creates a tenant at /platform/tenants/new.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14. Last modified: 2026-10-15.
  */
@@ -231,12 +263,17 @@ function CreateTenantFormBody({
     formError: null,
   });
   const [summaryFocus, setSummaryFocus] = useState(0);
-  const [prefillNote, setPrefillNote] = useState(false);
+  // Per section: the "empty fields were filled from the preview" note.
+  const [prefillNotes, setPrefillNotes] =
+    useState<Record<ModeSection, boolean>>(NO_PREFILL_NOTES);
   const [preview, setPreview] = useState<PreviewState>({ status: "idle" });
   const [connection, setConnection] = useState<ConnectionState>({
     status: "idle",
   });
   const [image, setImage] = useState<ImageState>(NO_IMAGE);
+  // What the Auto sections submitted, for the success panel (they never showed it).
+  const [submittedGenerated, setSubmittedGenerated] =
+    useState<GeneratedSummary>({});
 
   const [state, dispatch, pending] = useActionState(
     createTenantAction,
@@ -257,7 +294,10 @@ function CreateTenantFormBody({
 
   const errors: CreateTenantFieldErrors = { ...serverErrors, ...clientErrors };
   const ctx = { baseDomain, defaultPort, imageError: image.error };
-  const manual = values.mode === "manual";
+  const loginManual = values.modes.login === "manual";
+  const databaseManual = values.modes.database === "manual";
+  const domainManual = values.modes.domain === "manual";
+  const anyAuto = anySectionAuto(values);
   const databaseMode = effectiveDatabaseMode(values);
 
   // A new result of the Server Action, handled once, while rendering (the
@@ -299,7 +339,7 @@ function CreateTenantFormBody({
   }, [image.url]);
 
   // ---------------------------------------------------------------------------
-  // Auto generate preview
+  // Auto-Generate preview (shared by every section on Auto)
 
   const requestPreview = useCallback(async (name: string) => {
     previewSeq.current += 1;
@@ -327,16 +367,17 @@ function CreateTenantFormBody({
   const fullNameResult = validateFullName(values.shared.fullName);
   const nameForPreview = fullNameResult.ok ? fullNameResult.value : null;
 
-  // Debounced: one request once the owner pauses typing a valid name.
+  // Debounced: one request once the owner pauses typing a valid name, and
+  // only while some section still uses generated values.
   useEffect(() => {
-    if (values.mode !== "auto" || nameForPreview === null) return;
+    if (!anyAuto || nameForPreview === null) return;
     if (nameForPreview === previewedName.current) return;
     const timer = setTimeout(
       () => void requestPreview(nameForPreview),
       PREVIEW_DELAY_MS,
     );
     return () => clearTimeout(timer);
-  }, [values.mode, nameForPreview, requestPreview]);
+  }, [anyAuto, nameForPreview, requestPreview]);
 
   /**
    * Description: Request fresh automatic identifiers after checking the tenant name.
@@ -389,7 +430,7 @@ function CreateTenantFormBody({
   }
 
   /**
-   * Description: Update a creation draft shared by automatic and manual credentials.
+   * Description: Update a creation draft that every section mode shares.
    *
    * Input: The existing typed arguments and component state.
    * Output: The existing helper result or state update.
@@ -444,23 +485,33 @@ function CreateTenantFormBody({
   }
 
   /**
-   * Description: Switch credential mode while preserving existing drafts and validation rules.
-   *
-   * Input: The existing typed arguments and component state.
-   * Output: The existing helper result or state update.
-   * Use case: Tenant management’s existing owner workflow.
+   * Description: Move one section between Auto-Generate and Manual, keeping every typed draft.
+   * Input: The section whose switch was used and the requested mode.
+   * Output: Updated values, that section's prefill note and errors; other sections are untouched.
+   * Use case: The owner clicks Auto-Generate or Manual in a section header.
    * Author: Mr. Sachin Sharma
    * Created: 2026-10-14. Last modified: 2026-10-15.
    */
-  function changeCredentialMode(next: CredentialMode) {
-    if (next === values.mode) return;
-    const result = switchCredentialMode(values, next);
+  function changeSectionMode(section: ModeSection, next: CredentialMode) {
+    // Step 1: nothing to do when the switch did not move.
+    if (next === values.modes[section]) return;
+
+    // Step 2: move the switch (the model prefills empty fields once, from the preview).
+    const result = switchSectionMode(values, section, next);
     setValues(result.values);
-    if (next === "auto") setPrefillNote(false);
-    else if (result.prefilled.length > 0) setPrefillNote(true);
-    setClientErrors(errorsAfterModeSwitch);
-    setServerErrors(errorsAfterModeSwitch);
-    resetConnection();
+
+    // Step 3: the note explains a prefill only right after it happened.
+    setPrefillNotes((current) => ({
+      ...current,
+      [section]: next === "manual" && result.prefilled.length > 0,
+    }));
+
+    // Step 4: errors about values that are no longer submitted go away.
+    setClientErrors((current) => errorsAfterModeSwitch(current, section));
+    setServerErrors((current) => errorsAfterModeSwitch(current, section));
+
+    // Step 5: a connection result described the database fields: it is stale now.
+    if (section === "database") resetConnection();
   }
 
   /**
@@ -627,21 +678,33 @@ function CreateTenantFormBody({
     setServerErrors({});
     setSummary({ visible: false, formError: null });
     submitting.current = true;
+    // Exactly what the Auto sections send now, for the success panel.
+    setSubmittedGenerated(generatedSummary(values, baseDomain));
     const formData = buildCreateFormData(values, image.file);
     startTransition(() => dispatch(formData));
   }
 
   /**
-   * Description: Move focus to the requested form field after validation reports an error.
-   *
-   * Input: The existing typed arguments and component state.
-   * Output: The existing helper result or state update.
-   * Use case: Tenant management’s existing owner workflow.
+   * Description: Move focus to a form field after validation reports an error.
+   * Input: The field the error summary link points at.
+   * Output: Focus on the field, or on its section's switch when Auto hides the field.
+   * Use case: Error summary links, including errors on generated (hidden) values.
    * Author: Mr. Sachin Sharma
    * Created: 2026-10-14. Last modified: 2026-10-15.
    */
   function focusField(field: CreateTenantField) {
-    document.getElementById(fid(field))?.focus();
+    // Step 1: the field itself, when its section shows it.
+    const target = document.getElementById(fid(field));
+    if (target) {
+      focusElement(target);
+      return;
+    }
+    // Step 2: a generated value hidden by Auto: the section's switch is the
+    // nearest control, and the error is shown right below it.
+    const section = sectionOfField(field);
+    if (section === "profile") return;
+    const modeSwitch = document.getElementById(fid(SECTION_MODE_FIELD[section]));
+    if (modeSwitch) focusElement(modeSwitch);
   }
 
   if (state.status === "created") {
@@ -649,6 +712,7 @@ function CreateTenantFormBody({
       <SuccessPanel
         tenantId={state.tenantId}
         generatedMasterPassword={state.generatedMasterPassword}
+        generated={submittedGenerated}
         onCreateAnother={onReset}
       />
     );
@@ -660,41 +724,134 @@ function CreateTenantFormBody({
   const sections = summarizeErrors(errors);
   const showSummary =
     summary.visible && (sections.length > 0 || summary.formError !== null);
-  const tag = manual ? "manual" : "generated";
-  const generated = values.generated;
-  const identifiers = manual ? values.manual : generated;
-  const placeholder = manual ? undefined : "Generated from the full name";
 
   /**
-   * A text input in Manual entry, read-only with the generated value in Auto generate.
-   * Input: The existing typed arguments and component state.
-   * Output: Accessible React UI.
-   * Use case: Tenant management’s existing owner workflow.
+   * Description: The errors a section cannot show next to an input, because Auto hides the input.
+   * Input: The section.
+   * Output: Its switch's own error, plus (on Auto) the errors of its generated values.
+   * Use case: "<value> is no longer available — regenerate." and "not ready" messages
+   *   on values the owner never saw.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-10-15. Last modified: 2026-10-15.
+   */
+  function hiddenErrors(section: ModeSection): SectionError[] {
+    const fields: CreateTenantField[] = [SECTION_MODE_FIELD[section]];
+    if (values.modes[section] === "auto") {
+      fields.push(...SECTION_GENERATED_FIELDS[section]);
+    }
+    return fields.flatMap((field) => {
+      const message = errors[field];
+      return message ? [{ id: errorId(fid(field)), message }] : [];
+    });
+  }
+
+  /**
+   * Description: The ids a section's switch is described by: the errors of its hidden values.
+   * Input: The section.
+   * Output: A space-separated id list, or undefined when there is nothing to read out.
+   * Use case: aria-describedby of the login, database and domain switches.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-10-15. Last modified: 2026-10-15.
+   */
+  function switchDescribedBy(section: ModeSection): string | undefined {
+    const errorIds = hiddenErrors(section).map((error) => error.id);
+    return errorIds.length > 0 ? errorIds.join(" ") : undefined;
+  }
+
+  /**
+   * Description: Build the note an Auto section shows in place of its hidden fields.
+   * Input: The section, the note's title and its description.
+   * Output: An AutoGeneratedNote with the shared preview state and the section's hidden errors.
+   * Use case: The body of the login, database and domain sections while on Auto-Generate.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-10-15. Last modified: 2026-10-15.
+   */
+  function autoNote(
+    section: ModeSection,
+    title: string,
+    description: ReactNode,
+  ): ReactNode {
+    return (
+      <AutoGeneratedNote
+        title={title}
+        description={description}
+        status={
+          nameForPreview === null
+            ? "waiting"
+            : preview.status === "loading"
+              ? "loading"
+              : values.generated !== null
+                ? "ready"
+                : "waiting"
+        }
+        previewError={preview.status === "error" ? preview.message : null}
+        errors={hiddenErrors(section)}
+        regenerating={preview.status === "loading"}
+        onRegenerate={regenerate}
+      />
+    );
+  }
+
+  /**
+   * Description: The top of a Manual section: its switch's own error and the prefill note.
+   * Input: The section.
+   * Output: The switch error (if any) and, right after the first switch filled
+   *   something, the "empty fields were filled" note; otherwise nothing.
+   * Use case: Explaining why fields the owner never typed already hold values,
+   *   and giving the switch's aria-describedby an element to point at.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-10-14. Last modified: 2026-10-15.
+   */
+  function manualIntro(section: ModeSection): ReactNode {
+    // In Manual only the switch's own error can be hidden: every field is shown.
+    const switchErrors = hiddenErrors(section);
+    const showPrefill = prefillNotes[section];
+    if (switchErrors.length === 0 && !showPrefill) return null;
+    return (
+      <>
+        {switchErrors.map((error) => (
+          <p key={error.id} id={error.id} className="text-sm text-destructive">
+            {error.message}
+          </p>
+        ))}
+        {showPrefill ? (
+          <p
+            role="status"
+            className="flex items-start gap-2 text-xs text-fg-muted"
+          >
+            <Icon name="info" className="mt-px size-3.5 shrink-0" />
+            Empty fields were filled with the generated values; change
+            anything you like.
+          </p>
+        ) : null}
+      </>
+    );
+  }
+
+  /**
+   * A masked identifier input for a section on Manual (username, database name/user).
+   * Input: The identifier and its maximum length.
+   * Output: A SensitiveInput bound to the manual draft, with blur validation.
+   * Use case: Identifiers the owner types; the eye button reveals them.
    * Author: Mr. Sachin Sharma
    * Created: 2026-10-14. Last modified: 2026-10-15.
    */
   function identifierInput(
     field: "username" | "databaseName" | "databaseUser",
     maxLength: number,
+    noun: string,
   ): ReactNode {
     const id = fid(field);
     const error = errors[field];
     return (
-      <Input
+      <SensitiveInput
         id={id}
-        type="text"
-        value={identifiers?.[field] ?? ""}
-        readOnly={!manual}
-        placeholder={placeholder}
+        noun={noun}
+        value={values.manual[field]}
         maxLength={maxLength}
-        autoComplete="off"
-        autoCapitalize="none"
-        autoCorrect="off"
-        spellCheck={false}
-        onChange={
-          manual ? (event) => setManual(field, event.target.value) : undefined
-        }
-        onBlur={manual ? () => validateOnBlur(field) : undefined}
+        hasError={Boolean(error)}
+        onChange={(event) => setManual(field, event.target.value)}
+        onBlur={() => validateOnBlur(field)}
         {...describedBy(id, { error })}
       />
     );
@@ -758,233 +915,167 @@ function CreateTenantFormBody({
         </div>
       ) : null}
 
-      {/* Credentials mode */}
-      <Card className="gap-0 py-0">
-        <CardContent className="p-5">
-          <fieldset aria-describedby={hintId(fid("credentialMode"))}>
-            <legend className="mb-3 text-sm font-medium text-fg">
-              Credentials
-            </legend>
-            <RadioGroup
-              name="credentialMode"
-              value={values.mode}
-              onValueChange={(value) =>
-                changeCredentialMode(value as CredentialMode)
-              }
-              className="grid grid-cols-2 gap-3 sm:inline-grid"
-              aria-label="Credentials"
-            >
-              {CREDENTIAL_OPTIONS.map((option, index) => (
-                <Label
-                  key={option.value}
-                  htmlFor={
-                    index === 0
-                      ? fid("credentialMode")
-                      : `${fid("credentialMode")}-${option.value}`
-                  }
-                  className="flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/10"
-                >
-                  <RadioGroupItem
-                    id={
-                      index === 0
-                        ? fid("credentialMode")
-                        : `${fid("credentialMode")}-${option.value}`
-                    }
-                    value={option.value}
-                    aria-describedby={hintId(fid("credentialMode"))}
-                  />
-                  <Icon name={option.icon} className="size-4 shrink-0" />
-                  {option.label}
-                </Label>
-              ))}
-            </RadioGroup>
-            <p
-              id={hintId(fid("credentialMode"))}
-              className="mt-3 text-sm text-fg-muted"
-            >
-              Auto generate creates the username, passwords, database and
-              subdomain for you. Values you typed in Manual entry are kept if
-              you switch back.
-            </p>
-            {errors.credentialMode ? (
-              <p
-                id={errorId(fid("credentialMode"))}
-                className="mt-2 text-sm text-destructive"
-              >
-                {errors.credentialMode}
-              </p>
-            ) : null}
-          </fieldset>
-          {manual && prefillNote ? (
-            <p
-              role="status"
-              className="mt-3 flex items-start gap-2 text-xs text-fg-muted"
-            >
-              <Icon name="info" className="mt-px size-3.5 shrink-0" />
-              Empty fields were filled with the generated values; change
-              anything you like.
-            </p>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      {/* 1. Tenant profile */}
-      <FormSection number={1} title="Tenant profile">
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Field
-            label="Full name"
-            htmlFor={fid("fullName")}
-            required
-            error={errors.fullName}
+      {/* 1. Tenant profile: nothing here is generated, so no switch. */}
+      <FormSection
+        icon="user"
+        title="Tenant profile"
+        description="Who the tenant is. The full name is also the basis for generated values."
+      >
+        <div className="flex flex-col gap-6 md:flex-row md:items-start">
+          {/* Profile image: preview on the left, its controls below it. */}
+          <div
+            role="group"
+            aria-labelledby={fid("profileImage-label")}
+            className="flex shrink-0 items-center gap-4 md:w-48 md:flex-col md:items-center md:text-center"
           >
-            <Input
-              ref={fullNameRef}
-              id={fid("fullName")}
-              type="text"
-              value={values.shared.fullName}
-              maxLength={FULL_NAME_MAX_LENGTH}
-              autoComplete="off"
-              onChange={(event) => setShared("fullName", event.target.value)}
-              onBlur={() => validateOnBlur("fullName")}
-              {...describedBy(fid("fullName"), { error: errors.fullName })}
-            />
-          </Field>
-          <Field
-            label="Phone"
-            htmlFor={fid("phone")}
-            hint="Include the country code, e.g. +44 20 7946 0958"
-            error={errors.phone}
-          >
-            <Input
-              id={fid("phone")}
-              type="tel"
-              value={values.shared.phone}
-              maxLength={PHONE_MAX_LENGTH}
-              autoComplete="off"
-              onChange={(event) => setShared("phone", event.target.value)}
-              onBlur={() => validateOnBlur("phone")}
-              {...describedBy(fid("phone"), {
-                hint: true,
-                error: errors.phone,
-              })}
-            />
-          </Field>
-        </div>
-
-        <div
-          role="group"
-          aria-labelledby={fid("profileImage-label")}
-          className="flex min-w-0 flex-col gap-1.5"
-        >
-          <p
-            id={fid("profileImage-label")}
-            className="text-sm font-medium text-fg"
-          >
-            Profile image
-          </p>
-          <div className="flex flex-wrap items-center gap-4">
             <Avatar
               name={values.shared.fullName || "?"}
               src={image.url}
               size="lg"
             />
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                id={fid("profileImage")}
-                onClick={() => fileInputRef.current?.click()}
-                {...describedBy(fid("profileImage"), {
-                  hint: true,
-                  error: imageError,
-                })}
-                variant="outline"
-                size="sm"
+            <div className="flex min-w-0 flex-col gap-2 md:items-center">
+              <p
+                id={fid("profileImage-label")}
+                className="text-sm font-medium text-fg"
               >
-                <Icon name="upload" className="size-4" />
-                {image.file ? "Change" : "Upload image"}
-              </Button>
-              {image.file ? (
+                Profile image
+              </p>
+              <div className="flex flex-wrap gap-2 md:justify-center">
                 <Button
                   type="button"
-                  onClick={removeImage}
-                  variant="ghost"
+                  id={fid("profileImage")}
+                  onClick={() => fileInputRef.current?.click()}
+                  {...describedBy(fid("profileImage"), {
+                    hint: true,
+                    error: imageError,
+                  })}
+                  variant="outline"
                   size="sm"
                 >
-                  <Icon name="trash-2" className="size-4" />
-                  Remove
+                  <Icon name="upload" className="size-4" />
+                  {image.file ? "Change" : "Upload"}
                 </Button>
+                {image.file ? (
+                  <Button
+                    type="button"
+                    onClick={removeImage}
+                    variant="ghost"
+                    size="sm"
+                  >
+                    <Icon name="trash-2" className="size-4" />
+                    Remove
+                  </Button>
+                ) : null}
+              </div>
+              {/* Visually hidden and out of the tab order: the buttons above drive it. */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={PROFILE_IMAGE_ACCEPT}
+                tabIndex={-1}
+                aria-hidden="true"
+                onChange={handleImageChange}
+                className="sr-only"
+              />
+              <p
+                id={hintId(fid("profileImage"))}
+                className="text-xs text-fg-subtle"
+              >
+                PNG, JPEG or WebP, up to 2 MB
+              </p>
+              {imageError ? (
+                <p
+                  id={errorId(fid("profileImage"))}
+                  className="text-sm text-destructive"
+                >
+                  {imageError}
+                </p>
               ) : null}
             </div>
-            {/* Visually hidden and out of the tab order: the buttons above drive it. */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={PROFILE_IMAGE_ACCEPT}
-              tabIndex={-1}
-              aria-hidden="true"
-              onChange={handleImageChange}
-              className="sr-only"
-            />
           </div>
-          <p
-            id={hintId(fid("profileImage"))}
-            className="text-xs text-fg-subtle"
-          >
-            PNG, JPEG or WebP, up to 2 MB
-          </p>
-          {imageError ? (
-            <p
-              id={errorId(fid("profileImage"))}
-              className="text-sm text-destructive"
+
+          <div className="grid flex-1 gap-5 sm:grid-cols-2">
+            <Field
+              label="Full name"
+              htmlFor={fid("fullName")}
+              required
+              error={errors.fullName}
             >
-              {imageError}
-            </p>
-          ) : null}
+              <Input
+                ref={fullNameRef}
+                id={fid("fullName")}
+                type="text"
+                value={values.shared.fullName}
+                maxLength={FULL_NAME_MAX_LENGTH}
+                autoComplete="off"
+                placeholder="e.g. Acme Music"
+                onChange={(event) => setShared("fullName", event.target.value)}
+                onBlur={() => validateOnBlur("fullName")}
+                {...describedBy(fid("fullName"), { error: errors.fullName })}
+              />
+            </Field>
+            <Field
+              label="Phone"
+              htmlFor={fid("phone")}
+              hint="Include the country code, e.g. +44 20 7946 0958"
+              error={errors.phone}
+            >
+              <Input
+                id={fid("phone")}
+                type="tel"
+                value={values.shared.phone}
+                maxLength={PHONE_MAX_LENGTH}
+                autoComplete="off"
+                onChange={(event) => setShared("phone", event.target.value)}
+                onBlur={() => validateOnBlur("phone")}
+                {...describedBy(fid("phone"), {
+                  hint: true,
+                  error: errors.phone,
+                })}
+              />
+            </Field>
+          </div>
         </div>
       </FormSection>
 
       {/* 2. Tenant admin login */}
       <FormSection
-        number={2}
+        icon="key-round"
         title="Tenant admin login"
+        description="The account the tenant's administrator signs in with."
         action={
-          manual ? undefined : (
-            <Button
-              type="button"
-              onClick={regenerate}
-              disabled={preview.status === "loading"}
-              variant="outline"
-              size="sm"
-            >
-              {preview.status === "loading" ? (
-                <Spinner size="sm" />
-              ) : (
-                <Icon name="refresh-cw" className="size-4" />
-              )}
-              {preview.status === "loading" ? "Generating…" : "Regenerate"}
-            </Button>
-          )
+          <ModeSwitch
+            id={fid(SECTION_MODE_FIELD.login)}
+            value={values.modes.login}
+            onChange={(next) => changeSectionMode("login", next)}
+            label={SWITCH_LABELS.login}
+            describedBy={switchDescribedBy("login")}
+          />
         }
       >
-        {!manual && generated === null && nameForPreview === null ? (
-          <p className="text-sm text-fg-muted">
-            Enter the full name to generate these values.
-          </p>
-        ) : null}
-        {!manual && preview.status === "error" ? (
-          <Notice variant="warning">{preview.message}</Notice>
-        ) : null}
+        {loginManual
+          ? manualIntro("login")
+          : autoNote(
+              "login",
+              "Username and master password are generated",
+              "The username is based on the full name. The master password is created securely and shown once, right after the tenant is created.",
+            )}
 
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field
-            label="Username"
-            htmlFor={fid("username")}
-            required
-            tag={tag}
-            error={errors.username}
-          >
-            {identifierInput("username", TENANT_USERNAME_MAX_LENGTH)}
-          </Field>
+          {loginManual ? (
+            <Field
+              label="Username"
+              htmlFor={fid("username")}
+              required
+              error={errors.username}
+            >
+              {identifierInput(
+                "username",
+                TENANT_USERNAME_MAX_LENGTH,
+                "username",
+              )}
+            </Field>
+          ) : null}
           <Field
             label="Email"
             htmlFor={fid("email")}
@@ -999,18 +1090,18 @@ function CreateTenantFormBody({
               autoComplete="off"
               autoCapitalize="none"
               spellCheck={false}
+              placeholder="e.g. admin@acme.com"
               onChange={(event) => setShared("email", event.target.value)}
               onBlur={() => validateOnBlur("email")}
               {...describedBy(fid("email"), { error: errors.email })}
             />
           </Field>
-          <div className="sm:col-span-2">
-            {manual ? (
+          {loginManual ? (
+            <div className="sm:col-span-2">
               <Field
                 label="Master password"
                 htmlFor={masterPasswordId}
                 required
-                tag="manual"
                 error={errors.masterPassword}
                 action={
                   <Button
@@ -1047,355 +1138,469 @@ function CreateTenantFormBody({
                   username={values.manual.username}
                 />
               </Field>
-            ) : (
-              <Field
-                label="Master password"
-                htmlFor={masterPasswordId}
-                tag="generated"
-              >
-                <output id={masterPasswordId} className={GENERATED_TEXT_CLASS}>
-                  Generated when you create the tenant — shown once
-                </output>
-              </Field>
-            )}
-          </div>
-          <div className="flex flex-col gap-3 rounded-lg border border-line bg-surface-2 px-4 py-3 sm:col-span-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-fg">
-                Two-factor authentication
-              </p>
-              <p className="mt-0.5 text-xs text-fg-subtle">
-                Two-factor sign-in isn&apos;t supported for tenant accounts.
-              </p>
             </div>
-            <ToneBadge tone="neutral">Not available yet</ToneBadge>
+          ) : null}
+        </div>
+
+        <div className="flex flex-col gap-3 rounded-lg border border-line bg-surface-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-fg">
+              Two-factor authentication
+            </p>
+            <p className="mt-0.5 text-xs text-fg-subtle">
+              Two-factor sign-in isn&apos;t supported for tenant accounts.
+            </p>
           </div>
+          <ToneBadge tone="neutral">Not available yet</ToneBadge>
         </div>
       </FormSection>
 
       {/* 3. Database */}
-      <FormSection number={3} title="Database">
-        <fieldset
-          aria-describedby={
-            [
-              manual ? null : hintId(fid("databaseMode")),
-              errors.databaseMode ? errorId(fid("databaseMode")) : null,
-            ]
-              .filter(Boolean)
-              .join(" ") || undefined
-          }
-        >
-          <legend className="sr-only">Database mode</legend>
-          <RadioGroup
-            name="databaseMode"
-            value={databaseMode}
-            onValueChange={(value) => changeDatabaseMode(value as DatabaseMode)}
-            className="grid gap-3 sm:grid-cols-2"
-            aria-label="Database mode"
-          >
-            {DATABASE_OPTIONS.map((option, index) => {
-              const disabled = option.value === "existing" && !manual;
-              const optionId =
-                index === 0
-                  ? fid("databaseMode")
-                  : `${fid("databaseMode")}-${option.value}`;
-              return (
-                <Label
-                  key={option.value}
-                  htmlFor={optionId}
-                  className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/10 has-[[data-disabled]]:cursor-not-allowed has-[[data-disabled]]:opacity-60"
+      <FormSection
+        icon="database"
+        title="Database"
+        description="Where the tenant's data is stored."
+        action={
+          <ModeSwitch
+            id={fid(SECTION_MODE_FIELD.database)}
+            value={values.modes.database}
+            onChange={(next) => changeSectionMode("database", next)}
+            label={SWITCH_LABELS.database}
+            describedBy={switchDescribedBy("database")}
+          />
+        }
+      >
+        {databaseManual ? (
+          <>
+            {manualIntro("database")}
+            <fieldset
+              aria-describedby={
+                errors.databaseMode ? errorId(fid("databaseMode")) : undefined
+              }
+            >
+              <legend className="sr-only">Database mode</legend>
+              <RadioGroup
+                name="databaseMode"
+                value={databaseMode}
+                onValueChange={(value) =>
+                  changeDatabaseMode(value as DatabaseMode)
+                }
+                className="grid gap-3 sm:grid-cols-2"
+                aria-label="Database mode"
+              >
+                {DATABASE_OPTIONS.map((option, index) => {
+                  const optionId =
+                    index === 0
+                      ? fid("databaseMode")
+                      : `${fid("databaseMode")}-${option.value}`;
+                  return (
+                    <Label
+                      key={option.value}
+                      htmlFor={optionId}
+                      className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:bg-primary/10"
+                    >
+                      <RadioGroupItem
+                        id={optionId}
+                        value={option.value}
+                        className="mt-0.5 shrink-0"
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-medium text-foreground">
+                          {option.label}
+                        </span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                          {option.description}
+                        </span>
+                      </span>
+                    </Label>
+                  );
+                })}
+              </RadioGroup>
+              {errors.databaseMode ? (
+                <p
+                  id={errorId(fid("databaseMode"))}
+                  className="mt-2 text-sm text-destructive"
                 >
-                  <RadioGroupItem
-                    id={optionId}
-                    value={option.value}
-                    disabled={disabled}
-                    className="mt-0.5 shrink-0"
-                  />
-                  <span className="min-w-0">
-                    <span className="block text-sm font-medium text-foreground">
-                      {option.label}
-                    </span>
-                    <span className="mt-0.5 block text-xs text-muted-foreground">
-                      {option.description}
-                    </span>
-                  </span>
-                </Label>
-              );
-            })}
-          </RadioGroup>
-          {!manual ? (
-            <p
-              id={hintId(fid("databaseMode"))}
-              className="mt-2 text-xs text-fg-subtle"
-            >
-              Switch to Manual entry to attach an existing database
-            </p>
-          ) : null}
-          {errors.databaseMode ? (
-            <p
-              id={errorId(fid("databaseMode"))}
-              className="mt-2 text-sm text-destructive"
-            >
-              {errors.databaseMode}
-            </p>
-          ) : null}
-        </fieldset>
+                  {errors.databaseMode}
+                </p>
+              ) : null}
+            </fieldset>
 
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Field
-            label="Database name"
-            htmlFor={fid("databaseName")}
-            required
-            tag={tag}
-            error={errors.databaseName}
-          >
-            {identifierInput("databaseName", DATABASE_IDENTIFIER_MAX_LENGTH)}
-          </Field>
-          <Field
-            label="Database user"
-            htmlFor={fid("databaseUser")}
-            required
-            tag={tag}
-            error={errors.databaseUser}
-          >
-            {identifierInput("databaseUser", DATABASE_IDENTIFIER_MAX_LENGTH)}
-          </Field>
-          {manual ? (
-            <Field
-              label="Database password"
-              htmlFor={databasePasswordId}
-              required
-              tag="manual"
-              hint={databasePasswordHint}
-              error={errors.databasePassword}
-              action={
-                databaseMode === "provisioned" ? (
+            <div className="grid gap-5 sm:grid-cols-2">
+              <Field
+                label="Database name"
+                htmlFor={fid("databaseName")}
+                required
+                error={errors.databaseName}
+              >
+                {identifierInput(
+                  "databaseName",
+                  DATABASE_IDENTIFIER_MAX_LENGTH,
+                  "database name",
+                )}
+              </Field>
+              <Field
+                label="Database user"
+                htmlFor={fid("databaseUser")}
+                required
+                error={errors.databaseUser}
+              >
+                {identifierInput(
+                  "databaseUser",
+                  DATABASE_IDENTIFIER_MAX_LENGTH,
+                  "database user",
+                )}
+              </Field>
+              <Field
+                label="Database password"
+                htmlFor={databasePasswordId}
+                required
+                hint={databasePasswordHint}
+                error={errors.databasePassword}
+                action={
+                  databaseMode === "provisioned" ? (
+                    <Button
+                      type="button"
+                      onClick={fillDatabasePassword}
+                      variant="ghost"
+                      size="sm"
+                    >
+                      <Icon name="wand" className="size-4" />
+                      Generate
+                    </Button>
+                  ) : undefined
+                }
+              >
+                <PasswordInput
+                  id={databasePasswordId}
+                  value={values.manual.databasePassword}
+                  maxLength={DATABASE_PASSWORD_MAX_LENGTH}
+                  autoComplete={
+                    databaseMode === "existing" ? "off" : "new-password"
+                  }
+                  hasError={Boolean(errors.databasePassword)}
+                  onChange={(event) =>
+                    setManual("databasePassword", event.target.value)
+                  }
+                  onBlur={() => validateOnBlur("databasePassword")}
+                  {...describedBy(databasePasswordId, {
+                    hint: true,
+                    error: errors.databasePassword,
+                  })}
+                />
+              </Field>
+              <Field
+                label="Port"
+                htmlFor={fid("databasePort")}
+                required
+                error={errors.databasePort}
+              >
+                <Input
+                  id={fid("databasePort")}
+                  type="text"
+                  inputMode="numeric"
+                  value={values.manual.databasePort}
+                  maxLength={5}
+                  autoComplete="off"
+                  onChange={(event) =>
+                    setManual("databasePort", event.target.value)
+                  }
+                  onBlur={() => validateOnBlur("databasePort")}
+                  {...describedBy(fid("databasePort"), {
+                    error: errors.databasePort,
+                  })}
+                />
+              </Field>
+              <div className="sm:col-span-2">
+                <Field label="Server" htmlFor={fid("server")}>
+                  <Input
+                    id={fid("server")}
+                    type="text"
+                    value={hostLabel}
+                    readOnly
+                  />
+                </Field>
+              </div>
+            </div>
+
+            {databaseMode === "existing" ? (
+              <div className="flex flex-col gap-4 rounded-lg border border-line bg-surface-2 p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p
+                    id={fid("existing-hint")}
+                    className="text-xs text-fg-muted"
+                  >
+                    The database must be empty or already contain this
+                    platform&apos;s schema. Nothing in it is deleted or
+                    overwritten.
+                  </p>
                   <Button
                     type="button"
-                    onClick={fillDatabasePassword}
-                    variant="ghost"
-                    size="sm"
+                    onClick={testConnection}
+                    disabled={connection.status === "pending"}
+                    aria-describedby={fid("existing-hint")}
+                    variant="outline"
+                    className="shrink-0"
                   >
-                    <Icon name="wand" className="size-4" />
-                    Generate
+                    {connection.status === "pending" ? (
+                      <Spinner size="sm" />
+                    ) : (
+                      <Icon name="database" className="size-4" />
+                    )}
+                    {connection.status === "pending"
+                      ? "Testing…"
+                      : "Test connection"}
                   </Button>
-                ) : undefined
-              }
-            >
-              <PasswordInput
-                id={databasePasswordId}
-                value={values.manual.databasePassword}
-                maxLength={DATABASE_PASSWORD_MAX_LENGTH}
-                autoComplete={
-                  databaseMode === "existing" ? "off" : "new-password"
-                }
-                hasError={Boolean(errors.databasePassword)}
-                onChange={(event) =>
-                  setManual("databasePassword", event.target.value)
-                }
-                onBlur={() => validateOnBlur("databasePassword")}
-                {...describedBy(databasePasswordId, {
-                  hint: true,
-                  error: errors.databasePassword,
-                })}
-              />
-            </Field>
-          ) : (
-            <Field
-              label="Database password"
-              htmlFor={databasePasswordId}
-              tag="generated"
-            >
-              <output id={databasePasswordId} className={GENERATED_TEXT_CLASS}>
-                Generated and stored encrypted — never shown
-              </output>
-            </Field>
-          )}
-          <Field
-            label="Port"
-            htmlFor={fid("databasePort")}
-            required
-            tag={tag}
-            error={errors.databasePort}
-          >
-            <Input
-              id={fid("databasePort")}
-              type="text"
-              inputMode="numeric"
-              value={
-                manual
-                  ? values.manual.databasePort
-                  : String(generated?.port ?? defaultPort)
-              }
-              readOnly={!manual}
-              maxLength={5}
-              autoComplete="off"
-              onChange={
-                manual
-                  ? (event) => setManual("databasePort", event.target.value)
-                  : undefined
-              }
-              onBlur={manual ? () => validateOnBlur("databasePort") : undefined}
-              {...describedBy(fid("databasePort"), {
-                error: errors.databasePort,
-              })}
-            />
-          </Field>
-          <div className="sm:col-span-2">
-            <Field label="Server" htmlFor={fid("server")}>
-              <Input
-                id={fid("server")}
-                type="text"
-                value={hostLabel}
-                readOnly
-              />
-            </Field>
-          </div>
-        </div>
-
-        {databaseMode === "existing" ? (
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-              <Button
-                type="button"
-                onClick={testConnection}
-                disabled={connection.status === "pending"}
-                aria-describedby={fid("existing-hint")}
-                variant="outline"
-              >
-                {connection.status === "pending" ? (
-                  <Spinner size="sm" />
-                ) : (
-                  <Icon name="database" className="size-4" />
-                )}
-                {connection.status === "pending"
-                  ? "Testing…"
-                  : "Test connection"}
-              </Button>
-              <p
-                id={fid("existing-hint")}
-                className="text-xs text-fg-subtle sm:pt-1"
-              >
-                The database must be empty or already contain this
-                platform&apos;s schema. Nothing in it is deleted or overwritten.
-              </p>
-            </div>
-            <div aria-live="polite">
-              {connection.status === "checked" ? (
-                <ConnectionChecks
-                  ok={connection.ok}
-                  checks={connection.checks}
-                />
-              ) : connection.status === "error" ? (
-                <Notice variant="error">{connection.message}</Notice>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
+                </div>
+                <div aria-live="polite">
+                  {connection.status === "checked" ? (
+                    <ConnectionChecks
+                      ok={connection.ok}
+                      checks={connection.checks}
+                    />
+                  ) : connection.status === "error" ? (
+                    <Notice variant="error">{connection.message}</Notice>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+          </>
+        ) : (
+          autoNote(
+            "database",
+            "A new database is created automatically",
+            <>
+              A dedicated database, user and password are created on{" "}
+              <span className="font-mono text-fg">{hostLabel}</span>, port{" "}
+              <span className="font-mono text-fg">{defaultPort}</span>. The
+              password is stored encrypted and never shown. To attach an
+              existing database, switch to Manual.
+            </>,
+          )
+        )}
       </FormSection>
 
       {/* 4. Domain */}
-      <FormSection number={4} title="Domain">
+      <FormSection
+        icon="globe"
+        title="Domain"
+        description="The addresses the tenant's site is reached at."
+        action={
+          <ModeSwitch
+            id={fid(SECTION_MODE_FIELD.domain)}
+            value={values.modes.domain}
+            onChange={(next) => changeSectionMode("domain", next)}
+            label={SWITCH_LABELS.domain}
+            describedBy={switchDescribedBy("domain")}
+          />
+        }
+      >
+        {domainManual
+          ? manualIntro("domain")
+          : autoNote(
+              "domain",
+              "The SaaS subdomain is generated",
+              <>
+                It is based on the full name and ends in{" "}
+                <span className="font-mono text-fg">.{baseDomain}</span>.
+              </>,
+            )}
+
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field
-            label="SaaS subdomain"
-            htmlFor={subdomainId}
-            required
-            tag={tag}
-            error={subdomainError}
-          >
-            <div
-              className={`flex h-10 w-full min-w-0 overflow-hidden rounded-lg border transition-colors focus-within:ring-2 ${
-                manual ? "bg-surface" : "bg-surface-2"
-              } ${
-                subdomainError
-                  ? "border-destructive focus-within:border-destructive focus-within:ring-destructive/30"
-                  : "border-line focus-within:border-primary focus-within:ring-ring/30"
-              }`}
+          {domainManual ? (
+            <Field
+              label="SaaS subdomain"
+              htmlFor={subdomainId}
+              required
+              error={subdomainError}
+            >
+              <div
+                className={`flex h-10 w-full min-w-0 overflow-hidden rounded-lg border bg-surface transition-colors focus-within:ring-2 ${
+                  subdomainError
+                    ? "border-destructive focus-within:border-destructive focus-within:ring-destructive/30"
+                    : "border-line focus-within:border-primary focus-within:ring-ring/30"
+                }`}
+              >
+                <Input
+                  id={subdomainId}
+                  type="text"
+                  value={values.manual.subdomain}
+                  maxLength={SUBDOMAIN_LABEL_MAX_LENGTH}
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  onChange={(event) =>
+                    setManual("subdomain", event.target.value)
+                  }
+                  onBlur={() => validateOnBlur("subdomain")}
+                  aria-invalid={subdomainError ? true : undefined}
+                  aria-describedby={[
+                    subdomainSuffixId,
+                    subdomainError ? errorId(subdomainId) : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  className="h-full min-w-0 flex-1 rounded-none border-0 bg-transparent px-3 shadow-none focus-visible:border-transparent focus-visible:ring-0"
+                />
+                <span
+                  id={subdomainSuffixId}
+                  className="flex max-w-[55%] shrink-0 items-center truncate border-l border-line bg-surface-2 px-3 text-sm text-fg-muted"
+                >
+                  .{baseDomain}
+                </span>
+              </div>
+            </Field>
+          ) : null}
+          <div className={domainManual ? undefined : "sm:col-span-2"}>
+            <Field
+              label="Custom domain"
+              htmlFor={fid("customDomain")}
+              hint="Optional. Requires a DNS TXT record before it becomes active. Your SaaS subdomain works in the meantime."
+              error={errors.customDomain}
             >
               <Input
-                id={subdomainId}
+                id={fid("customDomain")}
                 type="text"
-                value={identifiers?.subdomain ?? ""}
-                readOnly={!manual}
-                placeholder={placeholder}
-                maxLength={SUBDOMAIN_LABEL_MAX_LENGTH}
+                value={values.shared.customDomain}
+                placeholder="music.example.com"
+                maxLength={CUSTOM_DOMAIN_MAX_LENGTH}
                 autoComplete="off"
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
-                onChange={
-                  manual
-                    ? (event) => setManual("subdomain", event.target.value)
-                    : undefined
+                onChange={(event) =>
+                  setShared("customDomain", event.target.value)
                 }
-                onBlur={manual ? () => validateOnBlur("subdomain") : undefined}
-                aria-invalid={subdomainError ? true : undefined}
-                aria-describedby={[
-                  subdomainSuffixId,
-                  subdomainError ? errorId(subdomainId) : null,
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                className="h-full min-w-0 flex-1 rounded-none border-0 bg-transparent px-3 shadow-none focus-visible:border-transparent focus-visible:ring-0 read-only:bg-transparent"
+                onBlur={() => validateOnBlur("customDomain")}
+                {...describedBy(fid("customDomain"), {
+                  hint: true,
+                  error: errors.customDomain,
+                })}
               />
-              <span
-                id={subdomainSuffixId}
-                className="flex max-w-[55%] shrink-0 items-center truncate border-l border-line bg-surface-2 px-3 text-sm text-fg-muted"
-              >
-                .{baseDomain}
-              </span>
-            </div>
-          </Field>
-          <Field
-            label="Custom domain"
-            htmlFor={fid("customDomain")}
-            hint="Requires a DNS TXT record before it becomes active. Your SaaS subdomain works in the meantime."
-            error={errors.customDomain}
-          >
-            <Input
-              id={fid("customDomain")}
-              type="text"
-              value={values.shared.customDomain}
-              placeholder="music.example.com"
-              maxLength={CUSTOM_DOMAIN_MAX_LENGTH}
-              autoComplete="off"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              onChange={(event) =>
-                setShared("customDomain", event.target.value)
-              }
-              onBlur={() => validateOnBlur("customDomain")}
-              {...describedBy(fid("customDomain"), {
-                hint: true,
-                error: errors.customDomain,
-              })}
-            />
-          </Field>
+            </Field>
+          </div>
         </div>
       </FormSection>
 
-      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-        <Button asChild variant="outline" className="w-full sm:w-auto">
+      <FormActions note={<RequiredLegend />}>
+        <Button asChild variant="outline">
           <Link href={TENANTS_PATH}>Cancel</Link>
         </Button>
         <Button
           type="submit"
           disabled={pending || !hydrated}
           variant="default"
-          className="w-full sm:w-auto"
         >
-          {pending ? <Spinner size="sm" /> : null}
+          {pending ? <Spinner size="sm" /> : <Icon name="plus" className="size-4" />}
           {pending ? "Creating…" : "Create tenant"}
         </Button>
-      </div>
+      </FormActions>
     </form>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Auto-Generate note
+
+/** One error of a value the section does not show, with the id its switch references. */
+type SectionError = { id: string; message: string };
+
+type AutoGeneratedNoteProps = {
+  title: string;
+  description: ReactNode;
+  /**
+   * waiting: no valid full name yet, or no preview yet;
+   * loading: a preview is on its way; ready: the values are there.
+   */
+  status: "waiting" | "loading" | "ready";
+  /** The last preview request's failure message, if it failed. */
+  previewError: string | null;
+  /** Server or client errors about this section's hidden values. */
+  errors: SectionError[];
+  regenerating: boolean;
+  onRegenerate: () => void;
+};
+
 /**
- * A read-only line in place of a password that only the server generates.
+ * Description: The panel an Auto-Generate section shows instead of its generated fields.
+ * Input: The title and description, the preview status, any preview failure and hidden-value errors.
+ * Output: A tinted note with a live status line; problems add a Regenerate button.
+ * Use case: Login, database and domain sections on Auto, whose values stay hidden
+ *   until the success panel, but whose problems must still be visible and fixable.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-15. Last modified: 2026-10-15.
  */
-const GENERATED_TEXT_CLASS =
-  "flex min-h-10 w-full items-center rounded-lg border border-line bg-surface-2 px-3 py-2 text-sm text-fg-muted";
+function AutoGeneratedNote({
+  title,
+  description,
+  status,
+  previewError,
+  errors,
+  regenerating,
+  onRegenerate,
+}: AutoGeneratedNoteProps) {
+  const hasProblem = previewError !== null || errors.length > 0;
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-primary/20 bg-primary/5 p-4">
+      <div className="flex items-start gap-3">
+        <Icon name="wand" className="mt-0.5 size-4 shrink-0 text-primary" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-fg">{title}</p>
+          <p className="mt-1 text-sm text-fg-muted">{description}</p>
+          {/* Announced as the shared preview moves on. */}
+          <p
+            aria-live="polite"
+            className="mt-2 flex items-center gap-1.5 text-xs text-fg-subtle"
+          >
+            {status === "loading" ? (
+              <>
+                <Spinner size="sm" />
+                Preparing values…
+              </>
+            ) : status === "ready" ? (
+              <>
+                <Icon name="circle-check" className="size-3.5 text-success" />
+                Ready. The values are shown once the tenant is created.
+              </>
+            ) : (
+              <>
+                <Icon name="clock" className="size-3.5" />
+                Waiting for the full name — the values are based on it.
+              </>
+            )}
+          </p>
+        </div>
+      </div>
+
+      {hasProblem ? (
+        <div className="flex flex-col gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-3 sm:flex-row sm:items-start sm:justify-between">
+          <ul className="flex min-w-0 flex-col gap-1 text-sm text-destructive">
+            {previewError ? <li>{previewError}</li> : null}
+            {errors.map((error) => (
+              <li key={error.id} id={error.id}>
+                {error.message}
+              </li>
+            ))}
+          </ul>
+          <Button
+            type="button"
+            onClick={onRegenerate}
+            disabled={regenerating}
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+          >
+            {regenerating ? (
+              <Spinner size="sm" />
+            ) : (
+              <Icon name="refresh-cw" className="size-4" />
+            )}
+            {regenerating ? "Generating…" : "Regenerate"}
+          </Button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
