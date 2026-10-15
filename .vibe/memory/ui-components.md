@@ -42,13 +42,17 @@ passes a clean-install dry run. Review fixes protect password-toggle padding,
 long-domain wrapping and focus restoration after modal closure. Reduced motion
 is supported by primitives and CSS.
 
-Actual browser theme, accent, responsive and interactive verification remains
-pending. Browser Use rejected localhost:3100 because a saved user preference
-blocks the origin. The user has been asked to allow that origin; no alternative
-browser or automation surface was used. A separate disposable preview database,
-accounts and fixtures prevent changes to the user's account or existing tenants.
-The task is not complete and must not be merged until rendered verification is
-completed or the user changes this requirement.
+Actual browser verification was not performed. Browser Use denied localhost:3100
+through its saved-permission/managed-policy gate. The user explicitly instructed
+"skip browser verification" on 2026-10-15, replacing the earlier requirement to
+hold integration for rendered checks. No alternate browser or automation surface
+was used. Implementation and automated verification are complete; Git integration
+follows the mandatory task-branch/worktree workflow. Browser-only visual,
+responsive and interactive results are not claimed.
+
+The isolated preview used disposable accounts and tenant fixtures in
+music_distribution_shadcn_preview_test. Cleanup removes only this task's preview
+container and scratch database, preserving existing account and tenant data.
 
 ## Sources
 
@@ -71,4 +75,7 @@ illustrates multiple draft palettes rather than inheriting the active mode.
 - 2026-10-15: Added official shadcn source/config, semantic tokens and themed portals.
 - 2026-10-15: Migrated existing interfaces and retained native form/ARIA contracts.
 - 2026-10-15: Removed obsolete custom control styling and repaired integration
-  review findings. Automated verification passed; browser access is pending.
+  review findings. Automated verification passed; browser access was blocked.
+
+- 2026-10-15: User explicitly waived browser verification and requested completion
+  using the passing automated checks; no rendered-browser results are claimed.

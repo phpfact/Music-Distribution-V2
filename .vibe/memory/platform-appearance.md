@@ -113,7 +113,7 @@ Integrated migration verification: the combined 1,062-test suite passed with one
 existing skip, including Appearance persistence/permissions/concurrency, width
 restoration, owner-bound notices and the success-only reload controller. Final
 UI contracts, lint, TypeScript and production build pass. Actual rendered checks
-for Light/Dark/System, six accents, portals and responsive layouts remain pending
-because Browser Use reports a saved localhost:3100 permission block. The user has
-been asked to allow that origin; no browser workaround was attempted. This
-migration is awaiting that verification before merging into main.
+for Light/Dark/System, six accents, portals and responsive layouts were blocked
+by Browser Use's origin gate. On 2026-10-15 the user explicitly instructed
+"skip browser verification". Automated validation is complete and integration
+proceeds under that revised requirement; browser results are not claimed.

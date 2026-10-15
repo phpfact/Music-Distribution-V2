@@ -33,3 +33,11 @@ announce loading and respect reduced-motion preferences.
   dashboard and error/loading behavior before implementation.
 - 2026-10-15: Migrated quick access and planned activity to Card, Badge and
   Button, with shared Alert/Button error boundaries and Skeleton loading states.
+
+## Integrated verification
+
+The combined regression suite passed 1,062 tests with one existing skip,
+including protected HTTP/Server Action behavior. All 11 final shared UI contract
+tests passed after review fixes; lint, TypeScript and production build passed.
+On 2026-10-15 the user explicitly waived browser verification after the browser
+permission gate prevented access. No rendered-browser results are claimed.

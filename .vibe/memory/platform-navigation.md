@@ -48,5 +48,6 @@ The isolated navigation branch passes `npm run typecheck`, `npm run lint`, and `
 - 2026-10-15: Integration review protects the visibility-toggle padding after
   application class overrides and accepts an explicit stable confirmation trigger.
   The integrated native login/logout HTTP regressions and UI contracts passed.
-  Lint, TypeScript and production build pass; actual browser checks are pending
-  the saved localhost:3100 permission block.
+  Lint, TypeScript and production build pass; actual browser checks were blocked
+  by the localhost:3100 permission gate. On 2026-10-15 the user explicitly waived
+  browser verification; no rendered interaction results are claimed.

@@ -32,5 +32,6 @@ The module depends on shared console wrappers (Field, FormSection, Notice, Avata
 - 2026-10-15: Integration review restores wrapping for long table-cell domains
   and returns row-dialog focus through the shared close-autofocus callback after
   the modal trap exits. The integrated tenant business/HTTP tests passed; lint,
-  TypeScript and production build pass. Browser checks remain pending the saved
-  localhost:3100 permission block.
+  TypeScript and production build pass. Browser checks were blocked by the saved
+  localhost:3100 permission gate; on 2026-10-15 the user explicitly waived those
+  checks. No rendered-browser results are claimed.
