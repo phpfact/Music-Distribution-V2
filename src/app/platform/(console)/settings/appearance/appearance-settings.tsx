@@ -237,7 +237,7 @@ function AppearanceForm({ saved, initialFeedback }: { saved: AppearanceState; in
                     value={option.value}
                     aria-label={option.label}
                     title={option.label}
-                    className="size-9 cursor-pointer border-border bg-[var(--swatch-light)] text-white shadow-xs data-[state=checked]:ring-2 data-[state=checked]:ring-primary data-[state=checked]:ring-offset-4 data-[state=checked]:ring-offset-card dark:bg-[var(--swatch-dark)] dark:text-background [&_svg]:size-3 [&_svg]:fill-current"
+                    className="size-9 cursor-pointer border-border bg-[var(--swatch-light)] text-primary-foreground shadow-xs data-[state=checked]:ring-2 data-[state=checked]:ring-primary data-[state=checked]:ring-offset-4 data-[state=checked]:ring-offset-card dark:bg-[var(--swatch-dark)] [&_svg]:size-3 [&_svg]:fill-current"
                     style={{ "--swatch-light": option.light, "--swatch-dark": option.dark } as CSSProperties}
                   />
                 ))}

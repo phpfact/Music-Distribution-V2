@@ -107,3 +107,13 @@ integration rather than inferred from static checks.
 
 - 2026-10-15: Migrated Appearance presentation to the shared shadcn/ui system,
   retaining saved state, drafts, all width choices and success-only reloads.
+
+
+Integrated migration verification: the combined 1,062-test suite passed with one
+existing skip, including Appearance persistence/permissions/concurrency, width
+restoration, owner-bound notices and the success-only reload controller. Final
+UI contracts, lint, TypeScript and production build pass. Actual rendered checks
+for Light/Dark/System, six accents, portals and responsive layouts remain pending
+because Browser Use reports a saved localhost:3100 permission block. The user has
+been asked to allow that origin; no browser workaround was attempted. This
+migration is awaiting that verification before merging into main.

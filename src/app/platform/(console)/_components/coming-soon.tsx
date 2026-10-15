@@ -10,7 +10,9 @@ type ComingSoonProps = {
   id: PlatformNavId;
 };
 
-/** The whole page of a module that is in the navigation but not built yet.  * Input: component props or field identifiers. Output: themed UI or ARIA attributes.
+/**
+ * The whole page of a module that is in the navigation but not built yet.
+ * Input: component props or field identifiers. Output: themed UI or ARIA attributes.
  * Use case: preserve shared application semantics across the shadcn migration.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-15. Last modified: 2026-10-15.

@@ -377,7 +377,7 @@ function CreatedCell({ row }: { row: TenantListRow }) {
 }
 
 const TH = "px-5 py-3.5 text-[11px] font-semibold tracking-wide";
-const TD = "px-5 py-4 align-middle";
+const TD = "px-5 py-4 align-middle whitespace-normal";
 
 /**
  * xl and up: below that, next to the sidebar, the seven columns would only fit

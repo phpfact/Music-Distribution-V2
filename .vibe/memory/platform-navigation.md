@@ -13,7 +13,7 @@ Migrate these shared interfaces to the project's source-owned shadcn/ui primitiv
 - The mobile drawer now uses the shared Sheet and closes on route changes, close button, Escape/outside interaction, and the desktop breakpoint. Controlled drawer focus returns to its mobile trigger when that trigger is visible. Desktop collapse still writes the existing cookie.
 - Sidebar links use Button composition, current-page markers, and portalled Tooltip content for the collapsed layout. Breadcrumb and Separator compose the topbar. The root Appearance provider supplies the shared tooltip timing.
 - The account menu uses DropdownMenu's keyboard/focus behavior. Its native logout form stays open during item selection to show the pending button. A `noscript` native form preserves server-rendered sign-out access without JavaScript.
-- ConfirmDialog preserves its caller API, uses Dialog for focus trapping and dismissal, and restores the opening control explicitly because callers do not render a DialogTrigger. Cancel is initially focused unless a reason field is present. Pending actions block all user dismissal and resubmission; failures retain drafts.
+- ConfirmDialog preserves its caller API, uses Dialog for focus trapping and dismissal, and restores the opening control explicitly because callers do not render a DialogTrigger. A caller may supply a stable return-focus ref when the opening menu item is removed; restoration happens only after Radix releases its focus scope. Cancel is initially focused unless a reason field is present. Pending actions block all user dismissal and resubmission; failures retain drafts.
 - PasswordInput forwards all native input props and refs to Input. Its icon Button toggles visibility without changing the field value or account setting. CopyButton shows pending clipboard feedback, synchronously guards repeat clicks, and announces only actual success/failure.
 - Avatar uses authenticated/local image URLs with decorative initials fallback, preserving existing display sizes and handling failed image loads.
 
@@ -44,3 +44,9 @@ The isolated navigation branch passes `npm run typecheck`, `npm run lint`, and `
 
 - 2026-10-15: Documented the requested shadcn migration and preserved navigation, confirmation, progressive sign-out, and field behavior before implementation.
 - 2026-10-15: Migrated the scoped shared navigation and interactive wrappers to the official Radix-backed shadcn foundation; kept Server Actions, preference persistence, and caller-facing confirmation contracts intact.
+
+- 2026-10-15: Integration review protects the visibility-toggle padding after
+  application class overrides and accepts an explicit stable confirmation trigger.
+  The integrated native login/logout HTTP regressions and UI contracts passed.
+  Lint, TypeScript and production build pass; actual browser checks are pending
+  the saved localhost:3100 permission block.

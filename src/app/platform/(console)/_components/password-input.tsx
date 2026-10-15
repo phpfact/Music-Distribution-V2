@@ -6,7 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
-type PasswordInputProps = Omit<ComponentPropsWithRef<"input">, "type" | "className"> & {
+type PasswordInputProps = Omit<
+  ComponentPropsWithRef<"input">,
+  "type" | "className"
+> & {
   id: string;
   hasError?: boolean;
   className?: string;
@@ -43,7 +46,7 @@ export function PasswordInput({
         spellCheck={false}
         disabled={disabled}
         aria-invalid={hasError || inputProps["aria-invalid"] || undefined}
-        className={cn("pr-12", className)}
+        className={cn(className, "pr-12")}
       />
       <Button
         type="button"

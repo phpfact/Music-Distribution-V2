@@ -12,7 +12,9 @@ type FormSectionProps = {
   children: ReactNode;
 };
 
-/** One numbered card of a long form, labelled by its own title.  * Input: component props or field identifiers. Output: themed UI or ARIA attributes.
+/**
+ * One numbered card of a long form, labelled by its own title.
+ * Input: component props or field identifiers. Output: themed UI or ARIA attributes.
  * Use case: preserve shared application semantics across the shadcn migration.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-15. Last modified: 2026-10-15.

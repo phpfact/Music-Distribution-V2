@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "./icons";
 import { Spinner } from "./spinner";
-import type { ButtonSize } from "./ui";
 
 type CopyState = "idle" | "copying" | "copied" | "failed";
 
@@ -13,7 +12,7 @@ type CopyButtonProps = {
   value: string;
   /** Accessible name saying what is copied, e.g. "Copy master password". */
   label: string;
-  size?: ButtonSize;
+  size?: "sm" | "md";
   className?: string;
 };
 
@@ -35,7 +34,12 @@ const TEXT: Record<CopyState, string> = {
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-15. Last modified: 2026-10-15.
  */
-export function CopyButton({ value, label, size = "sm", className = "" }: CopyButtonProps) {
+export function CopyButton({
+  value,
+  label,
+  size = "sm",
+  className = "",
+}: CopyButtonProps) {
   const [state, setState] = useState<CopyState>("idle");
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const copying = useRef(false);
@@ -100,12 +104,23 @@ export function CopyButton({ value, label, size = "sm", className = "" }: CopyBu
         size={size === "md" ? "default" : "sm"}
         className={className}
       >
-        {state === "copying" ? <Spinner /> : <Icon name={state === "copied" ? "check" : "copy"} className="size-4 shrink-0" />}
+        {state === "copying" ? (
+          <Spinner />
+        ) : (
+          <Icon
+            name={state === "copied" ? "check" : "copy"}
+            className="size-4 shrink-0"
+          />
+        )}
         {TEXT[state]}
       </Button>
       {/* The accessible name stays fixed, so the outcome is announced separately. */}
       <span aria-live="polite" className="sr-only">
-        {state === "copied" ? "Copied to clipboard" : state === "failed" ? "Copy failed" : ""}
+        {state === "copied"
+          ? "Copied to clipboard"
+          : state === "failed"
+            ? "Copy failed"
+            : ""}
       </span>
     </>
   );

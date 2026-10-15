@@ -1,8 +1,22 @@
 "use client";
 
-import { useId, useRef, useState, type FormEvent, type ReactNode, type RefObject } from "react";
+import {
+  useId,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Notice } from "./notice";
@@ -17,6 +31,8 @@ type ReasonOptions = {
 
 type ConfirmDialogProps = {
   open: boolean;
+  /** Stable trigger for confirmations opened from a disappearing menu item. */
+  returnFocusRef?: RefObject<HTMLElement | null>;
   /** Called for every permitted close: Cancel, Escape, outside interaction. */
   onClose: () => void;
   title: ReactNode;
@@ -43,30 +59,51 @@ type ConfirmDialogProps = {
 export function ConfirmDialog(props: ConfirmDialogProps) {
   const { open, onClose, pending = false, description } = props;
   const initialFocusRef = useRef<HTMLElement | null>(null);
-  const returnFocusRef = useRef<HTMLElement | null>(null);
+  const capturedFocusRef = useRef<HTMLElement | null>(null);
 
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen && !pending) onClose(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen && !pending) onClose();
+      }}
+    >
       <DialogContent
         showCloseButton={false}
         {...(description ? {} : { "aria-describedby": undefined })}
         className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg"
-        onEscapeKeyDown={(event) => { if (pending) event.preventDefault(); }}
-        onInteractOutside={(event) => { if (pending) event.preventDefault(); }}
+        onEscapeKeyDown={(event) => {
+          if (pending) event.preventDefault();
+        }}
+        onInteractOutside={(event) => {
+          if (pending) event.preventDefault();
+        }}
         onOpenAutoFocus={(event) => {
           // This controlled wrapper has no DialogTrigger. Save the caller's
           // focused control before selecting the safe initial field/button.
-          returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          capturedFocusRef.current =
+            document.activeElement instanceof HTMLElement
+              ? document.activeElement
+              : null;
           event.preventDefault();
           initialFocusRef.current?.focus();
         }}
         onCloseAutoFocus={(event) => {
           event.preventDefault();
-          if (returnFocusRef.current?.isConnected) returnFocusRef.current.focus();
+          // Restore after Radix releases its trap, never during onClose.
+          const target =
+            props.returnFocusRef?.current ?? capturedFocusRef.current;
+          if (target?.isConnected) target.focus();
         }}
       >
         {/* Reset the reason only after closing, retaining drafts on failures. */}
-        {open ? <DialogBody {...props} pending={pending} initialFocusRef={initialFocusRef} /> : null}
+        {open ? (
+          <DialogBody
+            {...props}
+            pending={pending}
+            initialFocusRef={initialFocusRef}
+          />
+        ) : null}
       </DialogContent>
     </Dialog>
   );
@@ -140,13 +177,19 @@ function DialogBody({
     reason?.hint ? reasonHintId : null,
     reasonCountId,
     reasonError ? reasonErrorId : null,
-  ].filter(Boolean).join(" ");
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <form onSubmit={onSubmit} noValidate className="flex flex-col gap-5">
       <DialogHeader>
         <DialogTitle className="break-words">{title}</DialogTitle>
-        {description ? <DialogDescription asChild><div>{description}</div></DialogDescription> : null}
+        {description ? (
+          <DialogDescription asChild>
+            <div>{description}</div>
+          </DialogDescription>
+        ) : null}
       </DialogHeader>
 
       {children}
@@ -156,14 +199,27 @@ function DialogBody({
           <div className="flex items-baseline justify-between gap-3">
             <Label htmlFor={reasonId}>
               {reason.label}
-              {reason.required ? <><span aria-hidden="true" className="text-destructive">*</span><span className="sr-only"> (required)</span></> : null}
+              {reason.required ? (
+                <>
+                  <span aria-hidden="true" className="text-destructive">
+                    *
+                  </span>
+                  <span className="sr-only"> (required)</span>
+                </>
+              ) : null}
             </Label>
-            <span id={reasonCountId} className="text-xs text-muted-foreground tabular-nums">
-              {reasonText.length} / {reason.maxLength}<span className="sr-only"> characters</span>
+            <span
+              id={reasonCountId}
+              className="text-xs text-muted-foreground tabular-nums"
+            >
+              {reasonText.length} / {reason.maxLength}
+              <span className="sr-only"> characters</span>
             </span>
           </div>
           <Textarea
-            ref={(element) => { initialFocusRef.current = element; }}
+            ref={(element) => {
+              initialFocusRef.current = element;
+            }}
             id={reasonId}
             value={reasonText}
             maxLength={reason.maxLength}
@@ -176,8 +232,20 @@ function DialogBody({
             aria-invalid={reasonError ? true : undefined}
             aria-describedby={reasonDescribedBy}
           />
-          {reason.hint ? <p id={reasonHintId} className="text-xs text-muted-foreground">{reason.hint}</p> : null}
-          {reasonError ? <p id={reasonErrorId} role="alert" className="text-sm text-destructive">{reasonError}</p> : null}
+          {reason.hint ? (
+            <p id={reasonHintId} className="text-xs text-muted-foreground">
+              {reason.hint}
+            </p>
+          ) : null}
+          {reasonError ? (
+            <p
+              id={reasonErrorId}
+              role="alert"
+              className="text-sm text-destructive"
+            >
+              {reasonError}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
@@ -187,11 +255,15 @@ function DialogBody({
         {/* aria-disabled retains focus while the caller is saving; handlers
             enforce the pending guard for mouse, keyboard, and form submits. */}
         <Button
-          ref={(element) => { if (!reason) initialFocusRef.current = element; }}
+          ref={(element) => {
+            if (!reason) initialFocusRef.current = element;
+          }}
           type="button"
           variant="outline"
           aria-disabled={pending || undefined}
-          onClick={() => { if (!pending) onClose(); }}
+          onClick={() => {
+            if (!pending) onClose();
+          }}
         >
           Cancel
         </Button>

@@ -89,10 +89,8 @@ export function TenantRowActions({
       </DropdownMenu>
       <LifecycleDialog
         action={dialog}
-        onClose={() => {
-          setDialog(null);
-          triggerRef.current?.focus();
-        }}
+        onClose={() => setDialog(null)}
+        returnFocusRef={triggerRef}
         tenantId={tenantId}
         tenantName={tenantName}
       />
