@@ -1,18 +1,24 @@
 "use client";
 
+import { Eye, EyeOff } from "lucide-react";
 import { useState, type ComponentPropsWithRef } from "react";
-import { inputClass } from "./ui";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 
 type PasswordInputProps = Omit<ComponentPropsWithRef<"input">, "type" | "className"> & {
-  /** Required: the Show/Hide toggle points at the input with `aria-controls`. */
   id: string;
   hasError?: boolean;
   className?: string;
 };
 
 /**
- * A password field with a Show/Hide toggle, as on the login form. Every other
- * prop (name, value, onChange, aria-*, ref…) goes to the `<input>`.
+ * Compose a shadcn input with an accessible password visibility control.
+ * Input: native input props/ref, required ID, and optional error/classes.
+ * Output: a password/text field that retains its value and form semantics.
+ * Use case: share password entry across login, creation, and credential dialogs.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-15. Last modified: 2026-10-15.
  */
 export function PasswordInput({
   id,
@@ -23,10 +29,11 @@ export function PasswordInput({
   ...inputProps
 }: PasswordInputProps) {
   const [visible, setVisible] = useState(false);
+  const accessibleName = visible ? "Hide password" : "Show password";
 
   return (
     <div className="relative">
-      <input
+      <Input
         {...inputProps}
         id={id}
         type={visible ? "text" : "password"}
@@ -35,19 +42,23 @@ export function PasswordInput({
         autoCorrect="off"
         spellCheck={false}
         disabled={disabled}
-        // Right padding keeps the text clear of the toggle.
-        className={inputClass(hasError, `pr-16 ${className}`)}
+        aria-invalid={hasError || inputProps["aria-invalid"] || undefined}
+        className={cn("pr-12", className)}
       />
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="icon"
+        aria-label={accessibleName}
+        title={accessibleName}
         aria-pressed={visible}
         aria-controls={id}
         disabled={disabled}
         onClick={() => setVisible((current) => !current)}
-        className="absolute inset-y-0 right-0 rounded-r-lg px-3 text-sm font-medium text-fg-muted transition-colors hover:text-fg focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-60"
+        className="absolute top-1/2 right-1 size-8 -translate-y-1/2 text-muted-foreground"
       >
-        {visible ? "Hide" : "Show"}
-      </button>
+        {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+      </Button>
     </div>
   );
 }

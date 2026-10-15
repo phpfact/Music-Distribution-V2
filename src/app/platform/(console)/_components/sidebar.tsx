@@ -3,110 +3,83 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useId, type ReactNode } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { getNavItem, isNavItemActive, PLATFORM_NAV_SECTIONS, type PlatformNavItem } from "../navigation";
 import { Icon } from "./icons";
 import { FOCUS_RING } from "./styles";
 
 type SidebarProps = {
-  /** Icons only, with the labels as tooltips. The mobile drawer is never collapsed. */
   collapsed: boolean;
-  /** Called when a navigation link is chosen (the drawer closes itself). */
   onNavigate?: () => void;
-  /** Rendered at the end of the branding row, e.g. the drawer's close button. */
   headerAction?: ReactNode;
-  /** Rendered below the navigation, e.g. the desktop collapse toggle. */
   footer?: ReactNode;
 };
 
-/** Branding and navigation, shared by the desktop sidebar and the mobile drawer. */
+/**
+ * Render the existing navigation registry in the desktop sidebar or Sheet.
+ * Input: collapsed layout, optional close-on-navigation callback and extra controls.
+ * Output: semantic grouped links composed with shadcn Button and Tooltip.
+ * Use case: share route labels, active states, and accessible collapsed navigation.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-15. Last modified: 2026-10-15.
+ */
 export function Sidebar({ collapsed, onNavigate, headerAction, footer }: SidebarProps) {
   const pathname = usePathname();
-  // Both instances are in the document at once; their label ids must differ.
   const idPrefix = useId();
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div
-        className={`flex h-20 shrink-0 items-center gap-2 ${
-          collapsed ? "justify-center px-2" : "px-5"
-        }`}
-      >
-        <Link
-          href={getNavItem("dashboard").href}
-          onClick={onNavigate}
-          aria-label={collapsed ? "Music Distribution — Platform Administration" : undefined}
-          className={`flex min-w-0 items-center gap-3 rounded-lg ${FOCUS_RING}`}
-        >
-          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent text-accent-fg shadow-sm">
-            <Icon name="disc-3" className="size-5" />
-          </span>
-          {collapsed ? null : (
-            <span className="flex min-w-0 flex-col">
-              <span className="truncate text-sm font-semibold tracking-tight text-fg">Music Distribution</span>
-              <span className="mt-0.5 truncate text-[11px] text-fg-subtle">Platform Administration</span>
-            </span>
-          )}
-        </Link>
-        {headerAction}
-      </div>
-
-      {/* Collapsed, the tooltips stick out to the right: nothing may clip them. */}
-      <nav
-        aria-label="Platform"
-        className={`min-h-0 flex-1 px-3 py-5 ${collapsed ? "overflow-visible" : "overflow-y-auto"}`}
-      >
-        <div className={`flex flex-col ${collapsed ? "gap-3" : "gap-6"}`}>
-          {PLATFORM_NAV_SECTIONS.map((section, index) => {
-            const labelId = `${idPrefix}-${section.id}`;
-            return (
-              <div key={section.id}>
-                {collapsed && index > 0 ? (
-                  <div aria-hidden="true" className="mx-2 mb-3 h-px bg-line" />
-                ) : null}
-                <p
-                  id={labelId}
-                  className={
-                    collapsed
-                      ? "sr-only"
-                      : "mb-2.5 px-3 text-[10px] font-semibold uppercase tracking-[0.13em] text-fg-subtle"
-                  }
-                >
-                  {section.label}
-                </p>
-                <ul aria-labelledby={labelId} className="flex flex-col gap-1">
-                  {section.items.map((item) => (
-                    <li key={item.id}>
-                      <SidebarLink
-                        item={item}
-                        active={isNavItemActive(item, pathname)}
-                        collapsed={collapsed}
-                        onNavigate={onNavigate}
-                      />
-                      {item.children && !collapsed ? (
-                        <ul className="ml-5 mt-1 space-y-1 border-l border-line pl-3" aria-label={`${item.label} pages`}>
-                          {item.children.map((child) => {
-                            const active = pathname === child.href || pathname.startsWith(`${child.href}/`);
-                            return (
-                              <li key={child.href}>
-                                <Link href={child.href} onClick={onNavigate} aria-current={active ? "page" : undefined}
-                                  className={`flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-medium transition-colors hover:bg-surface-2 ${FOCUS_RING} ${active ? "bg-accent-soft text-accent" : "text-fg-muted"}`}>
-                                  <Icon name={child.icon} className="size-3.5" />{child.label}
-                                </Link>
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            );
-          })}
+        <div className={`flex h-20 shrink-0 items-center gap-2 ${collapsed ? "justify-center px-2" : "px-5"}`}>
+          <Link href={getNavItem("dashboard").href} onClick={onNavigate} aria-label={collapsed ? "Music Distribution — Platform Administration" : undefined} className={`flex min-w-0 items-center gap-3 rounded-lg ${FOCUS_RING}`}>
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground shadow-sm"><Icon name="disc-3" className="size-5" /></span>
+            {collapsed ? null : (
+              <span className="flex min-w-0 flex-col">
+                <span className="truncate text-sm font-semibold tracking-tight">Music Distribution</span>
+                <span className="mt-0.5 truncate text-[11px] text-muted-foreground">Platform Administration</span>
+              </span>
+            )}
+          </Link>
+          {headerAction}
         </div>
-      </nav>
 
-      {footer}
+        <nav aria-label="Platform" className="min-h-0 flex-1 overflow-y-auto px-3 py-5">
+          <div className={`flex flex-col ${collapsed ? "gap-3" : "gap-6"}`}>
+            {PLATFORM_NAV_SECTIONS.map((section, index) => {
+              const labelId = `${idPrefix}-${section.id}`;
+              return (
+                <div key={section.id}>
+                  {collapsed && index > 0 ? <Separator className="mx-auto mb-3 w-[calc(100%-1rem)]" /> : null}
+                  <p id={labelId} className={collapsed ? "sr-only" : "mb-2.5 px-3 text-[10px] font-semibold uppercase tracking-[0.13em] text-muted-foreground"}>{section.label}</p>
+                  <ul aria-labelledby={labelId} className="flex flex-col gap-1">
+                    {section.items.map((item) => (
+                      <li key={item.id}>
+                        <SidebarLink item={item} active={isNavItemActive(item, pathname)} collapsed={collapsed} onNavigate={onNavigate} />
+                        {item.children && !collapsed ? (
+                          <ul className="ml-5 mt-1 space-y-1 border-l border-border pl-3" aria-label={`${item.label} pages`}>
+                            {item.children.map((child) => {
+                              const active = pathname === child.href || pathname.startsWith(`${child.href}/`);
+                              return (
+                                <li key={child.href}>
+                                  <Button asChild variant="ghost" className={`h-9 w-full justify-start gap-2 rounded-lg px-3 text-xs ${active ? "bg-primary/10 text-primary" : "text-muted-foreground"}`}>
+                                    <Link href={child.href} onClick={onNavigate} aria-current={active ? "page" : undefined}><Icon name={child.icon} className="size-3.5" />{child.label}</Link>
+                                  </Button>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        </nav>
+        {footer}
     </div>
   );
 }
@@ -118,47 +91,33 @@ type SidebarLinkProps = {
   onNavigate?: () => void;
 };
 
+/**
+ * Compose a navigation link and its optional collapsed-mode tooltip.
+ * Input: the registry item, route match, layout state and navigation callback.
+ * Output: one accessible link with persistent current-page and planned labels.
+ * Use case: show active navigation without relying on color alone.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-15. Last modified: 2026-10-15.
+ */
 function SidebarLink({ item, active, collapsed, onNavigate }: SidebarLinkProps) {
   const planned = item.status === "planned";
+  const link = (
+    <Button asChild variant="ghost" className={`relative h-11 w-full gap-3 rounded-xl text-[13px] motion-reduce:transition-none ${collapsed ? "justify-center px-0" : "justify-start px-3"} ${active ? "bg-primary/10 font-semibold text-primary" : "font-medium text-muted-foreground"}`}>
+      <Link href={item.href} onClick={onNavigate} aria-current={active && (collapsed || !item.children) ? "page" : undefined}>
+        {active ? <span aria-hidden="true" className="absolute top-1/2 left-0 h-5 w-[3px] -translate-y-1/2 rounded-full bg-primary" /> : null}
+        <Icon name={item.icon} className={`size-[18px] shrink-0 ${active ? "text-primary" : "text-muted-foreground"}`} />
+        <span className={collapsed ? "sr-only" : "min-w-0 flex-1 truncate"}>{item.label}{planned ? <span className="sr-only"> (coming soon)</span> : null}</span>
+        {planned && !collapsed ? <Badge aria-hidden="true" variant="secondary" className="ml-auto shrink-0 rounded-md px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground">Soon</Badge> : null}
+      </Link>
+    </Button>
+  );
+
+  if (!collapsed) return link;
 
   return (
-    <Link
-      href={item.href}
-      onClick={onNavigate}
-      aria-current={active && (collapsed || !item.children) ? "page" : undefined}
-      className={`group relative flex h-11 items-center gap-3 rounded-xl text-[13px] transition-colors motion-reduce:transition-none hover:bg-surface-2 hover:text-fg ${FOCUS_RING} ${
-        collapsed ? "justify-center px-0" : "px-3"
-      } ${active ? "bg-accent-soft font-semibold text-accent" : "font-medium text-fg-muted"}`}
-    >
-      {/* The active item is marked by more than its colour. */}
-      {active ? (
-        <span
-          aria-hidden="true"
-          className="absolute top-1/2 left-0 h-5 w-[3px] -translate-y-1/2 rounded-full bg-accent"
-        />
-      ) : null}
-      <Icon name={item.icon} className={`size-[18px] shrink-0 ${active ? "text-accent" : "text-fg-subtle"}`} />
-      <span className={collapsed ? "sr-only" : "min-w-0 flex-1 truncate"}>
-        {item.label}
-        {planned ? <span className="sr-only"> (coming soon)</span> : null}
-      </span>
-      {planned && !collapsed ? (
-        <span
-          aria-hidden="true"
-          className="ml-auto shrink-0 rounded-md bg-surface-2 px-1.5 py-0.5 text-[9px] font-medium text-fg-subtle"
-        >
-          Soon
-        </span>
-      ) : null}
-      {collapsed ? (
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute left-full z-50 ml-3 rounded-md border border-line bg-surface px-2 py-1 text-xs font-medium whitespace-nowrap text-fg opacity-0 shadow-lg transition-opacity motion-reduce:transition-none group-hover:opacity-100 group-focus-visible:opacity-100"
-        >
-          {item.label}
-          {planned ? " · Coming soon" : null}
-        </span>
-      ) : null}
-    </Link>
+    <Tooltip>
+      <TooltipTrigger asChild>{link}</TooltipTrigger>
+      <TooltipContent side="right" sideOffset={12}>{item.label}{planned ? " · Coming soon" : null}</TooltipContent>
+    </Tooltip>
   );
 }

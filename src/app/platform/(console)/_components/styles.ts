@@ -2,7 +2,7 @@
 
 /** The console's keyboard focus indicator. */
 export const FOCUS_RING =
-  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent";
+  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
 
 /** One row of the account menu, whether a link or a button. */
 export const MENU_ITEM_CLASS =
