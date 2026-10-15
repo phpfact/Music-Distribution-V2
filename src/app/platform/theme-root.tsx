@@ -4,6 +4,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useRouter } from "next/navigation";
 import { ACCENT_OPTIONS, WIDTH_OPTIONS, type AppearanceState } from "@/lib/appearance/preferences";
 import { refreshAppearanceAction } from "./(console)/settings/appearance/actions";
+import { ThemePortalProvider } from "@/components/theme-portal";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 type ThemeContextValue = {
   state: AppearanceState;
@@ -30,6 +32,7 @@ export function notifyAppearanceSaved() {
  * Created: 2026-10-14. Last modified: 2026-10-14.
  */
 export function ThemeRoot({ initialState, children }: { initialState: AppearanceState; children: ReactNode }) {
+  const [portalContainer, setPortalContainer] = useState<HTMLDivElement | null>(null);
   const [state, setState] = useState(initialState);
   const [previousInitial, setPreviousInitial] = useState(initialState);
   const requestVersion = useRef(0);
@@ -101,6 +104,7 @@ export function ThemeRoot({ initialState, children }: { initialState: Appearance
     <ThemeContext.Provider value={value}>
       {/* Keep width and accent presets centralized for the server-rendered layout. */}
       <div
+        ref={setPortalContainer}
         data-appearance-source={state.source}
         data-accent={state.appearance.accent}
         data-content-width={state.appearance.width}
@@ -111,7 +115,10 @@ export function ThemeRoot({ initialState, children }: { initialState: Appearance
         } as CSSProperties}
         className={`${state.appearance.theme} platform-theme min-h-dvh bg-canvas text-fg`}
       >
-        {children}
+        {/* Portals inherit these same variables; no competing theme state. */}
+        <ThemePortalProvider container={portalContainer}>
+          <TooltipProvider delayDuration={400}>{children}</TooltipProvider>
+        </ThemePortalProvider>
       </div>
     </ThemeContext.Provider>
   );

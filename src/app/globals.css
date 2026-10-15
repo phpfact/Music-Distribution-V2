@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 /* System mode is resolved by CSS on the first paint, before hydration. */
 @custom-variant dark {
@@ -19,9 +20,37 @@
   --fg-subtle: #697586;
   --accent-light: #047857;
   --accent-dark: #34d399;
-  --accent: var(--accent-light);
-  --accent-soft: color-mix(in srgb, var(--accent) 9%, transparent);
+  --brand: var(--accent-light);
+  --accent-soft: color-mix(in srgb, var(--brand) 9%, transparent);
   --accent-fg: #ffffff;
+  /* Semantic shadcn tokens resolve on this same theme ancestor. */
+  --background: var(--canvas);
+  --foreground: var(--fg);
+  --card: var(--surface);
+  --card-foreground: var(--fg);
+  --popover: var(--surface);
+  --popover-foreground: var(--fg);
+  --primary: var(--brand);
+  --primary-foreground: var(--accent-fg);
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--fg);
+  --muted: var(--surface-2);
+  --muted-foreground: var(--fg-muted);
+  --accent: var(--surface-2);
+  --accent-foreground: var(--fg);
+  --destructive: #b91c1c;
+  --destructive-foreground: #ffffff;
+  --success: #047857;
+  --warning: #92400e;
+  --info: #1d4ed8;
+  --success-soft: color-mix(in srgb, var(--success) 9%, var(--surface));
+  --warning-soft: color-mix(in srgb, var(--warning) 9%, var(--surface));
+  --info-soft: color-mix(in srgb, var(--info) 9%, var(--surface));
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--brand);
+  --overlay: rgb(0 0 0 / 0.5);
+  --radius: 0.625rem;
   --card-shadow: 0 2px 8px rgb(16 24 40 / 0.025), 0 12px 24px rgb(16 24 40 / 0.015);
 }
 
@@ -34,9 +63,14 @@
   --fg: #eef2f6;
   --fg-muted: #b6c0cc;
   --fg-subtle: #9ba8b8;
-  --accent: var(--accent-dark);
-  --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+  --brand: var(--accent-dark);
+  --accent-soft: color-mix(in srgb, var(--brand) 12%, transparent);
   --accent-fg: #101419;
+  --destructive: #fca5a5;
+  --destructive-foreground: #101419;
+  --success: #6ee7b7;
+  --warning: #fcd34d;
+  --info: #93c5fd;
   --card-shadow: 0 2px 8px rgb(0 0 0 / 0.06), 0 12px 24px rgb(0 0 0 / 0.035);
 }
 
@@ -50,9 +84,14 @@
     --fg: #eef2f6;
     --fg-muted: #b6c0cc;
     --fg-subtle: #9ba8b8;
-    --accent: var(--accent-dark);
-    --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+    --brand: var(--accent-dark);
+    --accent-soft: color-mix(in srgb, var(--brand) 12%, transparent);
     --accent-fg: #101419;
+    --destructive: #fca5a5;
+    --destructive-foreground: #101419;
+    --success: #6ee7b7;
+    --warning: #fcd34d;
+    --info: #93c5fd;
     --card-shadow: 0 2px 8px rgb(0 0 0 / 0.06), 0 12px 24px rgb(0 0 0 / 0.035);
   }
 }
@@ -65,8 +104,50 @@
   --color-fg: var(--fg);
   --color-fg-muted: var(--fg-muted);
   --color-fg-subtle: var(--fg-subtle);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-overlay: var(--overlay);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
   --color-accent-soft: var(--accent-soft);
   --color-accent-fg: var(--accent-fg);
   --shadow-card: var(--card-shadow);
+}
+
+@layer base {
+  * { @apply border-border; }
+}
+
+/* Radix motion is optional; keep focus and state feedback without animation. */
+@media (prefers-reduced-motion: reduce) {
+  [data-slot] {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
