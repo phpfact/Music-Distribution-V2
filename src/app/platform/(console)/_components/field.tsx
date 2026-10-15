@@ -1,4 +1,6 @@
 import type { ReactNode } from "react";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 
 type FieldTag = "generated" | "manual";
 
@@ -17,14 +19,28 @@ type FieldProps = {
 };
 
 const TAGS: Record<FieldTag, { label: string; className: string }> = {
-  generated: { label: "Generated", className: "bg-accent-soft text-accent" },
+  generated: { label: "Generated", className: "bg-accent-soft text-primary" },
   manual: { label: "Manual", className: "bg-surface-2 text-fg-muted" },
 };
 
+/**
+ * Create the hintId shared UI value.
+ * Input: component or field parameters. Output: reusable UI or accessible field ID.
+ * Use case: consistent application forms and feedback.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-15. Last modified: 2026-10-15.
+ */
 export function hintId(htmlFor: string): string {
   return `${htmlFor}-hint`;
 }
 
+/**
+ * Create the errorId shared UI value.
+ * Input: component or field parameters. Output: reusable UI or accessible field ID.
+ * Use case: consistent application forms and feedback.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-15. Last modified: 2026-10-15.
+ */
 export function errorId(htmlFor: string): string {
   return `${htmlFor}-error`;
 }
@@ -33,44 +49,63 @@ export function errorId(htmlFor: string): string {
  * The ARIA attributes the control inside a Field needs, so its hint and error
  * are read out with it. Spread them onto the input:
  * `<input id={id} {...describedBy(id, { hint, error })} />`.
+ * Input: component props or field identifiers. Output: themed UI or ARIA attributes.
+ * Use case: preserve shared application semantics across the shadcn migration.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-15. Last modified: 2026-10-15.
  */
 export function describedBy(
   htmlFor: string,
   { hint, error }: { hint?: unknown; error?: unknown },
-): { "aria-describedby": string | undefined; "aria-invalid": true | undefined } {
-  const ids = [hint ? hintId(htmlFor) : null, error ? errorId(htmlFor) : null].filter(
-    (id): id is string => id !== null,
-  );
+): {
+  "aria-describedby": string | undefined;
+  "aria-invalid": true | undefined;
+} {
+  const ids = [
+    hint ? hintId(htmlFor) : null,
+    error ? errorId(htmlFor) : null,
+  ].filter((id): id is string => id !== null);
   return {
     "aria-describedby": ids.length > 0 ? ids.join(" ") : undefined,
     "aria-invalid": error ? true : undefined,
   };
 }
 
-/** A labelled form control with its optional tag, hint and error message. */
-export function Field({ label, htmlFor, required, hint, error, tag, action, children }: FieldProps) {
+/** A labelled form control with its optional tag, hint and error message.  * Input: component props or field identifiers. Output: themed UI or ARIA attributes.
+ * Use case: preserve shared application semantics across the shadcn migration.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-15. Last modified: 2026-10-15.
+ */
+export function Field({
+  label,
+  htmlFor,
+  required,
+  hint,
+  error,
+  tag,
+  action,
+  children,
+}: FieldProps) {
   return (
     <div className="flex min-w-0 flex-col gap-1.5">
       <div className="flex min-h-5 items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
-          <label htmlFor={htmlFor} className="text-sm font-medium text-fg">
+          <Label htmlFor={htmlFor} className="text-sm font-medium text-fg">
             {label}
             {required ? (
               <>
                 {/* The asterisk is for the eye; screen readers hear the word. */}
-                <span aria-hidden="true" className="ml-0.5 text-red-600 dark:text-red-400">
+                <span aria-hidden="true" className="ml-0.5 text-destructive">
                   *
                 </span>
                 <span className="sr-only"> (required)</span>
               </>
             ) : null}
-          </label>
+          </Label>
           {tag ? (
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs font-medium ${TAGS[tag].className}`}
-            >
+            <Badge variant="secondary" className={TAGS[tag].className}>
               {TAGS[tag].label}
-            </span>
+            </Badge>
           ) : null}
         </div>
         {action ? <div className="shrink-0">{action}</div> : null}
@@ -82,7 +117,7 @@ export function Field({ label, htmlFor, required, hint, error, tag, action, chil
         </p>
       ) : null}
       {error ? (
-        <p id={errorId(htmlFor)} className="text-sm text-red-600 dark:text-red-400">
+        <p id={errorId(htmlFor)} className="text-sm text-destructive">
           {error}
         </p>
       ) : null}

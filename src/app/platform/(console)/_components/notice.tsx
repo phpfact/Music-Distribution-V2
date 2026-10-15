@@ -1,69 +1,62 @@
 import type { ReactNode } from "react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { Icon, type IconName } from "./icons";
-import { FOCUS_RING } from "./styles";
 
 type NoticeVariant = "success" | "error" | "warning" | "info";
-
 type NoticeProps = {
   variant: NoticeVariant;
   title?: ReactNode;
   children?: ReactNode;
-  /** Shows a close button; only from a client component. */
   onDismiss?: () => void;
 };
-
-const VARIANTS: Record<NoticeVariant, { icon: IconName; srLabel: string; className: string }> = {
-  success: {
-    icon: "circle-check",
-    srLabel: "Success:",
-    className: "border-emerald-600/30 bg-emerald-500/10 text-emerald-800 dark:text-emerald-300",
-  },
-  error: {
-    icon: "circle-x",
-    srLabel: "Error:",
-    className: "border-red-600/30 bg-red-500/10 text-red-700 dark:text-red-400",
-  },
-  warning: {
-    icon: "alert-triangle",
-    srLabel: "Warning:",
-    className: "border-amber-600/30 bg-amber-500/10 text-amber-800 dark:text-amber-300",
-  },
-  info: {
-    icon: "info",
-    srLabel: "Note:",
-    className: "border-zinc-500/30 bg-zinc-500/10 text-zinc-700 dark:text-zinc-300",
-  },
+const VARIANTS: Record<NoticeVariant, { icon: IconName; srLabel: string }> = {
+  success: { icon: "circle-check", srLabel: "Success:" },
+  error: { icon: "circle-x", srLabel: "Error:" },
+  warning: { icon: "alert-triangle", srLabel: "Warning:" },
+  info: { icon: "info", srLabel: "Note:" },
 };
 
 /**
- * A message box for the result of an action or a state worth knowing. Errors
- * interrupt (`alert`); everything else is announced politely (`status`).
+ * Announce action results through the shared shadcn Alert.
+ * Input: message severity, title, content and optional dismissal callback.
+ * Output: an assertive error or a polite status with semantic theme colors.
+ * Use case: preserve existing success/error announcements on every screen.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-15. Last modified: 2026-10-15.
  */
 export function Notice({ variant, title, children, onDismiss }: NoticeProps) {
-  const { icon, srLabel, className } = VARIANTS[variant];
-
+  const { icon, srLabel } = VARIANTS[variant];
   return (
-    <div
+    <Alert
+      variant={variant === "error" ? "destructive" : variant}
       role={variant === "error" ? "alert" : "status"}
-      className={`flex gap-3 rounded-lg border px-4 py-3 text-sm ${className}`}
+      className={`flex items-start gap-3 ${variant === "error" ? "border-destructive/25 bg-destructive/10" : ""}`}
     >
       <Icon name={icon} className="mt-0.5 size-4 shrink-0" />
       <div className="min-w-0 flex-1 break-words">
-        {/* The icon is decorative: the kind of message is also said in words. */}
         <span className="sr-only">{srLabel} </span>
-        {title ? <p className="font-semibold">{title}</p> : null}
-        {children ? <div className={title ? "mt-1" : undefined}>{children}</div> : null}
+        {title ? (
+          <AlertTitle className="font-semibold">{title}</AlertTitle>
+        ) : null}
+        {children ? (
+          <AlertDescription className={`text-inherit ${title ? "mt-1" : ""}`}>
+            {children}
+          </AlertDescription>
+        ) : null}
       </div>
       {onDismiss ? (
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="icon-sm"
           onClick={onDismiss}
           aria-label="Dismiss"
-          className={`-my-1 -mr-2 grid size-7 shrink-0 place-items-center rounded-md opacity-80 transition-opacity hover:opacity-100 ${FOCUS_RING}`}
+          className="-my-1 -mr-2 shrink-0 text-inherit"
         >
           <Icon name="x" className="size-4" />
-        </button>
+        </Button>
       ) : null}
-    </div>
+    </Alert>
   );
 }
