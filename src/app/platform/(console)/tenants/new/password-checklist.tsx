@@ -2,14 +2,27 @@ import { checkMasterPassword } from "@/lib/tenants/rules";
 import { Icon } from "../../_components/icons";
 
 type PasswordChecklistProps = {
-  /** Referenced by the password input's aria-describedby. */
+  /**
+   * Referenced by the password input's aria-describedby.
+   */
   id: string;
   password: string;
   username: string;
 };
 
-/** The master password policy (§4) as a live checklist, from the server's own rule. */
-export function PasswordChecklist({ id, password, username }: PasswordChecklistProps) {
+/**
+ * The master password policy (§4) as a live checklist, from the server's own rule.
+ * Input: The existing typed arguments and component state.
+ * Output: Accessible React UI.
+ * Use case: Tenant management’s existing owner workflow.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14. Last modified: 2026-10-15.
+ */
+export function PasswordChecklist({
+  id,
+  password,
+  username,
+}: PasswordChecklistProps) {
   const { valid, requirements } = checkMasterPassword(password, username);
   const met = requirements.filter((requirement) => requirement.met).length;
 
@@ -20,7 +33,7 @@ export function PasswordChecklist({ id, password, username }: PasswordChecklistP
           <li
             key={requirement.id}
             className={`flex items-start gap-2 text-xs ${
-              requirement.met ? "text-emerald-700 dark:text-emerald-300" : "text-fg-muted"
+              requirement.met ? "text-success" : "text-fg-muted"
             }`}
           >
             <Icon
@@ -28,7 +41,9 @@ export function PasswordChecklist({ id, password, username }: PasswordChecklistP
               className="mt-px size-3.5 shrink-0"
             />
             <span className="min-w-0">
-              <span className="sr-only">{requirement.met ? "Met: " : "Not met: "}</span>
+              <span className="sr-only">
+                {requirement.met ? "Met: " : "Not met: "}
+              </span>
               {requirement.label}
             </span>
           </li>

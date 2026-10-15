@@ -12,7 +12,12 @@ import {
   useRef,
   useState,
 } from "react";
-import { CUSTOM_DOMAIN_MAX_LENGTH, SUBDOMAIN_LABEL_MAX_LENGTH } from "@/lib/domains/rules";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  CUSTOM_DOMAIN_MAX_LENGTH,
+  SUBDOMAIN_LABEL_MAX_LENGTH,
+} from "@/lib/domains/rules";
 import { PROFILE_IMAGE_ACCEPT } from "@/lib/storage/image";
 import type { TenantForEdit } from "@/lib/tenants/service";
 import {
@@ -22,14 +27,22 @@ import {
   TENANT_USERNAME_MAX_LENGTH,
 } from "@/lib/tenants/rules";
 import { Avatar } from "../../../_components/avatar";
-import { describedBy, errorId, Field, hintId } from "../../../_components/field";
+import {
+  describedBy,
+  errorId,
+  Field,
+  hintId,
+} from "../../../_components/field";
 import { FormSection } from "../../../_components/form-section";
 import { Icon } from "../../../_components/icons";
 import { Notice } from "../../../_components/notice";
 import { Spinner } from "../../../_components/spinner";
 import { FOCUS_RING } from "../../../_components/styles";
-import { buttonClass, inputClass } from "../../../_components/ui";
-import type { UpdateTenantActionState, UpdateTenantField, UpdateTenantFieldErrors } from "../../action-types";
+import type {
+  UpdateTenantActionState,
+  UpdateTenantField,
+  UpdateTenantFieldErrors,
+} from "../../action-types";
 import { TENANTS_PATH } from "../../list-query";
 import { updateTenantAction } from "../../manage-actions";
 import { checkProfileImageFile } from "../../new/form-model";
@@ -51,7 +64,14 @@ type ImageState = EditImage & { url: string | null; error: string | null };
 
 type EditTenantFormProps = { tenant: TenantForEdit };
 
-/** The edit-tenant form (docs/tenant-management.md §9.5). No secret fields. */
+/**
+ * The edit-tenant form (docs/tenant-management.md §9.5). No secret fields.
+ * Input: The existing typed arguments and component state.
+ * Output: Accessible React UI.
+ * Use case: Tenant management’s existing owner workflow.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14. Last modified: 2026-10-15.
+ */
 export function EditTenantForm({ tenant }: EditTenantFormProps) {
   const router = useRouter();
   const uid = useId();
@@ -61,17 +81,27 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
   // Setup writes the same rows: the server refuses edits until it finishes.
   const locked = tenant.status === "provisioning";
 
-  const [values, setValues] = useState<EditValues>(() => initialEditValues(tenant));
+  const [values, setValues] = useState<EditValues>(() =>
+    initialEditValues(tenant),
+  );
   // Client errors come from the shared rules (blur, submit); server errors
   // from the last save. A server error stays until its field is edited.
   const [clientErrors, setClientErrors] = useState<UpdateTenantFieldErrors>({});
   const [serverErrors, setServerErrors] = useState<UpdateTenantFieldErrors>({});
-  const [summary, setSummary] = useState<{ visible: boolean; formError: string | null }>({
+  const [summary, setSummary] = useState<{
+    visible: boolean;
+    formError: string | null;
+  }>({
     visible: false,
     formError: null,
   });
   const [summaryFocus, setSummaryFocus] = useState(0);
-  const [image, setImage] = useState<ImageState>({ action: "keep", file: null, url: null, error: null });
+  const [image, setImage] = useState<ImageState>({
+    action: "keep",
+    file: null,
+    url: null,
+    error: null,
+  });
 
   const action = updateTenantAction.bind(null, tenant.id);
   const [state, dispatch, pending] = useActionState(action, INITIAL_STATE);
@@ -119,6 +149,15 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
   // ---------------------------------------------------------------------------
   // Editing
 
+  /**
+   * Description: Remove only the edited fields from the existing client and server error state.
+   *
+   * Input: The existing typed arguments and component state.
+   * Output: The existing helper result or state update.
+   * Use case: Tenant management’s existing owner workflow.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-10-14. Last modified: 2026-10-15.
+   */
   function dropErrors(fields: readonly UpdateTenantField[]) {
     const without = (current: UpdateTenantFieldErrors) => {
       const next = { ...current };
@@ -129,6 +168,15 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
     setServerErrors(without);
   }
 
+  /**
+   * Description: Update an edit-field draft and clear that field’s previous server error.
+   *
+   * Input: The existing typed arguments and component state.
+   * Output: The existing helper result or state update.
+   * Use case: Tenant management’s existing owner workflow.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-10-14. Last modified: 2026-10-15.
+   */
   function setField(field: EditTextField, value: string) {
     setValues((current) => ({ ...current, [field]: value }));
     setServerErrors((current) => {
@@ -139,7 +187,14 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
     });
   }
 
-  /** Checks one field with the shared rules when the owner leaves it. */
+  /**
+   * Checks one field with the shared rules when the owner leaves it.
+   * Input: The existing typed arguments and component state.
+   * Output: The existing helper result or state update.
+   * Use case: Tenant management’s existing owner workflow.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-10-14. Last modified: 2026-10-15.
+   */
   function validateOnBlur(field: UpdateTenantField) {
     const error = validateEditField(field, values, ctx);
     setClientErrors((current) => {
@@ -151,6 +206,15 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
     });
   }
 
+  /**
+   * Description: Validate a selected image and keep only the latest preview response.
+   *
+   * Input: The existing typed arguments and component state.
+   * Output: The existing helper result or state update.
+   * Use case: Tenant management’s existing owner workflow.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-10-14. Last modified: 2026-10-15.
+   */
   async function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
     const input = event.currentTarget;
     const file = input.files?.[0];
@@ -166,15 +230,38 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
       setImage((current) => ({ ...current, error }));
       return;
     }
-    setImage({ action: "replace", file, url: URL.createObjectURL(file), error: null });
+    setImage({
+      action: "replace",
+      file,
+      url: URL.createObjectURL(file),
+      error: null,
+    });
   }
 
+  /**
+   * Description: Clear the image preview and record the existing removal intent.
+   *
+   * Input: The existing typed arguments and component state.
+   * Output: The existing helper result or state update.
+   * Use case: Tenant management’s existing owner workflow.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-10-14. Last modified: 2026-10-15.
+   */
   function removeImage() {
     imageSeq.current += 1;
     setImage({ action: "remove", file: null, url: null, error: null });
     dropErrors(["profileImage"]);
   }
 
+  /**
+   * Description: Restore the edit form’s stored image without uploading or saving a new file.
+   *
+   * Input: The existing typed arguments and component state.
+   * Output: The existing helper result or state update.
+   * Use case: Tenant management’s existing owner workflow.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-10-14. Last modified: 2026-10-15.
+   */
   function keepImage() {
     imageSeq.current += 1;
     setImage({ action: "keep", file: null, url: null, error: null });
@@ -184,6 +271,15 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
   // ---------------------------------------------------------------------------
   // Submit
 
+  /**
+   * Description: Prevent duplicate submission, validate drafts and dispatch the existing payload.
+   *
+   * Input: The existing typed arguments and component state.
+   * Output: The existing helper result or state update.
+   * Use case: Tenant management’s existing owner workflow.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-10-14. Last modified: 2026-10-15.
+   */
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (locked || pending || saved || submitting.current) return;
@@ -204,6 +300,15 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
     startTransition(() => dispatch(formData));
   }
 
+  /**
+   * Description: Move focus to the requested form field after validation reports an error.
+   *
+   * Input: The existing typed arguments and component state.
+   * Output: The existing helper result or state update.
+   * Use case: Tenant management’s existing owner workflow.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-10-14. Last modified: 2026-10-15.
+   */
   function focusField(field: UpdateTenantField) {
     document.getElementById(fid(field))?.focus();
   }
@@ -212,10 +317,16 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
   // Rendering
 
   const sections = summarizeEditErrors(errors);
-  const showSummary = summary.visible && (sections.length > 0 || summary.formError !== null);
+  const showSummary =
+    summary.visible && (sections.length > 0 || summary.formError !== null);
   const busy = pending || saved;
 
-  const previewSrc = image.action === "replace" ? image.url : image.action === "remove" ? null : storedImage;
+  const previewSrc =
+    image.action === "replace"
+      ? image.url
+      : image.action === "remove"
+        ? null
+        : storedImage;
   const hasImage = previewSrc !== null;
   const imageError = image.error ?? errors.profileImage;
   const imageStatus =
@@ -228,7 +339,8 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
   const subdomainId = fid("subdomain");
   const subdomainSuffixId = fid("subdomain-suffix");
   const subdomainError = errors.subdomain;
-  const domainNote = "Changing a domain means it has to pass the DNS check again before it becomes active.";
+  const domainNote =
+    "Changing a domain means it has to pass the DNS check again before it becomes active.";
 
   return (
     <form
@@ -245,10 +357,17 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
       ) : null}
 
       {showSummary ? (
-        <div ref={summaryRef} tabIndex={-1} className="rounded-lg focus:outline-none">
+        <div
+          ref={summaryRef}
+          tabIndex={-1}
+          className="rounded-lg focus:outline-none"
+        >
           <Notice
             variant="error"
-            title={summary.formError ?? "The changes could not be saved. Check these sections:"}
+            title={
+              summary.formError ??
+              "The changes could not be saved. Check these sections:"
+            }
           >
             {sections.length > 0 ? (
               <ul className="list-disc space-y-1 pl-5">
@@ -264,7 +383,9 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                     >
                       {section.title}
                     </a>{" "}
-                    — {section.count} {section.count === 1 ? "field needs" : "fields need"} attention
+                    — {section.count}{" "}
+                    {section.count === 1 ? "field needs" : "fields need"}{" "}
+                    attention
                   </li>
                 ))}
               </ul>
@@ -280,8 +401,13 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
         {/* 1. Profile */}
         <FormSection number={1} title="Profile">
           <div className="grid gap-5 sm:grid-cols-2">
-            <Field label="Full name" htmlFor={fid("fullName")} required error={errors.fullName}>
-              <input
+            <Field
+              label="Full name"
+              htmlFor={fid("fullName")}
+              required
+              error={errors.fullName}
+            >
+              <Input
                 id={fid("fullName")}
                 type="text"
                 value={values.fullName}
@@ -290,7 +416,6 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 onChange={(event) => setField("fullName", event.target.value)}
                 onBlur={() => validateOnBlur("fullName")}
                 {...describedBy(fid("fullName"), { error: errors.fullName })}
-                className={inputClass(Boolean(errors.fullName))}
               />
             </Field>
             <Field
@@ -299,7 +424,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
               hint="Include the country code, e.g. +44 20 7946 0958"
               error={errors.phone}
             >
-              <input
+              <Input
                 id={fid("phone")}
                 type="tel"
                 value={values.phone}
@@ -307,40 +432,67 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 autoComplete="off"
                 onChange={(event) => setField("phone", event.target.value)}
                 onBlur={() => validateOnBlur("phone")}
-                {...describedBy(fid("phone"), { hint: true, error: errors.phone })}
-                className={inputClass(Boolean(errors.phone))}
+                {...describedBy(fid("phone"), {
+                  hint: true,
+                  error: errors.phone,
+                })}
               />
             </Field>
           </div>
 
-          <div role="group" aria-labelledby={fid("profileImage-label")} className="flex min-w-0 flex-col gap-1.5">
-            <p id={fid("profileImage-label")} className="text-sm font-medium text-fg">
+          <div
+            role="group"
+            aria-labelledby={fid("profileImage-label")}
+            className="flex min-w-0 flex-col gap-1.5"
+          >
+            <p
+              id={fid("profileImage-label")}
+              className="text-sm font-medium text-fg"
+            >
               Profile image
             </p>
             <div className="flex flex-wrap items-center gap-4">
-              <Avatar name={values.fullName || tenant.fullName} src={previewSrc} size="lg" />
+              <Avatar
+                name={values.fullName || tenant.fullName}
+                src={previewSrc}
+                size="lg"
+              />
               <div className="flex flex-wrap gap-2">
-                <button
+                <Button
                   type="button"
                   id={fid("profileImage")}
                   onClick={() => fileInputRef.current?.click()}
-                  {...describedBy(fid("profileImage"), { hint: true, error: imageError })}
-                  className={buttonClass("secondary", "sm")}
+                  {...describedBy(fid("profileImage"), {
+                    hint: true,
+                    error: imageError,
+                  })}
+                  variant="outline"
+                  size="sm"
                 >
                   <Icon name="upload" className="size-4" />
                   {hasImage ? "Change" : "Upload image"}
-                </button>
+                </Button>
                 {hasImage ? (
-                  <button type="button" onClick={removeImage} className={buttonClass("ghost", "sm")}>
+                  <Button
+                    type="button"
+                    onClick={removeImage}
+                    variant="ghost"
+                    size="sm"
+                  >
                     <Icon name="trash-2" className="size-4" />
                     Remove
-                  </button>
+                  </Button>
                 ) : null}
                 {image.action !== "keep" && storedImage ? (
-                  <button type="button" onClick={keepImage} className={buttonClass("ghost", "sm")}>
+                  <Button
+                    type="button"
+                    onClick={keepImage}
+                    variant="ghost"
+                    size="sm"
+                  >
                     <Icon name="rotate-ccw" className="size-4" />
                     Keep current image
-                  </button>
+                  </Button>
                 ) : null}
               </div>
               {/* Visually hidden and out of the tab order: the buttons above drive it. */}
@@ -354,14 +506,23 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 className="sr-only"
               />
             </div>
-            <p id={hintId(fid("profileImage"))} className="text-xs text-fg-subtle">
+            <p
+              id={hintId(fid("profileImage"))}
+              className="text-xs text-fg-subtle"
+            >
               PNG, JPEG or WebP, up to 2 MB
             </p>
-            <p aria-live="polite" className="text-xs text-fg-muted empty:hidden">
+            <p
+              aria-live="polite"
+              className="text-xs text-fg-muted empty:hidden"
+            >
               {imageStatus}
             </p>
             {imageError ? (
-              <p id={errorId(fid("profileImage"))} className="text-sm text-red-600 dark:text-red-400">
+              <p
+                id={errorId(fid("profileImage"))}
+                className="text-sm text-destructive"
+              >
                 {imageError}
               </p>
             ) : null}
@@ -375,8 +536,13 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
           description="Passwords are changed with Reset master password on the tenant page."
         >
           <div className="grid gap-5 sm:grid-cols-2">
-            <Field label="Username" htmlFor={fid("username")} required error={errors.username}>
-              <input
+            <Field
+              label="Username"
+              htmlFor={fid("username")}
+              required
+              error={errors.username}
+            >
+              <Input
                 id={fid("username")}
                 type="text"
                 value={values.username}
@@ -388,11 +554,15 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 onChange={(event) => setField("username", event.target.value)}
                 onBlur={() => validateOnBlur("username")}
                 {...describedBy(fid("username"), { error: errors.username })}
-                className={inputClass(Boolean(errors.username))}
               />
             </Field>
-            <Field label="Email" htmlFor={fid("email")} required error={errors.email}>
-              <input
+            <Field
+              label="Email"
+              htmlFor={fid("email")}
+              required
+              error={errors.email}
+            >
+              <Input
                 id={fid("email")}
                 type="email"
                 value={values.email}
@@ -403,7 +573,6 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 onChange={(event) => setField("email", event.target.value)}
                 onBlur={() => validateOnBlur("email")}
                 {...describedBy(fid("email"), { error: errors.email })}
-                className={inputClass(Boolean(errors.email))}
               />
             </Field>
           </div>
@@ -412,15 +581,20 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
         {/* 3. Domain */}
         <FormSection number={3} title="Domain" description={domainNote}>
           <div className="grid gap-5 sm:grid-cols-2">
-            <Field label="SaaS subdomain" htmlFor={subdomainId} required error={subdomainError}>
+            <Field
+              label="SaaS subdomain"
+              htmlFor={subdomainId}
+              required
+              error={subdomainError}
+            >
               <div
                 className={`flex h-10 w-full min-w-0 overflow-hidden rounded-lg border bg-surface transition-colors focus-within:ring-2 ${
                   subdomainError
-                    ? "border-red-600 focus-within:border-red-600 focus-within:ring-red-600/30 dark:border-red-500 dark:focus-within:border-red-500 dark:focus-within:ring-red-500/30"
-                    : "border-line focus-within:border-accent focus-within:ring-accent/30"
+                    ? "border-destructive focus-within:border-destructive focus-within:ring-destructive/30"
+                    : "border-line focus-within:border-primary focus-within:ring-ring/30"
                 } ${locked ? "opacity-70" : ""}`}
               >
-                <input
+                <Input
                   id={subdomainId}
                   type="text"
                   value={values.subdomain}
@@ -429,13 +603,18 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                   autoCapitalize="none"
                   autoCorrect="off"
                   spellCheck={false}
-                  onChange={(event) => setField("subdomain", event.target.value)}
+                  onChange={(event) =>
+                    setField("subdomain", event.target.value)
+                  }
                   onBlur={() => validateOnBlur("subdomain")}
                   aria-invalid={subdomainError ? true : undefined}
-                  aria-describedby={[subdomainSuffixId, subdomainError ? errorId(subdomainId) : null]
+                  aria-describedby={[
+                    subdomainSuffixId,
+                    subdomainError ? errorId(subdomainId) : null,
+                  ]
                     .filter(Boolean)
                     .join(" ")}
-                  className="h-full min-w-0 flex-1 bg-transparent px-3 text-sm text-fg outline-none placeholder:text-fg-subtle disabled:cursor-not-allowed disabled:text-fg-subtle"
+                  className="h-full min-w-0 flex-1 rounded-none border-0 bg-transparent px-3 shadow-none focus-visible:border-transparent focus-visible:ring-0"
                 />
                 <span
                   id={subdomainSuffixId}
@@ -451,7 +630,7 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
               hint="Optional. Leave empty to remove it. Requires a DNS TXT record before it becomes active."
               error={errors.customDomain}
             >
-              <input
+              <Input
                 id={fid("customDomain")}
                 type="text"
                 value={values.customDomain}
@@ -461,10 +640,14 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
-                onChange={(event) => setField("customDomain", event.target.value)}
+                onChange={(event) =>
+                  setField("customDomain", event.target.value)
+                }
                 onBlur={() => validateOnBlur("customDomain")}
-                {...describedBy(fid("customDomain"), { hint: true, error: errors.customDomain })}
-                className={inputClass(Boolean(errors.customDomain))}
+                {...describedBy(fid("customDomain"), {
+                  hint: true,
+                  error: errors.customDomain,
+                })}
               />
             </Field>
           </div>
@@ -472,17 +655,18 @@ export function EditTenantForm({ tenant }: EditTenantFormProps) {
       </fieldset>
 
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-        <Link href={detailsHref} className={`${buttonClass("secondary")} w-full sm:w-auto`}>
-          Cancel
-        </Link>
-        <button
+        <Button asChild variant="outline" className="w-full sm:w-auto">
+          <Link href={detailsHref}>Cancel</Link>
+        </Button>
+        <Button
           type="submit"
           disabled={locked || busy}
-          className={`${buttonClass("primary")} w-full sm:w-auto`}
+          variant="default"
+          className="w-full sm:w-auto"
         >
           {busy ? <Spinner size="sm" /> : null}
           {busy ? "Saving…" : "Save changes"}
-        </button>
+        </Button>
       </div>
     </form>
   );

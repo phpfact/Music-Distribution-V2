@@ -8,6 +8,14 @@ import { CreateTenantForm } from "./create-tenant-form";
 
 export const metadata: Metadata = { title: "Create tenant" };
 
+/**
+ * Description: Load safe public configuration into the protected creation page.
+ * Input: The existing typed arguments and component state.
+ * Output: Accessible React UI.
+ * Use case: Tenant management’s existing owner workflow.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14. Last modified: 2026-10-15.
+ */
 export default async function CreateTenantPage() {
   // Checked on the server on every request; nothing below renders without it.
   await requirePlatformOwner();
@@ -28,10 +36,12 @@ export default async function CreateTenantPage() {
           <Icon name="arrow-left" className="size-4" />
           Tenants
         </Link>
-        <p className="mt-2 text-xs font-medium tracking-wider text-accent uppercase">
+        <p className="mt-2 text-xs font-medium tracking-wider text-primary uppercase">
           Platform management
         </p>
-        <h1 className="text-2xl font-semibold tracking-tight break-words sm:text-3xl">Create tenant</h1>
+        <h1 className="text-2xl font-semibold tracking-tight break-words sm:text-3xl">
+          Create tenant
+        </h1>
         <p className="text-fg-muted">
           Set up a new tenant with its own admin login, database and subdomain.
         </p>

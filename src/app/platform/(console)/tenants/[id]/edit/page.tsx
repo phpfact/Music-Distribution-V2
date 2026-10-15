@@ -14,13 +14,31 @@ type PageProps = { params: Promise<{ id: string }> };
 // Memoized for one request: the metadata and the page read the tenant once.
 const loadTenant = cache(async (id: string) => getTenantForEdit(id));
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+/**
+ * Description: Load an authenticated tenant title without exposing data to signed-out visitors.
+ * Input: The existing typed arguments and component state.
+ * Output: The existing helper result or state update.
+ * Use case: Tenant management’s existing owner workflow.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14. Last modified: 2026-10-15.
+ */
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
   // No tenant data in the title without a session.
   await requirePlatformOwner();
   const tenant = await loadTenant((await params).id);
   return { title: tenant ? `Edit ${tenant.fullName}` : "Tenant not found" };
 }
 
+/**
+ * Description: Load saved tenant values into the protected edit page.
+ * Input: The existing typed arguments and component state.
+ * Output: Accessible React UI.
+ * Use case: Tenant management’s existing owner workflow.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14. Last modified: 2026-10-15.
+ */
 export default async function EditTenantPage({ params }: PageProps) {
   // Checked on the server on every request; nothing below renders without it.
   await requirePlatformOwner();
@@ -39,13 +57,15 @@ export default async function EditTenantPage({ params }: PageProps) {
           <Icon name="arrow-left" className="size-4" />
           <span className="break-all">{tenant.fullName}</span>
         </Link>
-        <p className="mt-2 text-xs font-medium tracking-wider text-accent uppercase">
+        <p className="mt-2 text-xs font-medium tracking-wider text-primary uppercase">
           Platform management
         </p>
-        <h1 className="text-2xl font-semibold tracking-tight break-words sm:text-3xl">Edit tenant</h1>
+        <h1 className="text-2xl font-semibold tracking-tight break-words sm:text-3xl">
+          Edit tenant
+        </h1>
         <p className="text-fg-muted">
-          Change the tenant&apos;s profile, admin login and domains. Credentials are changed on the
-          tenant page.
+          Change the tenant&apos;s profile, admin login and domains. Credentials
+          are changed on the tenant page.
         </p>
       </header>
 

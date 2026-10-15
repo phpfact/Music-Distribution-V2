@@ -2,27 +2,46 @@
 
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
-import { DATABASE_PASSWORD_MAX_LENGTH, validateExistingDatabasePassword } from "@/lib/tenants/rules";
+import { Button } from "@/components/ui/button";
+import {
+  DATABASE_PASSWORD_MAX_LENGTH,
+  validateExistingDatabasePassword,
+} from "@/lib/tenants/rules";
 import { ConfirmDialog } from "../../../_components/confirm-dialog";
 import { describedBy, Field } from "../../../_components/field";
 import { Icon } from "../../../_components/icons";
 import { PasswordInput } from "../../../_components/password-input";
-import { buttonClass } from "../../../_components/ui";
 import { useTenantFlash } from "../../_components/tenant-flash";
 import type { DatabasePasswordActionResult } from "../../action-types";
-import { rotateDatabasePasswordAction, updateDatabasePasswordAction } from "../../manage-actions";
+import {
+  rotateDatabasePasswordAction,
+  updateDatabasePasswordAction,
+} from "../../manage-actions";
 
 const FAILED = "The action could not be completed. Try again shortly.";
 
 type DatabasePasswordProps = {
   tenantId: string;
   tenantName: string;
-  /** provisioned → "Rotate password"; existing → "Update password". */
+  /**
+   * provisioned → "Rotate password"; existing → "Update password".
+   */
   mode: "provisioned" | "existing";
 };
 
-/** The Database card's password action (§8.5, §9.4). The password itself is never shown. */
-export function DatabasePassword({ tenantId, tenantName, mode }: DatabasePasswordProps) {
+/**
+ * The Database card's password action (§8.5, §9.4). The password itself is never shown.
+ * Input: The existing typed arguments and component state.
+ * Output: Accessible React UI.
+ * Use case: Tenant management’s existing owner workflow.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14. Last modified: 2026-10-15.
+ */
+export function DatabasePassword({
+  tenantId,
+  tenantName,
+  mode,
+}: DatabasePasswordProps) {
   const router = useRouter();
   const flash = useTenantFlash();
   const uid = useId();
@@ -35,6 +54,15 @@ export function DatabasePassword({ tenantId, tenantName, mode }: DatabasePasswor
   const [pending, startTransition] = useTransition();
   const rotate = mode === "provisioned";
 
+  /**
+   * Description: Prepare a fresh credential confirmation with old errors and secrets cleared.
+   *
+   * Input: The existing typed arguments and component state.
+   * Output: The existing helper result or state update.
+   * Use case: Tenant management’s existing owner workflow.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-10-14. Last modified: 2026-10-15.
+   */
   function openDialog() {
     setPassword("");
     setPasswordError(null);
@@ -42,12 +70,30 @@ export function DatabasePassword({ tenantId, tenantName, mode }: DatabasePasswor
     setOpen(true);
   }
 
+  /**
+   * Description: Close an idle credential confirmation and clear its transient secret.
+   *
+   * Input: The existing typed arguments and component state.
+   * Output: The existing helper result or state update.
+   * Use case: Tenant management’s existing owner workflow.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-10-14. Last modified: 2026-10-15.
+   */
   function close() {
     if (pending) return;
     setOpen(false);
     setPassword("");
   }
 
+  /**
+   * Description: Validate the selected credential operation and run its existing Server Action.
+   *
+   * Input: The existing typed arguments and component state.
+   * Output: The existing helper result or state update.
+   * Use case: Tenant management’s existing owner workflow.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-10-14. Last modified: 2026-10-15.
+   */
   function confirm() {
     if (pending) return;
     setError(null);
@@ -76,17 +122,19 @@ export function DatabasePassword({ tenantId, tenantName, mode }: DatabasePasswor
       }
       setOpen(false);
       setPassword("");
-      flash.show(rotate ? "Database password rotated." : "Database password updated.");
+      flash.show(
+        rotate ? "Database password rotated." : "Database password updated.",
+      );
       router.refresh();
     });
   }
 
   return (
     <>
-      <button type="button" onClick={openDialog} className={buttonClass("secondary", "sm")}>
+      <Button type="button" onClick={openDialog} variant="outline" size="sm">
         <Icon name={rotate ? "refresh-cw" : "key-round"} className="size-4" />
         {rotate ? "Rotate password" : "Update password"}
-      </button>
+      </Button>
 
       {rotate ? (
         <ConfirmDialog
@@ -110,7 +158,12 @@ export function DatabasePassword({ tenantId, tenantName, mode }: DatabasePasswor
           confirmLabel="Update password"
           onConfirm={confirm}
         >
-          <Field label="Database password" htmlFor={passwordId} required error={passwordError}>
+          <Field
+            label="Database password"
+            htmlFor={passwordId}
+            required
+            error={passwordError}
+          >
             <PasswordInput
               id={passwordId}
               value={password}

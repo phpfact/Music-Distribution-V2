@@ -1,44 +1,54 @@
+import { Skeleton } from "@/components/ui/skeleton";
+
 // Placeholder blocks shaped like the create form (back link, header, the
 // credentials control and the four numbered sections) while it renders, so the
 // tenant list's skeleton one level up is not shown here.
+/**
+ * Description: Show accessible skeletons matching the create-tenant form.
+ * Input: The existing typed arguments and component state.
+ * Output: Accessible React UI.
+ * Use case: Tenant management’s existing owner workflow.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14. Last modified: 2026-10-15.
+ */
 export default function CreateTenantLoading() {
   return (
     <div
       role="status"
       aria-label="Loading"
-      className="flex w-full max-w-3xl flex-col gap-8 motion-safe:animate-pulse"
+      className="flex w-full max-w-3xl flex-col gap-8"
     >
       <div className="flex flex-col gap-3">
-        <div className="h-4 w-20 rounded bg-surface-2" />
-        <div className="mt-2 h-3 w-32 rounded bg-surface-2" />
-        <div className="h-8 w-56 max-w-full rounded-lg bg-surface-2" />
-        <div className="h-4 w-96 max-w-full rounded bg-surface-2" />
+        <Skeleton className="h-4 w-20 rounded bg-surface-2" />
+        <Skeleton className="mt-2 h-3 w-32 rounded bg-surface-2" />
+        <Skeleton className="h-8 w-56 max-w-full rounded-lg bg-surface-2" />
+        <Skeleton className="h-4 w-96 max-w-full rounded bg-surface-2" />
       </div>
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-5">
-          <div className="h-4 w-24 rounded bg-surface-2" />
-          <div className="h-11 w-full rounded-lg bg-surface-2 sm:w-72" />
-          <div className="h-4 w-full max-w-lg rounded bg-surface-2" />
+          <Skeleton className="h-4 w-24 rounded bg-surface-2" />
+          <Skeleton className="h-11 w-full rounded-lg bg-surface-2 sm:w-72" />
+          <Skeleton className="h-4 w-full max-w-lg rounded bg-surface-2" />
         </div>
         {[0, 1, 2, 3].map((index) => (
           <div key={index} className="rounded-xl border border-line bg-surface">
             <div className="flex items-center gap-3 border-b border-line p-5">
-              <div className="size-7 shrink-0 rounded-full bg-surface-2" />
-              <div className="h-5 w-40 max-w-full rounded bg-surface-2" />
+              <Skeleton className="size-7 shrink-0 rounded-full bg-surface-2" />
+              <Skeleton className="h-5 w-40 max-w-full rounded bg-surface-2" />
             </div>
             <div className="grid gap-5 p-5 sm:grid-cols-2">
               {[0, 1].map((field) => (
                 <div key={field} className="flex flex-col gap-1.5">
-                  <div className="h-4 w-24 rounded bg-surface-2" />
-                  <div className="h-10 rounded-lg bg-surface-2" />
+                  <Skeleton className="h-4 w-24 rounded bg-surface-2" />
+                  <Skeleton className="h-10 rounded-lg bg-surface-2" />
                 </div>
               ))}
             </div>
           </div>
         ))}
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <div className="h-10 rounded-lg bg-surface-2 sm:w-24" />
-          <div className="h-10 rounded-lg bg-surface-2 sm:w-36" />
+          <Skeleton className="h-10 rounded-lg bg-surface-2 sm:w-24" />
+          <Skeleton className="h-10 rounded-lg bg-surface-2 sm:w-36" />
         </div>
       </div>
     </div>

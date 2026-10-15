@@ -1,18 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { useRef, useState } from "react";
 import {
-  useEffect,
-  useId,
-  useRef,
-  useState,
-  type CSSProperties,
-  type KeyboardEvent,
-  type MouseEvent,
-} from "react";
-import { flushSync } from "react-dom";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 import { Icon } from "../../_components/icons";
-import { FOCUS_RING, MENU_ITEM_CLASS } from "../../_components/styles";
 import type { TenantStatus } from "../labels";
 import { TENANTS_PATH } from "../list-query";
 import { LifecycleDialog, type LifecycleAction } from "./lifecycle-dialog";
@@ -23,216 +20,73 @@ type TenantRowActionsProps = {
   status: TenantStatus;
 };
 
-// Room the panel needs below the button before it opens upwards instead.
-const MENU_HEIGHT_ESTIMATE = 120;
-
 /**
- * "View" and the overflow menu (Edit, Suspend or Reactivate) of one tenant in
- * the list. The menu follows the WAI-ARIA menu button pattern of the account
- * menu. Its panel is fixed to the viewport, so the table's horizontal scroll
- * box cannot clip it; scrolling or resizing closes it.
+ * Description: Render tenant navigation and permission-appropriate lifecycle actions.
+ * Input: The tenant identity, display name and existing lifecycle status.
+ * Output: A shadcn menu and the existing confirmation workflow.
+ * Use case: The desktop directory table and responsive tenant cards.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
-export function TenantRowActions({ tenantId, tenantName, status }: TenantRowActionsProps) {
-  const [open, setOpen] = useState(false);
-  const [position, setPosition] = useState<CSSProperties>({});
+export function TenantRowActions({
+  tenantId,
+  tenantName,
+  status,
+}: TenantRowActionsProps) {
   const [dialog, setDialog] = useState<LifecycleAction | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const triggerId = useId();
-  const menuId = useId();
   const detailsHref = `${TENANTS_PATH}/${tenantId}`;
-
-  // A press outside, a scroll or a resize closes it: the panel would float off its button.
-  useEffect(() => {
-    if (!open) return;
-    function onPointerDown(event: PointerEvent) {
-      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
-    }
-    function onMove() {
-      setOpen(false);
-    }
-    document.addEventListener("pointerdown", onPointerDown);
-    window.addEventListener("scroll", onMove, true);
-    window.addEventListener("resize", onMove);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      window.removeEventListener("scroll", onMove, true);
-      window.removeEventListener("resize", onMove);
-    };
-  }, [open]);
-
-  function menuItems(): HTMLElement[] {
-    const menu = menuRef.current;
-    if (!menu) return [];
-    return Array.from(menu.querySelectorAll<HTMLElement>('[role="menuitem"]:not(:disabled)'));
-  }
-
-  function placeMenu() {
-    const rect = triggerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const right = window.innerWidth - rect.right;
-    setPosition(
-      rect.bottom + MENU_HEIGHT_ESTIMATE > window.innerHeight
-        ? { right, bottom: window.innerHeight - rect.top + 4 }
-        : { right, top: rect.bottom + 4 },
-    );
-  }
-
-  function openMenu(focus: "first" | "last" | null) {
-    // The panel must be placed and visible before one of its items can take focus.
-    flushSync(() => {
-      placeMenu();
-      setOpen(true);
-    });
-    if (focus === null) return;
-    const items = menuItems();
-    (focus === "first" ? items[0] : items.at(-1))?.focus();
-  }
-
-  function closeMenu(returnFocus: boolean) {
-    setOpen(false);
-    if (returnFocus) triggerRef.current?.focus();
-  }
-
-  function onTriggerClick(event: MouseEvent<HTMLButtonElement>) {
-    if (open) {
-      closeMenu(false);
-      return;
-    }
-    // detail is 0 for a click made with Enter or Space: move focus into the menu.
-    openMenu(event.detail === 0 ? "first" : null);
-  }
-
-  function onTriggerKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
-    if (event.key === "ArrowDown") {
-      event.preventDefault();
-      openMenu("first");
-    } else if (event.key === "ArrowUp") {
-      event.preventDefault();
-      openMenu("last");
-    } else if (event.key === "Escape" && open) {
-      event.preventDefault();
-      closeMenu(true);
-    }
-  }
-
-  function onMenuKeyDown(event: KeyboardEvent<HTMLDivElement>) {
-    const items = menuItems();
-    if (items.length === 0) return;
-    const index = items.indexOf(document.activeElement as HTMLElement);
-
-    switch (event.key) {
-      case "ArrowDown":
-        event.preventDefault();
-        items[(index + 1) % items.length]?.focus();
-        break;
-      case "ArrowUp":
-        event.preventDefault();
-        items[index <= 0 ? items.length - 1 : index - 1]?.focus();
-        break;
-      case "Home":
-        event.preventDefault();
-        items[0]?.focus();
-        break;
-      case "End":
-        event.preventDefault();
-        items.at(-1)?.focus();
-        break;
-      case "Escape":
-        event.preventDefault();
-        closeMenu(true);
-        break;
-      case "Tab":
-        // Focus moves on as usual; the menu just does not stay open behind it.
-        closeMenu(false);
-        break;
-      case " ":
-        // Space activates a button natively, but not a link.
-        if (event.target instanceof HTMLAnchorElement) {
-          event.preventDefault();
-          event.target.click();
-        }
-        break;
-    }
-  }
-
-  function openDialog(action: LifecycleAction) {
-    // The dialog takes focus; back on the trigger once it closes.
-    setOpen(false);
-    setDialog(action);
-  }
 
   return (
     <div className="flex items-center justify-end gap-1">
-      <Link
-        href={detailsHref}
-        aria-label={`View ${tenantName}`}
-        className={`inline-flex h-8 items-center rounded-lg px-2.5 text-sm font-medium text-accent transition-colors hover:bg-accent-soft ${FOCUS_RING}`}
-      >
-        View
-      </Link>
-      <div ref={containerRef}>
-        <button
-          ref={triggerRef}
-          id={triggerId}
-          type="button"
-          onClick={onTriggerClick}
-          onKeyDown={onTriggerKeyDown}
-          aria-label={`More actions for ${tenantName}`}
-          aria-haspopup="menu"
-          aria-expanded={open}
-          aria-controls={menuId}
-          className={`grid size-8 place-items-center rounded-lg text-fg-muted transition-colors hover:bg-surface-2 hover:text-fg ${FOCUS_RING}`}
-        >
-          <Icon name="more-horizontal" className="size-4" />
-        </button>
-        <div
-          ref={menuRef}
-          id={menuId}
-          role="menu"
-          aria-labelledby={triggerId}
-          hidden={!open}
-          onKeyDown={onMenuKeyDown}
-          style={position}
-          className="fixed z-50 w-48 rounded-xl border border-line bg-surface p-1.5 shadow-xl shadow-black/20"
-        >
-          <Link
-            href={`${detailsHref}/edit`}
-            role="menuitem"
-            tabIndex={-1}
-            onClick={() => setOpen(false)}
-            className={MENU_ITEM_CLASS}
+      <Button asChild variant="ghost" size="sm" className="text-primary">
+        <Link href={detailsHref} aria-label={`View ${tenantName}`}>
+          View
+        </Link>
+      </Button>
+      {/* The shared portal keeps the menu outside the table's overflow box and inside ThemeRoot. */}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            ref={triggerRef}
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="size-8 text-muted-foreground"
+            aria-label={`More actions for ${tenantName}`}
           >
-            <Icon name="pencil" className="size-4 shrink-0" />
-            Edit
-          </Link>
+            <Icon name="more-horizontal" className="size-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="end"
+          className="w-48"
+          onCloseAutoFocus={(event) => {
+            // The newly opened confirmation owns focus until it closes.
+            if (dialog !== null) event.preventDefault();
+          }}
+        >
+          <DropdownMenuItem asChild>
+            <Link href={`${detailsHref}/edit`}>
+              <Icon name="pencil" className="size-4" />
+              Edit
+            </Link>
+          </DropdownMenuItem>
           {status === "active" ? (
-            <button
-              type="button"
-              role="menuitem"
-              tabIndex={-1}
-              onClick={() => openDialog("suspend")}
-              className={MENU_ITEM_CLASS}
-            >
-              <Icon name="ban" className="size-4 shrink-0" />
+            <DropdownMenuItem onSelect={() => setDialog("suspend")}>
+              <Icon name="ban" className="size-4" />
               Suspend
-            </button>
+            </DropdownMenuItem>
           ) : null}
           {status === "suspended" ? (
-            <button
-              type="button"
-              role="menuitem"
-              tabIndex={-1}
-              onClick={() => openDialog("reactivate")}
-              className={MENU_ITEM_CLASS}
-            >
-              <Icon name="rotate-ccw" className="size-4 shrink-0" />
+            <DropdownMenuItem onSelect={() => setDialog("reactivate")}>
+              <Icon name="rotate-ccw" className="size-4" />
               Reactivate
-            </button>
+            </DropdownMenuItem>
           ) : null}
-        </div>
-      </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
       <LifecycleDialog
         action={dialog}
         onClose={() => {
