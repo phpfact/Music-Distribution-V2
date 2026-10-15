@@ -7,12 +7,28 @@ import type { TenantHistoryAction, TenantDetails } from "@/lib/tenants/service";
 import { formatDateTime } from "./format";
 import type { TenantStatus } from "./labels";
 
-/** Setup is under way: the page polls for progress while this holds. */
+/**
+ * Description: Tell whether the tenant's setup is under way.
+ * Input: The tenant status.
+ * Output: True for pending and provisioning.
+ * Use case: The details page polls for progress (AutoRefresh) while this holds.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function isSetupInProgress(status: TenantStatus): boolean {
   return status === "pending" || status === "provisioning";
 }
 
-/** The setup card is shown until setup has succeeded, and whenever it can be retried. */
+/**
+ * Description: Decide whether the details page shows the setup card.
+ * Input: The tenant status and whether setup can be retried.
+ * Output: True until setup has succeeded, and whenever it can be retried.
+ * Use case: The Setup Progress section (and its secondary-menu item).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function showsSetupCard(status: TenantStatus, canRetry: boolean): boolean {
   return isSetupInProgress(status) || status === "failed" || canRetry;
 }
@@ -39,12 +55,16 @@ export const SCHEMA_STATUS_LABELS: Readonly<
 };
 
 /**
- * "Suspended on 14 Oct 2026, 07:03 UTC by owner: <reason>", leaving out
- * whatever is unknown.
+ * Description: Word the start of the suspension notice.
+ * Input: The tenant's suspension (time, actor, reason).
+ * Output: "Suspended" or "Suspended on 14 Oct 2026, 07:03 UTC". The actor and the
+ *   reason are rendered by the page, because a platform owner's username is
+ *   masked behind an eye button there.
+ * Use case: The suspension notice of the details page.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
-export function suspensionSentence(suspension: NonNullable<TenantDetails["suspension"]>): string {
-  let sentence = "Suspended";
-  if (suspension.at) sentence += ` on ${formatDateTime(suspension.at)}`;
-  if (suspension.by) sentence += ` by ${suspension.by}`;
-  return suspension.reason ? `${sentence}: ${suspension.reason}` : `${sentence}.`;
+export function suspensionLead(suspension: NonNullable<TenantDetails["suspension"]>): string {
+  return suspension.at ? `Suspended on ${formatDateTime(suspension.at)}` : "Suspended";
 }

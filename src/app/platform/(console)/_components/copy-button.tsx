@@ -32,7 +32,8 @@ const TEXT: Record<CopyState, string> = {
  * Output: shadcn Button and a live-region result with automatic reset.
  * Use case: share safe copy feedback for credentials and account information.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 export function CopyButton({
   value,
@@ -41,7 +42,7 @@ export function CopyButton({
   className = "",
 }: CopyButtonProps) {
   const [state, setState] = useState<CopyState>("idle");
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timer   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const copying = useRef(false);
 
   useEffect(
@@ -57,7 +58,8 @@ export function CopyButton({
    * Output: visible feedback that resets after the established delay.
    * Use case: avoid stale copy confirmation on later interactions.
    * Author: Mr. Sachin Sharma
-   * Created: 2026-10-15. Last modified: 2026-10-15.
+   * Created: 2026-10-15
+   * Last modified: 2026-10-15
    */
   function show(next: CopyState) {
     setState(next);
@@ -71,7 +73,8 @@ export function CopyButton({
    * Output: copied/failed feedback without logging sensitive error details.
    * Use case: report clipboard permission or secure-context failures accurately.
    * Author: Mr. Sachin Sharma
-   * Created: 2026-10-15. Last modified: 2026-10-15.
+   * Created: 2026-10-15
+   * Last modified: 2026-10-15
    */
   async function copy() {
     // Guard synchronously because the browser can leave clipboard permission

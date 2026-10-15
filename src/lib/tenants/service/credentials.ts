@@ -40,7 +40,7 @@ export type MasterPasswordResetResult =
 /** Database password rotation and update. */
 export type CredentialResult = { ok: true } | CredentialFailure;
 
-const NOT_FOUND = { ok: false, reason: "not_found", message: "This tenant does not exist." } as const;
+const NOT_FOUND   = { ok: false, reason: "not_found", message: "This tenant does not exist." } as const;
 const UNAVAILABLE = { ok: false, reason: "unavailable", message: UNAVAILABLE_MESSAGE } as const;
 const BUSY = {
   ok: false,
@@ -52,6 +52,16 @@ const CREDENTIAL_LIMIT = { limit: 10, windowSeconds: 15 * 60 };
 
 type CredentialAction = "tenant-admin-password" | "tenant-db-rotate" | "tenant-db-password";
 
+/**
+ * Description: Rate-limit a credential change per owner and action.
+ * Input: The action key and the acting owner.
+ * Output: null when allowed; otherwise the rate-limited (10 per 15 minutes) or
+ *   unavailable failure to return.
+ * Use case: resetMasterPassword, rotateDatabasePassword, updateExistingDatabasePassword.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function limitAction(action: CredentialAction, actor: TenantActor): Promise<CredentialFailure | null> {
   const limit = await consumeRateLimit({ key: `${action}:${actor.ownerId}`, ...CREDENTIAL_LIMIT });
   if (limit === "limited") {
@@ -72,7 +82,15 @@ class AdminRowError extends Error {
   }
 }
 
-/** After a conditional update matched nothing: gone, or in another state now. */
+/**
+ * Description: Explain why a conditional update matched nothing.
+ * Input: The tenant id.
+ * Output: "not found" when the tenant is gone, otherwise "wait until setup finishes".
+ * Use case: The credential changes after a guarded update.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function mismatch(id: string): Promise<CredentialFailure> {
   const exists = await getControlDb().tenant.count({ where: { id } }).catch(() => 1);
   return exists === 0 ? NOT_FOUND : BUSY;
@@ -81,6 +99,15 @@ async function mismatch(id: string): Promise<CredentialFailure> {
 // ---------------------------------------------------------------------------
 // Master password
 
+/**
+ * Description: Validate the master-password reset request.
+ * Input: Anything (untrusted Server Action argument).
+ * Output: Auto, Manual with the typed password, or null for any other shape.
+ * Use case: resetMasterPassword.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function parseResetInput(input: unknown): MasterPasswordResetInput | null {
   if (typeof input !== "object" || input === null) return null;
   const { mode, password } = input as { mode?: unknown; password?: unknown };
@@ -90,9 +117,15 @@ function parseResetInput(input: unknown): MasterPasswordResetInput | null {
 }
 
 /**
- * Sets a new master password (§8.5). Once the admin account exists, its
- * `password_hash` in the tenant database is replaced; before that, the hash
- * waiting for setup (`pending_admin_password_hash`) is.
+ * Description: Set a new master password for the tenant admin (§8.5).
+ * Input: The tenant id, the request (auto, or manual with a password) and the acting owner.
+ * Output: ok (with the generated password once, Auto only), or a failure. Once the
+ *   admin account exists its password_hash in the tenant database is replaced;
+ *   before that the hash waiting for setup is.
+ * Use case: Reset master password on the details page.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function resetMasterPassword(
   id: string,
@@ -142,7 +175,7 @@ export async function resetMasterPassword(
   } as const;
 
   const adminExists = tenant.provisioningSteps.length > 0;
-  let applied = false;
+  let applied       = false;
   try {
     // Argon2id is slow: hashed before any transaction is opened.
     const hash = await hashPassword(password);
@@ -201,10 +234,15 @@ export async function resetMasterPassword(
 // Database password
 
 /**
- * A new generated password for a provisioned tenant's database login (§8.5).
- * The secret is replaced and the role altered inside one control-plane
- * transaction: a failed ALTER rolls the secret back. Pooled clients holding
- * the old login are closed afterwards.
+ * Description: Generate a new password for a provisioned tenant's database login (§8.5).
+ * Input: The tenant id and the acting owner.
+ * Output: ok or a failure. The secret is replaced and the role altered in one
+ *   control-plane transaction (a failed ALTER rolls the secret back); pooled
+ *   clients holding the old login are closed afterwards.
+ * Use case: Rotate password on the details page (new database).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function rotateDatabasePassword(id: string, actor: TenantActor): Promise<CredentialResult> {
   if (!isUuid(id)) return NOT_FOUND;
@@ -256,7 +294,7 @@ export async function rotateDatabasePassword(id: string, actor: TenantActor): Pr
     return UNAVAILABLE;
   }
 
-  const next = generateDatabasePassword();
+  const next  = generateDatabasePassword();
   let altered = false;
   try {
     await db.$transaction(
@@ -299,8 +337,14 @@ export async function rotateDatabasePassword(id: string, actor: TenantActor): Pr
 }
 
 /**
- * Stores a password the owner already set on an existing database's login
- * (§8.5). It is tried first: one that cannot sign in is never saved.
+ * Description: Store a password the owner already set on an existing database's login (§8.5).
+ * Input: The tenant id, the new password and the acting owner.
+ * Output: ok, a field error, or a failure. The password is tried first: one that
+ *   cannot sign in is never saved.
+ * Use case: Update password on the details page (existing database).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function updateExistingDatabasePassword(
   id: string,

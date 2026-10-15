@@ -18,9 +18,16 @@ export type LoginResult =
 type VerifiedOwner = { id: string; username: string; passwordHash: string };
 
 /**
- * The owner these credentials belong to, or null. Every way of being wrong
- * (malformed name, unknown name, wrong password, disabled account) costs one
- * password verification, so the response time does not tell them apart.
+ * Description: Find the active owner these credentials belong to.
+ * Input: The normalized username and the password exactly as typed.
+ * Output: The owner's id, username and password hash, or null for any wrong
+ *   credential. Every way of being wrong (malformed name, unknown name, wrong
+ *   password, disabled account) costs one password verification, so the
+ *   response time does not tell them apart.
+ * Use case: authenticatePlatformOwner, after validation and rate limiting.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 async function verifyCredentials(
   username: string,
@@ -51,9 +58,16 @@ async function verifyCredentials(
 }
 
 /**
- * Checks a sign-in attempt and, if it succeeds, starts a session and returns
- * its token. This is the whole decision: callers add nothing to it, so it is
- * safe behind a Server Action, which is a public HTTP endpoint.
+ * Description: Decide a sign-in attempt and start a session when it succeeds.
+ * Input: The submitted username and password (untrusted, any type) and the client IP.
+ * Output: `{ ok: true, token }`, field errors for empty fields, or a reason
+ *   (invalid credentials, rate limited, unavailable). This is the whole
+ *   decision: callers add nothing to it, so it is safe behind a Server Action,
+ *   which is a public HTTP endpoint.
+ * Use case: loginAction (the platform sign-in form).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function authenticatePlatformOwner(
   input: LoginInput,
@@ -63,9 +77,12 @@ export async function authenticatePlatformOwner(
   // Used exactly as given: a password is never trimmed or otherwise altered.
   const password = typeof input.password === "string" ? input.password : "";
 
+  // Required fields. A whitespace-only password counts as empty (CLAUDE.md:
+  // required text fields reject whitespace-only input), but a real password
+  // is still used exactly as typed below.
   const fieldErrors: LoginFieldErrors = {};
   if (!username) fieldErrors.username = "Enter your username.";
-  if (!password) fieldErrors.password = "Enter your password.";
+  if (password.trim().length === 0) fieldErrors.password = "Enter your password.";
   if (fieldErrors.username || fieldErrors.password) {
     return { ok: false, reason: "validation", fieldErrors };
   }

@@ -40,14 +40,31 @@ export type TenantMigration = {
   checksum: string;
 };
 
-/** The production image copies the migrations to the same relative place. */
+/**
+ * Description: Locate the tenant migrations folder.
+ * Input: None.
+ * Output: `<cwd>/prisma/tenant/migrations` (the production image copies them there).
+ * Use case: readTenantMigrations.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function tenantMigrationsDirectory(): string {
   return path.join(process.cwd(), "prisma/tenant/migrations");
 }
 
+/**
+ * Description: Read every tenant migration with its checksum.
+ * Input: None.
+ * Output: The migrations in name order (SQL and SHA-256 checksum); throws when none exist.
+ * Use case: The apply_migrations step and latestTenantMigration.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export async function readTenantMigrations(): Promise<TenantMigration[]> {
   const directory = tenantMigrationsDirectory();
-  const entries = await readdir(directory, { withFileTypes: true });
+  const entries   = await readdir(directory, { withFileTypes: true });
   const names = entries
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
@@ -67,7 +84,15 @@ export async function readTenantMigrations(): Promise<TenantMigration[]> {
   );
 }
 
-/** The newest tenant migration: what a current tenant database is at. */
+/**
+ * Description: Name the newest tenant migration.
+ * Input: None.
+ * Output: Its folder name: what a current tenant database is at.
+ * Use case: Schema status of tenants.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export async function latestTenantMigration(): Promise<string> {
   const migrations = await readTenantMigrations();
   return (migrations.at(-1) as TenantMigration).name;
@@ -88,16 +113,21 @@ export type MigrationPlan =
   | { ok: false; problem: string };
 
 /**
- * What still has to be applied, or why the database cannot be migrated:
- * a migration that failed and was not rolled back, one applied from files
- * this platform does not have, or one changed after it was applied.
- * Rolled-back rows are history only, as for Prisma.
+ * Description: Decide what still has to be applied to a tenant database.
+ * Input: The local migrations and the database's bookkeeping rows.
+ * Output: The pending migrations, or why the database cannot be migrated: a failed
+ *   unrolled migration, one from unknown files, or one changed after it was
+ *   applied. Rolled-back rows are history only, as for Prisma.
+ * Use case: applyTenantMigrations and existing-database checks.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function planMigrations(
   local: readonly TenantMigration[],
   rows: readonly AppliedMigrationRow[],
 ): MigrationPlan {
-  const byName = new Map(local.map((migration) => [migration.name, migration]));
+  const byName  = new Map(local.map((migration) => [migration.name, migration]));
   const applied = new Set<string>();
   for (const row of rows) {
     if (row.rolled_back_at !== null) continue;
@@ -129,7 +159,15 @@ export function planMigrations(
   };
 }
 
-/** The bookkeeping rows, or null when the database has no `_prisma_migrations` table. */
+/**
+ * Description: Read a database's migration bookkeeping rows.
+ * Input: An open client.
+ * Output: The `_prisma_migrations` rows, or null when the table does not exist.
+ * Use case: applyTenantMigrations and existing-database checks.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export async function readAppliedMigrations(client: Client): Promise<AppliedMigrationRow[] | null> {
   const exists = await client.query<{ present: boolean }>(
     "SELECT to_regclass('public._prisma_migrations') IS NOT NULL AS present",
@@ -145,6 +183,15 @@ export async function readAppliedMigrations(client: Client): Promise<AppliedMigr
 // ---------------------------------------------------------------------------
 // Applying
 
+/**
+ * Description: Take Prisma's migration advisory lock on a tenant database.
+ * Input: An open client.
+ * Output: Nothing; a busy lock becomes a retryable resource_conflict error.
+ * Use case: applyTenantMigrations.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function takeMigrationLock(client: Client): Promise<void> {
   await client.query(`SET lock_timeout = '${MIGRATION_LOCK_TIMEOUT}'`);
   try {
@@ -164,11 +211,15 @@ async function takeMigrationLock(client: Client): Promise<void> {
 }
 
 /**
- * The bookkeeping row is written in the same transaction as the migration, so
- * a crash at any point leaves either both or neither: never a row that looks
- * like a half-applied migration. A failure is recorded afterwards, already
- * marked rolled back (the transaction was), so Prisma and later runs apply the
- * migration again instead of refusing.
+ * Description: Apply one migration together with its bookkeeping row.
+ * Input: An open client and the migration.
+ * Output: Nothing. Row and migration commit in one transaction (never a half-applied
+ *   looking row); a failure is recorded afterwards, already rolled back, so
+ *   later runs apply it again.
+ * Use case: applyTenantMigrations.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 async function applyMigration(client: Client, migration: TenantMigration): Promise<void> {
   const id = randomUUID();
@@ -199,6 +250,15 @@ async function applyMigration(client: Client, migration: TenantMigration): Promi
   }
 }
 
+/**
+ * Description: Explain a migration failure safely.
+ * Input: The migration and the error.
+ * Output: A ProvisioningError: connection lost, privilege refused, or a schema mismatch.
+ * Use case: applyMigration.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function migrationFailed(migration: TenantMigration, error: unknown): ProvisioningError {
   const code = classifyError(error);
   if (code === "unreachable" || code === "permission_denied") {
@@ -219,9 +279,13 @@ function migrationFailed(migration: TenantMigration, error: unknown): Provisioni
 }
 
 /**
- * Brings the database the client is connected to up to date. Runs as the
- * administrative login. Returns the names applied now (empty when it was
- * already current).
+ * Description: Bring a tenant database's schema up to date.
+ * Input: An open client (administrative login) and the migrations.
+ * Output: The names applied now (empty when already current).
+ * Use case: The apply_migrations provisioning step.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function applyTenantMigrations(
   client: Client,

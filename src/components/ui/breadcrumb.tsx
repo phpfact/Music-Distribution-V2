@@ -8,7 +8,8 @@ import { Slot } from "radix-ui";
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent breadcrumb behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function Breadcrumb({ ...props }: React.ComponentProps<"nav">) {
   return <nav aria-label="breadcrumb" data-slot="breadcrumb" {...props} />;
@@ -19,7 +20,8 @@ function Breadcrumb({ ...props }: React.ComponentProps<"nav">) {
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent breadcrumb list behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function BreadcrumbList({ className, ...props }: React.ComponentProps<"ol">) {
   return (
@@ -39,7 +41,8 @@ function BreadcrumbList({ className, ...props }: React.ComponentProps<"ol">) {
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent breadcrumb item behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function BreadcrumbItem({ className, ...props }: React.ComponentProps<"li">) {
   return (
@@ -56,7 +59,8 @@ function BreadcrumbItem({ className, ...props }: React.ComponentProps<"li">) {
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent breadcrumb link behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function BreadcrumbLink({
   asChild,
@@ -81,7 +85,8 @@ function BreadcrumbLink({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent breadcrumb page behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function BreadcrumbPage({ className, ...props }: React.ComponentProps<"span">) {
   return (
@@ -101,7 +106,8 @@ function BreadcrumbPage({ className, ...props }: React.ComponentProps<"span">) {
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent breadcrumb separator behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function BreadcrumbSeparator({
   children,
@@ -126,7 +132,8 @@ function BreadcrumbSeparator({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent breadcrumb ellipsis behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function BreadcrumbEllipsis({
   className,

@@ -10,6 +10,16 @@ import { domainToASCII } from "node:url";
 import { normalizeHostName, validateCustomDomain } from "@/lib/domains/rules";
 import type { RuleResult } from "@/lib/tenants/rules";
 
+/**
+ * Description: Convert a typed custom domain to its ASCII form and validate it.
+ * Input: The raw text (may be internationalized) and PLATFORM_BASE_DOMAIN.
+ * Output: The punycode host, or the error message (validateCustomDomain's rules, or
+ *   "Enter a valid domain" when the name cannot be converted).
+ * Use case: Tenant create and edit services (server side; needs node:url).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function normalizeCustomDomainInput(raw: string, baseDomain: string): RuleResult<string> {
   const host = normalizeHostName(raw);
   if (host.length === 0) return validateCustomDomain(host, baseDomain);

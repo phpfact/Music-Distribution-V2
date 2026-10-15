@@ -8,12 +8,14 @@ import { Icon } from "../(console)/_components/icons";
 import { LoginForm } from "./login-form";
 
 /**
- * Render the platform sign-in page using the active shared Appearance tokens.
- * Input: the authenticated request session, resolved on the server.
- * Output: a responsive sign-in Card or a redirect for an existing session.
- * Use case: retain authentication and server-owned field limits during UI migration.
+ * Description: Render the platform sign-in page.
+ * Input: None (the request session is resolved on the server).
+ * Output: A redirect to the dashboard for a signed-in owner; otherwise the
+ *   responsive sign-in page (brand panel on large screens, the form card) with
+ *   the server-owned field length limits passed to the form.
+ * Use case: /platform/login.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15
+ * Created: 2026-10-14
  * Last modified: 2026-10-15
  */
 export default async function PlatformLoginPage() {

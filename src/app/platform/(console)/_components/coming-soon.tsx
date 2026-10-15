@@ -11,11 +11,14 @@ type ComingSoonProps = {
 };
 
 /**
- * The whole page of a module that is in the navigation but not built yet.
- * Input: component props or field identifiers. Output: themed UI or ARIA attributes.
- * Use case: preserve shared application semantics across the shadcn migration.
+ * Description: Render the whole page of a module that is in the navigation but not built yet.
+ * Input: The navigation id of the module.
+ * Output: A centred card: the module's icon, "Coming soon", its label and
+ *   description, and a Back to dashboard button.
+ * Use case: Roles, Subscriptions and Support pages.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function ComingSoon({ id }: ComingSoonProps) {
   const item = getNavItem(id);

@@ -33,15 +33,15 @@ const KINDS = {
 type Outcome = { variant: "warning" | "error"; message: string } | null;
 
 /**
- * "Check DNS" (custom domain) and "Check again" (subdomain), inline on the
- * Domains card. A pass reports through the page's flash notice and refreshes
- * the card; a failed DNS check is a warning that names the record to add.
- *
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Render the inline "Check DNS" / "Check again" control of a domain.
+ * Input: The tenant id and the domain kind (custom or subdomain).
+ * Output: A button with its pending state and the last outcome: a pass reports
+ *   through the flash notice and refreshes the card; a failed DNS check is a
+ *   warning naming the record to add.
+ * Use case: The details page's Domain Information card.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function DomainCheck({
   tenantId,
@@ -51,19 +51,19 @@ export function DomainCheck({
   kind: keyof typeof KINDS;
 }) {
   const router = useRouter();
-  const flash = useTenantFlash();
+  const flash  = useTenantFlash();
   const [pending, startTransition] = useTransition();
   const [outcome, setOutcome] = useState<Outcome>(null);
   const config = KINDS[kind];
 
   /**
    * Description: Run one DNS check and refresh only the affected server data.
-   *
-   * Input: The existing typed arguments and component state.
-   * Output: The existing helper result or state update.
-   * Use case: Tenant management’s existing owner workflow.
+   * Input: None.
+   * Output: The outcome shown inline or in the flash notice; duplicate clicks are ignored while pending.
+   * Use case: The check button.
    * Author: Mr. Sachin Sharma
-   * Created: 2026-10-14. Last modified: 2026-10-15.
+   * Created: 2026-10-14
+   * Last modified: 2026-10-15
    */
   function check() {
     if (pending) return;

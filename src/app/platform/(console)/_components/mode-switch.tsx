@@ -34,7 +34,8 @@ type ModeSwitchProps = {
  * Use case: The header of each create-tenant section that has generated values,
  *   so every section decides on its own whether its values are generated or typed.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 export function ModeSwitch({
   id,

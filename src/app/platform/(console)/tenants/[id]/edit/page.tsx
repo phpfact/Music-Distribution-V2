@@ -3,22 +3,48 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 import { requirePlatformOwner } from "@/lib/platform-auth/dal";
 import { getTenantForEdit } from "@/lib/tenants/service";
+import type { IconName } from "../../../_components/icons";
 import { PageHeader } from "../../../_components/page-header";
+import { SectionedLayout, type SecondaryMenuItem } from "../../../_components/secondary-menu";
 import { TENANTS_PATH } from "../../list-query";
+import { EDIT_SECTIONS, type EditSectionId } from "./edit-model";
 import { EditTenantForm } from "./edit-tenant-form";
 
 type PageProps = { params: Promise<{ id: string }> };
 
-// Memoized for one request: the metadata and the page read the tenant once.
+// The symbol of each form category in the secondary menu (same as the section headers).
+const SECTION_ICONS: Readonly<Record<EditSectionId, IconName>> = {
+  profile: "user",
+  login:   "key-round",
+  domain:  "globe",
+};
+
+// The secondary menu: one item per form category, in form order.
+const MENU_ITEMS: readonly SecondaryMenuItem[] = EDIT_SECTIONS.map((section) => ({
+  id: section.anchor,
+  label: section.title,
+  icon: SECTION_ICONS[section.id],
+}));
+
+/**
+ * Description: Load the tenant once per request for the metadata and the page.
+ * Input: The tenant id from the URL.
+ * Output: The tenant as loaded for editing, or null when there is none.
+ * Use case: generateMetadata and EditTenantPage (React cache: one database read).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 const loadTenant = cache(async (id: string) => getTenantForEdit(id));
 
 /**
- * Description: Load an authenticated tenant title without exposing data to signed-out visitors.
- * Input: The existing typed arguments and component state.
- * Output: The existing helper result or state update.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Build the edit page's title without exposing data to signed-out visitors.
+ * Input: The route parameters (tenant id).
+ * Output: "Edit <name>", or "Tenant not found"; a signed-out visitor is redirected first.
+ * Use case: The browser tab title of /platform/tenants/<id>/edit.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function generateMetadata({
   params,
@@ -30,12 +56,15 @@ export async function generateMetadata({
 }
 
 /**
- * Description: Load saved tenant values into the protected edit page.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Render the protected edit-tenant page.
+ * Input: The route parameters (tenant id).
+ * Output: The page header, the secondary menu (Personal, Login and Domain
+ *   Information) and the edit form prefilled with the saved values; 404 when
+ *   the tenant does not exist.
+ * Use case: /platform/tenants/<id>/edit — the owner changes a tenant's details.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export default async function EditTenantPage({ params }: PageProps) {
   // Checked on the server on every request; nothing below renders without it.
@@ -47,7 +76,7 @@ export default async function EditTenantPage({ params }: PageProps) {
 
   return (
     // Centred and capped like the create page, so both forms look the same.
-    <div className="relative mx-auto flex w-full max-w-4xl flex-col gap-8">
+    <div className="relative mx-auto flex w-full max-w-6xl flex-col gap-8">
       <PageHeader
         backHref={detailsHref}
         backLabel={tenant.fullName}
@@ -56,7 +85,9 @@ export default async function EditTenantPage({ params }: PageProps) {
         description="Change the tenant's profile, admin login and domains. Credentials are changed on the tenant page."
       />
 
-      <EditTenantForm tenant={tenant} />
+      <SectionedLayout items={MENU_ITEMS} label="Form sections">
+        <EditTenantForm tenant={tenant} />
+      </SectionedLayout>
     </div>
   );
 }

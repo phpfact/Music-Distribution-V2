@@ -13,7 +13,8 @@ import { Button } from "@/components/ui/button";
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent dialog behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function Dialog({
   ...props
@@ -26,7 +27,8 @@ function Dialog({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent dialog trigger behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function DialogTrigger({
   ...props
@@ -39,7 +41,8 @@ function DialogTrigger({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent dialog portal behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function DialogPortal({
   ...props
@@ -60,7 +63,8 @@ function DialogPortal({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent dialog close behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function DialogClose({
   ...props
@@ -73,7 +77,8 @@ function DialogClose({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent dialog overlay behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function DialogOverlay({
   className,
@@ -96,7 +101,8 @@ function DialogOverlay({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent dialog content behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function DialogContent({
   className,
@@ -137,7 +143,8 @@ function DialogContent({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent dialog header behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
@@ -154,7 +161,8 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent dialog footer behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function DialogFooter({
   className,
@@ -188,7 +196,8 @@ function DialogFooter({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent dialog title behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function DialogTitle({
   className,
@@ -208,7 +217,8 @@ function DialogTitle({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent dialog description behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function DialogDescription({
   className,

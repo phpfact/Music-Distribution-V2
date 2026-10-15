@@ -34,19 +34,43 @@ import type {
 
 const TENANTS_PATH = "/platform/tenants";
 
-/** The signed-in owner (or a redirect to the login page) and the client address. */
+/**
+ * Description: Identify the signed-in owner and the client address for a tenant action.
+ * Input: None (reads the session cookie and X-Forwarded-For).
+ * Output: The actor; a signed-out caller is redirected to the login page.
+ * Use case: Every manage Server Action.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function currentActor(): Promise<TenantActor> {
   const { owner } = await requirePlatformOwner();
   const ipAddress = clientIpFromForwardedFor((await headers()).get("x-forwarded-for"));
   return { ownerId: owner.id, ipAddress };
 }
 
-/** Anything that is not a string (a file, a missing field) reads as "". */
+/**
+ * Description: Read an untrusted Server Action value as text.
+ * Input: Any value.
+ * Output: The string, or "" for anything else.
+ * Use case: Every manage Server Action.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function text(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
-/** The list, the details page and the edit page all show what changed. */
+/**
+ * Description: Refresh the server-rendered pages that show a tenant.
+ * Input: The tenant id.
+ * Output: Nothing; the directory, details and edit pages re-render on next visit.
+ * Use case: After successful edits, credential and DNS actions.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function revalidateTenant(tenantId: string): void {
   revalidatePath(TENANTS_PATH);
   revalidatePath(`${TENANTS_PATH}/${tenantId}`);
@@ -56,8 +80,14 @@ function revalidateTenant(tenantId: string): void {
 const IMAGE_TOO_LARGE = "The image is larger than 2 MB. Choose a smaller image.";
 
 /**
- * The image change the form asks for. `replace` needs a non-empty file; an
- * unknown action is passed on as such and refused by the service.
+ * Description: Read the edit form's image change.
+ * Input: The submitted FormData.
+ * Output: keep, remove, or replace with the file's bytes; an error for a missing or
+ *   oversized (> 2 MB) file; an unknown action is passed on and refused by the service.
+ * Use case: updateTenantAction.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 async function profileImageChange(
   formData: FormData,
@@ -76,16 +106,35 @@ async function profileImageChange(
 
 // ---------------------------------------------------------------------------
 
+/**
+ * Description: Save the edit form.
+ * Input: The tenant id (bound), the previous state and the submitted FormData.
+ * Output: "saved" with the changed fields and whether DNS is pending, or "error"
+ *   with field errors or a form message.
+ * Use case: The edit form (useActionState).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export async function updateTenantAction(
   tenantId: string,
   _previousState: UpdateTenantActionState,
   formData: FormData,
 ): Promise<UpdateTenantActionState> {
   const actor = await currentActor();
-  const id = text(tenantId);
+  const id    = text(tenantId);
   if (!(formData instanceof FormData)) {
     return { status: "error", formError: "The form could not be read. Reload the page and try again.", fieldErrors: {} };
   }
+  /**
+   * Description: Read one FormData field as text.
+   * Input: The field name.
+   * Output: The text, or "".
+   * Use case: updateTenantAction.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-10-14
+   * Last modified: 2026-10-15
+   */
   const field = (name: string): string => text(formData.get(name));
 
   const image = await profileImageChange(formData);
@@ -114,12 +163,21 @@ export async function updateTenantAction(
   return { status: "saved", tenantId: result.tenantId, changed: result.changed, dnsPending: result.dnsPending };
 }
 
+/**
+ * Description: Reset the tenant admin's master password.
+ * Input: The tenant id and the request (auto, or manual with a password).
+ * Output: ok (with the generated password once, Auto) or a safe failure.
+ * Use case: Reset master password dialog.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export async function resetMasterPasswordAction(
   tenantId: string,
   input: ResetMasterPasswordInput,
 ): Promise<ResetMasterPasswordActionResult> {
-  const actor = await currentActor();
-  const id = text(tenantId);
+  const actor  = await currentActor();
+  const id     = text(tenantId);
   const values = (typeof input === "object" && input !== null ? input : {}) as Record<string, unknown>;
   // Only the two documented shapes reach the service; anything else is refused there.
   const request = (
@@ -132,37 +190,74 @@ export async function resetMasterPasswordAction(
   return result;
 }
 
+/**
+ * Description: Rotate a provisioned tenant's database password.
+ * Input: The tenant id.
+ * Output: ok or a safe failure.
+ * Use case: Rotate password confirmation.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export async function rotateDatabasePasswordAction(tenantId: string): Promise<DatabasePasswordActionResult> {
-  const actor = await currentActor();
-  const id = text(tenantId);
+  const actor  = await currentActor();
+  const id     = text(tenantId);
   const result = await rotateDatabasePassword(id, actor);
   if (result.ok) revalidateTenant(id);
   return result;
 }
 
+/**
+ * Description: Store a new password of an existing database's login.
+ * Input: The tenant id and the password.
+ * Output: ok or a safe failure (the password is tested before it is saved).
+ * Use case: Update password confirmation.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export async function updateDatabasePasswordAction(
   tenantId: string,
   password: string,
 ): Promise<DatabasePasswordActionResult> {
-  const actor = await currentActor();
-  const id = text(tenantId);
+  const actor  = await currentActor();
+  const id     = text(tenantId);
   const result = await updateExistingDatabasePassword(id, text(password), actor);
   if (result.ok) revalidateTenant(id);
   return result;
 }
 
+/**
+ * Description: Run the custom domain's DNS check.
+ * Input: The tenant id.
+ * Output: ok or the reason; a failed DNS check still revalidates (its time and
+ *   reason are recorded).
+ * Use case: Check DNS on the details page.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export async function verifyCustomDomainAction(tenantId: string): Promise<DomainCheckActionResult> {
-  const actor = await currentActor();
-  const id = text(tenantId);
+  const actor  = await currentActor();
+  const id     = text(tenantId);
   const result = await verifyCustomDomain(id, actor);
   // A failed check records its time and reason on the row too.
   if (result.ok || result.reason === "dns") revalidateTenant(id);
   return result;
 }
 
+/**
+ * Description: Re-run the subdomain's DNS check.
+ * Input: The tenant id.
+ * Output: ok or the reason (revalidated like the custom domain check).
+ * Use case: Check again on the details page.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export async function recheckSubdomainAction(tenantId: string): Promise<DomainCheckActionResult> {
-  const actor = await currentActor();
-  const id = text(tenantId);
+  const actor  = await currentActor();
+  const id     = text(tenantId);
   const result = await recheckSubdomain(id, actor);
   if (result.ok || result.reason === "dns") revalidateTenant(id);
   return result;

@@ -24,7 +24,8 @@ type SidebarProps = {
  * Output: semantic grouped links composed with shadcn Button and Tooltip.
  * Use case: share route labels, active states, and accessible collapsed navigation.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 export function Sidebar({ collapsed, onNavigate, headerAction, footer }: SidebarProps) {
   const pathname = usePathname();
@@ -97,7 +98,8 @@ type SidebarLinkProps = {
  * Output: one accessible link with persistent current-page and planned labels.
  * Use case: show active navigation without relying on color alone.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function SidebarLink({ item, active, collapsed, onNavigate }: SidebarLinkProps) {
   const planned = item.status === "planned";

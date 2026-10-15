@@ -64,7 +64,15 @@ const EXISTING_PLAN: readonly ProvisioningStep[] = [
   "verify",
 ];
 
-/** The steps of a tenant's setup, in order. */
+/**
+ * Description: List the steps of a tenant's setup, in order.
+ * Input: The database mode (provisioned or existing).
+ * Output: A copy of the plan for that mode.
+ * Use case: The runner and the details page's progress list.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function provisioningPlan(mode: TenantDatabaseMode): ProvisioningStep[] {
   return [...(mode === "existing" ? EXISTING_PLAN : PROVISIONED_PLAN)];
 }
@@ -99,6 +107,15 @@ export type StepContext = {
   dnsResolver?: DnsResolver;
 };
 
+/**
+ * Description: Build a resource-conflict error.
+ * Input: The safe message.
+ * Output: A ProvisioningError with code resource_conflict.
+ * Use case: Name clashes on the database server.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function conflict(message: string): ProvisioningError {
   return new ProvisioningError("resource_conflict", message);
 }
@@ -106,10 +123,21 @@ function conflict(message: string): ProvisioningError {
 // ---------------------------------------------------------------------------
 // create_database_user
 
+/**
+ * Description: Step create_database_user: create the tenant's login role.
+ * Input: The step context.
+ * Output: Nothing. Role and ownership marker are created in one transaction; a role
+ *   of ours from an earlier attempt gets the stored password again; a foreign
+ *   role of that name is a conflict and is left untouched.
+ * Use case: Provisioned-database plans.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function createDatabaseUser(ctx: StepContext): Promise<void> {
-  const target = await ctx.target();
-  const role = quoteTenantIdentifier(target.user, "user");
-  const marker = ownershipMarker(ctx.tenant.id);
+  const target   = await ctx.target();
+  const role     = quoteTenantIdentifier(target.user, "user");
+  const marker   = ownershipMarker(ctx.tenant.id);
   const password = passwordClause(target.password);
 
   await withAdminClient(MAINTENANCE_DATABASE, target.port, async (client) => {
@@ -138,6 +166,15 @@ async function createDatabaseUser(ctx: StepContext): Promise<void> {
   });
 }
 
+/**
+ * Description: Explain that a role of this name exists and is not the tenant's.
+ * Input: The role name.
+ * Output: A resource-conflict error asking to resolve the clash, then retry.
+ * Use case: createDatabaseUser.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function foreignRole(name: string): ProvisioningError {
   return conflict(
     `A PostgreSQL role named "${name}" already exists and was not created for this tenant, so it was left untouched. Resolve the name clash on the database server, then retry setup.`,
@@ -147,10 +184,21 @@ function foreignRole(name: string): ProvisioningError {
 // ---------------------------------------------------------------------------
 // create_database
 
+/**
+ * Description: Step create_database: create the tenant's database.
+ * Input: The step context.
+ * Output: Nothing. CREATE DATABASE (UTF8, template0) then the ownership marker; a
+ *   database of ours is accepted, one left by an interrupted attempt is adopted;
+ *   any other database of that name is a conflict and is left untouched.
+ * Use case: Provisioned-database plans.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function createDatabase(ctx: StepContext): Promise<void> {
-  const target = await ctx.target();
+  const target   = await ctx.target();
   const database = quoteTenantIdentifier(target.database, "database");
-  const marker = ownershipMarker(ctx.tenant.id);
+  const marker   = ownershipMarker(ctx.tenant.id);
 
   await withAdminClient(MAINTENANCE_DATABASE, target.port, async (client) => {
     let existing = await findDatabaseWith(client, target.database);
@@ -183,9 +231,14 @@ async function createDatabase(ctx: StepContext): Promise<void> {
 }
 
 /**
- * A database without any marker is ours only in the crash window between
- * CREATE DATABASE and COMMENT: the previous attempt stopped at this very
- * step, the administrative login owns it and nothing was put in it yet.
+ * Description: Decide whether an unmarked database was left by our own interrupted attempt.
+ * Input: The step context, the database owner and the target.
+ * Output: True only when the previous attempt failed at this very step, the
+ *   administrative login owns it and it holds no relations yet.
+ * Use case: createDatabase.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 async function mayAdopt(ctx: StepContext, owner: string, target: TenantDatabase): Promise<boolean> {
   const previous = ctx.previousRun;
@@ -198,6 +251,15 @@ async function mayAdopt(ctx: StepContext, owner: string, target: TenantDatabase)
 // ---------------------------------------------------------------------------
 // check_database (existing-database mode)
 
+/**
+ * Description: Step check_database: run the existing-database checks again.
+ * Input: The step context.
+ * Output: Nothing; the first failed check becomes the step's error.
+ * Use case: Existing-database plans.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function checkDatabase(ctx: StepContext): Promise<void> {
   const target = await ctx.target();
   const checks = await runDatabaseChecks(target, { excludeTenantId: ctx.tenant.id });
@@ -208,11 +270,22 @@ async function checkDatabase(ctx: StepContext): Promise<void> {
 // ---------------------------------------------------------------------------
 // grant_privileges
 
+/**
+ * Description: Step grant_privileges: give the tenant role exactly what it needs.
+ * Input: The step context.
+ * Output: Nothing. For a database we created: CONNECT/TEMPORARY only for the tenant
+ *   role; in schema public: USAGE and default table/sequence privileges, applied
+ *   in one implicit transaction.
+ * Use case: Every plan.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function grantPrivileges(ctx: StepContext): Promise<void> {
-  const target = await ctx.target();
+  const target   = await ctx.target();
   const database = quoteTenantIdentifier(target.database, "database");
-  const role = quoteTenantIdentifier(target.user, "user");
-  const admin = quotedAdminLogin();
+  const role     = quoteTenantIdentifier(target.user, "user");
+  const admin    = quotedAdminLogin();
 
   if (ctx.tenant.databaseMode === "provisioned") {
     // Only for a database we created: an attached one's database-level
@@ -240,12 +313,21 @@ async function grantPrivileges(ctx: StepContext): Promise<void> {
 // ---------------------------------------------------------------------------
 // apply_migrations
 
+/**
+ * Description: Step apply_migrations: install or update the tenant schema.
+ * Input: The step context.
+ * Output: Nothing; the tenant's schema status and version are recorded.
+ * Use case: Every plan.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function applyMigrations(ctx: StepContext): Promise<void> {
-  const target = await ctx.target();
-  const role = quoteTenantIdentifier(target.user, "user");
+  const target     = await ctx.target();
+  const role       = quoteTenantIdentifier(target.user, "user");
   const migrations = await readTenantMigrations();
-  const latest = migrations.at(-1)?.name ?? null;
-  const control = getControlDb();
+  const latest     = migrations.at(-1)?.name ?? null;
+  const control    = getControlDb();
 
   try {
     await withAdminClient(target.database, target.port, async (client) => {
@@ -278,9 +360,18 @@ async function applyMigrations(ctx: StepContext): Promise<void> {
 // ---------------------------------------------------------------------------
 // create_initial_admin
 
-/** Runs as the tenant role: proves the runtime login can write its own database. */
+/**
+ * Description: Step create_initial_admin: create the tenant admin in the tenant database.
+ * Input: The step context.
+ * Output: Nothing. Runs as the tenant role (proves the runtime login can write);
+ *   clears the pending password hash only if it was not reset meanwhile.
+ * Use case: Every plan.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function createInitialAdmin(ctx: StepContext): Promise<void> {
-  const target = await ctx.target();
+  const target  = await ctx.target();
   const control = getControlDb();
   const tenant = await control.tenant.findUnique({
     where: { id: ctx.tenant.id },
@@ -316,6 +407,15 @@ async function createInitialAdmin(ctx: StepContext): Promise<void> {
   }
 }
 
+/**
+ * Description: Write the owner role, the admin user and its role link.
+ * Input: The tenant-role client, the admin's names and the pending password hash.
+ * Output: Nothing; an existing admin keeps its row (only a pending hash is applied).
+ * Use case: createInitialAdmin.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function writeInitialAdmin(
   client: Client,
   admin: { username: string; email: string; name: string },
@@ -373,11 +473,28 @@ async function writeInitialAdmin(
 // ---------------------------------------------------------------------------
 // register_domain
 
-/** The subdomain row is inserted with the tenant (it reserves the name); this confirms it. */
+/**
+ * Description: Step register_domain: confirm the subdomain row exists.
+ * Input: The step context.
+ * Output: Nothing; the row is inserted with the tenant (it reserves the name).
+ * Use case: Every plan.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function registerDomain(ctx: StepContext): Promise<void> {
   await subdomainRow(ctx.tenant.id);
 }
 
+/**
+ * Description: Load the tenant's subdomain row.
+ * Input: The tenant id.
+ * Output: The row (id, host name, verified time); throws when it is missing.
+ * Use case: registerDomain and verifySubdomain.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function subdomainRow(tenantId: string) {
   const row = await getControlDb().tenantDomain.findFirst({
     where: { tenantId, type: "subdomain" },
@@ -395,6 +512,16 @@ async function subdomainRow(tenantId: string) {
 // ---------------------------------------------------------------------------
 // verify
 
+/**
+ * Description: Step verify: confirm the tenant is ready to serve.
+ * Input: The step context.
+ * Output: Nothing. The subdomain resolves, the runtime login works, the admin is an
+ *   active owner and the schema is at the latest version.
+ * Use case: Every plan (last step).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function verify(ctx: StepContext): Promise<void> {
   await verifySubdomain(ctx);
   const target = await ctx.target();
@@ -441,11 +568,20 @@ async function verify(ctx: StepContext): Promise<void> {
   }
 }
 
+/**
+ * Description: Check the subdomain's DNS and record the result on its row.
+ * Input: The step context.
+ * Output: Nothing; a failure records the reason and throws a dns error.
+ * Use case: verify.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function verifySubdomain(ctx: StepContext): Promise<void> {
-  const row = await subdomainRow(ctx.tenant.id);
+  const row     = await subdomainRow(ctx.tenant.id);
   const control = getControlDb();
-  const result = await checkSubdomainDns(row.hostname, getEnv().platformBaseDomain, ctx.dnsResolver);
-  const now = new Date();
+  const result  = await checkSubdomainDns(row.hostname, getEnv().platformBaseDomain, ctx.dnsResolver);
+  const now     = new Date();
   if (!result.ok) {
     await control.tenantDomain.update({
       where: { id: row.id },

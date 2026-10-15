@@ -11,7 +11,8 @@ const SIZES: Record<SpinnerSize, string> = {
  * Input: size and optional classes. Output: motion-aware current-color indicator.
  * Use case: pending buttons keep their own descriptive text without duplicate announcements.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 export function Spinner({
   size = "sm",

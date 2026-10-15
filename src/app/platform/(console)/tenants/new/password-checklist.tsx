@@ -11,12 +11,14 @@ type PasswordChecklistProps = {
 };
 
 /**
- * The master password policy (§4) as a live checklist, from the server's own rule.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Show the master password policy (§4) as a live checklist.
+ * Input: The list's id (for aria-describedby), the password and the username.
+ * Output: Each requirement marked met or not (from the server's own rule) and a
+ *   polite announcement once something is typed.
+ * Use case: Master password fields (create Manual login, Reset master password).
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function PasswordChecklist({
   id,

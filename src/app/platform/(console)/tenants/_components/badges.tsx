@@ -15,19 +15,43 @@ const DOMAIN_TONES: Record<DomainStatus, BadgeTone> = {
   failed: "danger",
 };
 
-/** Whether a tenant's database is ready, in words and colour. */
+/**
+ * Description: Show whether a tenant's database is ready, in words and colour.
+ * Input: The database state.
+ * Output: A tone badge: Ready, Provisioning, Pending or Failed.
+ * Use case: The directory's Database column.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function DatabaseStateBadge({ state }: { state: DatabaseState }) {
   const { label, tone } = DATABASE_STATES[state];
   return <ToneBadge tone={tone}>{label}</ToneBadge>;
 }
 
-/** A domain's verification state, in words and colour; `compact` says just "Pending" for a table cell. */
+/**
+ * Description: Show a domain's verification state, in words and colour.
+ * Input: The domain status and whether to use the compact wording.
+ * Output: A tone badge (compact says just "Pending" for a table cell).
+ * Use case: Directory and details page.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function DomainStatusBadge({ status, compact = false }: { status: DomainStatus; compact?: boolean }) {
   const label = compact && status === "pending" ? "Pending" : DOMAIN_STATUS_LABELS[status];
   return <ToneBadge tone={DOMAIN_TONES[status]}>{label}</ToneBadge>;
 }
 
-/** The "Existing" tag of a tenant that brought its own database. */
+/**
+ * Description: Mark a tenant that brought its own database.
+ * Input: None.
+ * Output: A neutral "Existing" badge.
+ * Use case: The directory's Database column.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function ExistingDatabaseTag() {
   return <ToneBadge tone="neutral">Existing</ToneBadge>;
 }

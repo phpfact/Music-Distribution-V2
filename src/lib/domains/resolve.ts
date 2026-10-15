@@ -37,11 +37,15 @@ export type TenantAccess =
 const TENANT_SELECT = { id: true, name: true, status: true, schemaStatus: true } as const;
 
 /**
- * IP addresses and the base domain are the platform. Exactly one label in
- * front of the base domain is a subdomain (looked up whatever its DNS state:
- * the tenant's own status decides access). Any other host is a custom domain
- * and counts only once verified (`active`), so nobody can claim a host by
- * merely typing it into the form.
+ * Description: Find which tenant (if any) a request's Host header belongs to.
+ * Input: The Host header value.
+ * Output: "platform" for IP addresses and the base domain; the tenant for its
+ *   subdomain (whatever its DNS state) or for a verified (active) custom domain;
+ *   otherwise "unknown". Nobody can claim a host by merely typing it into the form.
+ * Use case: getTenantAccess (the tenant gate).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function resolveHost(hostHeader: string | null | undefined): Promise<HostResolution> {
   const host = parseHostHeader(hostHeader);
@@ -59,7 +63,16 @@ export async function resolveHost(hostHeader: string | null | undefined): Promis
   return domain ? { tenant: domain.tenant } : "unknown";
 }
 
-/** The access decision for a resolved host. The platform host is no tenant: `unknown`. */
+/**
+ * Description: Decide whether a resolved tenant may be served.
+ * Input: The host resolution.
+ * Output: "allowed" for an active tenant with a current schema, "suspended",
+ *   "not_ready" (setup unfinished or failed), or "unknown" (also for the platform host).
+ * Use case: getTenantAccess; unit tests.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function tenantAccessOf(resolution: HostResolution): TenantAccess {
   if (resolution === "platform" || resolution === "unknown") return { access: "unknown" };
   const { tenant } = resolution;
@@ -68,7 +81,15 @@ export function tenantAccessOf(resolution: HostResolution): TenantAccess {
   return { access: "not_ready", tenant };
 }
 
-/** The tenant gate: `allowed` only for an active tenant whose schema is current. */
+/**
+ * Description: The tenant gate every tenant-facing route must call first.
+ * Input: The request's Host header.
+ * Output: The access decision; tenant content may be served only when it is "allowed".
+ * Use case: The root host gate and every future tenant route.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export async function getTenantAccess(hostHeader: string | null | undefined): Promise<TenantAccess> {
   return tenantAccessOf(await resolveHost(hostHeader));
 }

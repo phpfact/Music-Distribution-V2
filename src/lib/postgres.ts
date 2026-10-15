@@ -5,6 +5,15 @@ import { getEnv } from "./env";
 // Kept on globalThis so dev hot reloads reuse one pool instead of leaking a new one per reload.
 const globalForPostgres = globalThis as typeof globalThis & { __pgPool?: Pool };
 
+/**
+ * Description: Return the shared, bounded pg connection pool.
+ * Input: None.
+ * Output: The pool (one per process).
+ * Use case: The control-plane Prisma client and the readiness check.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-13
+ * Last modified: 2026-10-15
+ */
 export function getPool(): Pool {
   if (!globalForPostgres.__pgPool) {
     const { postgres } = getEnv();
@@ -29,6 +38,15 @@ export function getPool(): Pool {
   return globalForPostgres.__pgPool;
 }
 
+/**
+ * Description: Check that PostgreSQL answers.
+ * Input: None.
+ * Output: Nothing; rejects when SELECT 1 fails.
+ * Use case: The readiness endpoint.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-13
+ * Last modified: 2026-10-15
+ */
 export async function pingPostgres(): Promise<void> {
   await getPool().query("SELECT 1");
 }

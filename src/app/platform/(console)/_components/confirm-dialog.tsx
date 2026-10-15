@@ -54,11 +54,12 @@ type ConfirmDialogProps = {
  * Output: a themed modal with guarded dismissal and validated optional reason.
  * Use case: confirm tenant and Appearance changes without duplicating focus traps.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 export function ConfirmDialog(props: ConfirmDialogProps) {
   const { open, onClose, pending = false, description } = props;
-  const initialFocusRef = useRef<HTMLElement | null>(null);
+  const initialFocusRef  = useRef<HTMLElement | null>(null);
   const capturedFocusRef = useRef<HTMLElement | null>(null);
 
   return (
@@ -120,7 +121,8 @@ type DialogBodyProps = ConfirmDialogProps & {
  * Output: a native form that sends a trimmed, length-checked reason to the caller.
  * Use case: retain failed-operation drafts and accessible reason feedback.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function DialogBody({
   onClose,
@@ -137,9 +139,9 @@ function DialogBody({
 }: DialogBodyProps) {
   const [reasonText, setReasonText] = useState("");
   const [reasonError, setReasonError] = useState<string | null>(null);
-  const id = useId();
-  const reasonId = `${id}-reason`;
-  const reasonHintId = `${id}-reason-hint`;
+  const id            = useId();
+  const reasonId      = `${id}-reason`;
+  const reasonHintId  = `${id}-reason-hint`;
   const reasonCountId = `${id}-reason-count`;
   const reasonErrorId = `${id}-reason-error`;
 
@@ -149,10 +151,14 @@ function DialogBody({
    * Output: validation feedback or the caller's confirmation callback.
    * Use case: block blank reasons and duplicate submits while work is pending.
    * Author: Mr. Sachin Sharma
-   * Created: 2026-10-15. Last modified: 2026-10-15.
+   * Created: 2026-10-15
+   * Last modified: 2026-10-15
    */
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    // React events travel up the component tree through the portal: without
+    // this, a dialog opened from inside another form would submit that form too.
+    event.stopPropagation();
     if (pending) return;
     if (!reason) {
       onConfirm();

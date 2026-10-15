@@ -10,7 +10,8 @@ import { RadioGroup as RadioGroupPrimitive } from "radix-ui";
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent radio group behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function RadioGroup({
   className,
@@ -30,7 +31,8 @@ function RadioGroup({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent radio group item behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function RadioGroupItem({
   className,

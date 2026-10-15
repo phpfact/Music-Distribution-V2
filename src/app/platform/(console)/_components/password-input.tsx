@@ -20,7 +20,8 @@ type PasswordInputProps = Omit<
  * Output: a password/text field that retains its value and form semantics.
  * Use case: share password entry across login, creation, and credential dialogs.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 export function PasswordInput({
   id,

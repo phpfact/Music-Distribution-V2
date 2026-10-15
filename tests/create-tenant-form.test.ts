@@ -21,6 +21,7 @@ import {
   generateDatabasePassword,
   generatedSummary,
   generateMasterPassword,
+  hasUnsavedInput,
   initialFormValues,
   NOT_GENERATED_YET,
   sectionOfField,
@@ -60,7 +61,7 @@ function filled(values: FormValues): FormValues {
     ...values,
     shared: {
       fullName: "Acme Music",
-      phone: "+44 20 7946 0958",
+      phone: "9876543210",
       email: "admin@acme.example.com",
       customDomain: "",
     },
@@ -264,7 +265,7 @@ describe("buildCreateFormData", () => {
       subdomainMode: "manual",
       databaseMode: "provisioned",
       fullName: "Acme Music",
-      phone: "+44 20 7946 0958",
+      phone: "9876543210",
       email: "admin@acme.example.com",
       customDomain: "",
       username: "acme",
@@ -415,6 +416,9 @@ describe("validateForm", () => {
       /1 to 65535/,
     );
     expect(validateField("phone", { ...manual, shared: { ...manual.shared, phone: "12" } }, CTX)).toBeDefined();
+    // Indian mobile numbers only: 10 digits starting with 6–9.
+    expect(validateField("phone", { ...manual, shared: { ...manual.shared, phone: "+442079460958" } }, CTX)).toBeDefined();
+    expect(validateField("phone", { ...manual, shared: { ...manual.shared, phone: "9876543210" } }, CTX)).toBeUndefined();
     const domain = (customDomain: string) =>
       validateField("customDomain", { ...manual, shared: { ...manual.shared, customDomain } }, CTX);
     expect(domain("")).toBeUndefined();
@@ -460,10 +464,34 @@ describe("summarizeErrors", () => {
         fullName: "x",
       }),
     ).toEqual([
-      { id: "profile", title: "Tenant profile", firstField: "fullName", count: 1 },
-      { id: "login", title: "Tenant admin login", firstField: "email", count: 1 },
-      { id: "database", title: "Database", firstField: "databaseName", count: 2 },
-      { id: "domain", title: "Domain", firstField: "customDomain", count: 1 },
+      {
+        id: "profile",
+        title: "Personal Information",
+        firstField: "fullName",
+        fields: [{ field: "fullName", label: "Full name" }],
+      },
+      {
+        id: "login",
+        title: "Login Information",
+        firstField: "email",
+        fields: [{ field: "email", label: "Email" }],
+      },
+      {
+        id: "database",
+        title: "Database Information",
+        firstField: "databaseName",
+        // Every invalid field is named (no bare counts), in page order.
+        fields: [
+          { field: "databaseName", label: "Database name" },
+          { field: "databasePort", label: "Port" },
+        ],
+      },
+      {
+        id: "domain",
+        title: "Domain Information",
+        firstField: "customDomain",
+        fields: [{ field: "customDomain", label: "Custom domain" }],
+      },
     ]);
     expect(summarizeErrors({})).toEqual([]);
   });
@@ -476,7 +504,7 @@ describe("summarizeErrors", () => {
 
   it("places every form field in a section", () => {
     const all = Object.fromEntries(CREATE_TENANT_FIELDS.map((field) => [field, "x"]));
-    const total = summarizeErrors(all).reduce((sum, section) => sum + section.count, 0);
+    const total = summarizeErrors(all).reduce((sum, section) => sum + section.fields.length, 0);
     expect(total).toBe(CREATE_TENANT_FIELDS.length);
   });
 });
@@ -575,5 +603,20 @@ describe("checkProfileImageFile", () => {
     expect(await checkProfileImageFile(new Blob([big]))).toBe(
       "The image is larger than 2 MB. Choose a smaller image.",
     );
+  });
+});
+
+describe("hasUnsavedInput", () => {
+  it("is false for the untouched form, also after a preview arrived", () => {
+    const initial = initialFormValues(PORT);
+    expect(hasUnsavedInput(initial, initial, false)).toBe(false);
+    expect(hasUnsavedInput(withPreview(initial), initial, false)).toBe(false);
+  });
+
+  it("is true for typed values, a moved switch or a chosen image", () => {
+    const initial = initialFormValues(PORT);
+    expect(hasUnsavedInput(filled(initial), initial, false)).toBe(true);
+    expect(hasUnsavedInput({ ...initial, modes: { ...initial.modes, domain: "manual" } }, initial, false)).toBe(true);
+    expect(hasUnsavedInput(initial, initial, true)).toBe(true);
   });
 });

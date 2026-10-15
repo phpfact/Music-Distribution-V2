@@ -18,14 +18,30 @@ const TENANT_NOTICES: Readonly<Record<TenantNoticeCode, string>> = {
   reactivated: "Tenant reactivated.",
 };
 
-/** The message for a `?notice=` value; null for a missing or unknown code. */
+/**
+ * Description: Turn a `?notice=` code into its fixed message.
+ * Input: The notice parameter.
+ * Output: The message, or null for a missing or unknown code (the URL never supplies the text).
+ * Use case: Directory and details pages after create/edit/lifecycle actions.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function tenantNoticeMessage(value: string | string[] | undefined): string | null {
   const code = Array.isArray(value) ? value[0] : value;
   if (code === undefined || !Object.hasOwn(TENANT_NOTICES, code)) return null;
   return TENANT_NOTICES[code as TenantNoticeCode];
 }
 
-/** A list URL; the defaults (no search, all statuses, page 1) are left out. */
+/**
+ * Description: Build a directory URL.
+ * Input: The search, status and page (defaults are left out).
+ * Output: `/platform/tenants?q=…&status=…&page=…`.
+ * Use case: Pagination, empty states and the count dialogs.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function tenantListHref(query: Partial<TenantListQuery>): string {
   const params = new URLSearchParams();
   if (query.q) params.set("q", query.q);
@@ -36,8 +52,13 @@ export function tenantListHref(query: Partial<TenantListQuery>): string {
 }
 
 /**
- * The list URL after a filter change: other parameters are kept, the page
- * starts over at 1 and a one-off notice is dropped.
+ * Description: Build the directory URL after a filter change.
+ * Input: The current query string and the changed search/status.
+ * Output: The URL with other parameters kept, the page reset to 1 and the one-off notice dropped.
+ * Use case: The toolbar (search and status filter stay in the URL).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function tenantFilterHref(
   current: string | URLSearchParams,
@@ -60,8 +81,14 @@ export function tenantFilterHref(
 }
 
 /**
- * The 1-based positions of the rows on a page ("Showing 21–40 of 45"); null
- * when the page holds none (no rows at all, or a page past the last one).
+ * Description: Compute the positions of the rows on a page.
+ * Input: The page, the page size and the total.
+ * Output: The first and last row numbers ("Showing 21–40 of 45"), or null when the
+ *   page holds none.
+ * Use case: Directory pagination and the count dialogs.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function pageRowRange(
   page: number,

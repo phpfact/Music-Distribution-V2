@@ -6,7 +6,8 @@ import { cn } from "@/lib/utils";
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent card behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
@@ -26,7 +27,8 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent card header behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
@@ -46,7 +48,8 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent card title behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
   return (
@@ -63,7 +66,8 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent card description behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
   return (
@@ -80,7 +84,8 @@ function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent card action behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function CardAction({ className, ...props }: React.ComponentProps<"div">) {
   return (
@@ -100,7 +105,8 @@ function CardAction({ className, ...props }: React.ComponentProps<"div">) {
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent card content behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function CardContent({ className, ...props }: React.ComponentProps<"div">) {
   return (
@@ -117,7 +123,8 @@ function CardContent({ className, ...props }: React.ComponentProps<"div">) {
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent card footer behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (

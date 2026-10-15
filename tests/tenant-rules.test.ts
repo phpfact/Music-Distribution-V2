@@ -6,7 +6,11 @@ import {
   MASTER_PASSWORD_MAX_LENGTH,
   normalizeFullName,
   parsePort,
+  parseTenantCountPage,
+  parseTenantCountSource,
   parseTenantListQuery,
+  sanitizeIndianMobileInput,
+  TENANT_LIST_MAX_PAGE,
   TENANT_LIST_PAGE_SIZE,
   validateDatabaseIdentifier,
   validateEmail,
@@ -36,10 +40,13 @@ describe("full name", () => {
     expect(valueOf(validateFullName("  Ada   Lovelace "))).toBe("Ada Lovelace");
   });
 
+  // Business rule (owner, 2026-10-15): letters of any script, spaces and . ' - & only.
   it.each([
     ["2 characters (the minimum)", "Al"],
     ["200 characters (the maximum)", "a".repeat(200)],
     ["non-Latin letters", "Björk Guðmundsdóttir"],
+    ["Hindi (letters with combining marks)", "सचिन शर्मा"],
+    ["the allowed separators", "O'Brien-Smith & Co. Records"],
   ])("accepts %s", (_, name) => {
     expect(validateFullName(name).ok).toBe(true);
   });
@@ -52,8 +59,17 @@ describe("full name", () => {
     ["a NUL character", "Ada\0Lovelace"],
     ["a DEL character", "Ada\x7fLovelace"],
     ["a C1 control character", "Ada\u0085Lovelace"],
+    ["digits", "Studio 54 Records"],
+    ["Devanagari digits", "स्टूडियो ५४"],
+    ["other symbols", "Acme @ Music"],
+    ["an underscore", "Acme_Music"],
+    ["a percent sign", "100% Music"],
   ])("rejects %s", (_, name) => {
     expect(errorOf(validateFullName(name))).toMatch(/\.$/);
+  });
+
+  it("names the allowed characters when a digit is used", () => {
+    expect(errorOf(validateFullName("Acme 2"))).toBe("Use only letters, spaces and . ' - & (no digits) in the name.");
   });
 });
 
@@ -63,24 +79,43 @@ describe("phone", () => {
     expect(valueOf(validatePhone("   "))).toBeNull();
   });
 
+  // Business rule (owner, 2026-10-15): an Indian mobile number, exactly 10
+  // digits starting with 6–9, stored as those digits.
   it.each([
-    ["+44 (020) 7946-0958", "+4402079460958"],
-    ["555.123.4567", "5551234567"],
-    ["1234567", "1234567"],
-    ["+123456789012345", "+123456789012345"],
-  ])("normalizes %j to %j", (input, expected) => {
+    ["9876543210", "9876543210"],
+    ["6000000000", "6000000000"],
+    ["  7012345678  ", "7012345678"],
+  ])("accepts %j as %j", (input, expected) => {
     expect(valueOf(validatePhone(input))).toBe(expected);
   });
 
   it.each([
-    ["6 digits", "123456"],
-    ["16 digits", "1234567890123456"],
-    ["letters", "555-CALL-NOW"],
-    ["a + in the middle", "12+34567890"],
-    ["two leading +", "++1234567"],
-    ["an over-long formatted input", `+1${" ".repeat(40)}234567`],
+    ["9 digits", "987654321"],
+    ["11 digits", "98765432101"],
+    ["a first digit below 6", "5876543210"],
+    ["a country code", "+919876543210"],
+    ["spaces inside", "98765 43210"],
+    ["dashes", "98765-43210"],
+    ["letters", "98765ABCDE"],
+    ["international", "+442079460958"],
   ])("rejects %s", (_, phone) => {
-    expect(errorOf(validatePhone(phone))).toContain("7–15 digits");
+    expect(errorOf(validatePhone(phone))).toBe(
+      "Enter a 10-digit Indian mobile number starting with 6, 7, 8 or 9.",
+    );
+  });
+});
+
+describe("sanitizeIndianMobileInput", () => {
+  it.each([
+    ["typed digits", "98765", "98765"],
+    ["letters and symbols are dropped", "98a7-6 5(4)", "987654"],
+    ["a pasted +91 number", "+91 98765 43210", "9876543210"],
+    ["a pasted 91 prefix", "919876543210", "9876543210"],
+    ["a pasted trunk 0", "098765 43210", "9876543210"],
+    ["never more than 10 digits", "98765432109999", "9876543210"],
+    ["empty", "", ""],
+  ])("%s", (_, input, expected) => {
+    expect(sanitizeIndianMobileInput(input)).toBe(expected);
   });
 });
 
@@ -368,4 +403,61 @@ describe("escapeLikePattern", () => {
   ])("escapes %j as %j", (input, expected) => {
     expect(escapeLikePattern(input)).toBe(expected);
   });
+});
+
+describe("parseTenantCountSource", () => {
+  it.each([
+    [{ kind: "summary", category: "all" }],
+    [{ kind: "summary", category: "active" }],
+    [{ kind: "summary", category: "suspended" }],
+    [{ kind: "summary", category: "setup" }],
+    [{ kind: "summary", category: "failed" }],
+  ])("accepts the summary figure %j", (source) => {
+    expect(parseTenantCountSource(source)).toEqual(source);
+  });
+
+  it("accepts the directory total with its bounded search and status", () => {
+    expect(parseTenantCountSource({ kind: "list", q: "  acme  ", status: "pending" })).toEqual({
+      kind: "list",
+      q: "acme",
+      status: "pending",
+    });
+    expect(parseTenantCountSource({ kind: "list", q: "x".repeat(150), status: "all" })).toEqual({
+      kind: "list",
+      q: "x".repeat(100),
+      status: "all",
+    });
+  });
+
+  it.each([
+    [null],
+    [undefined],
+    ["summary"],
+    [[]],
+    [{}],
+    [{ kind: "summary" }],
+    [{ kind: "summary", category: "deprovisioning" }],
+    [{ kind: "summary", category: "__proto__" }],
+    [{ kind: "list", status: "all" }],
+    [{ kind: "list", q: 1, status: "all" }],
+    [{ kind: "list", q: "", status: "setup" }],
+    [{ kind: "other", q: "", status: "all" }],
+  ])("rejects %j", (value) => {
+    expect(parseTenantCountSource(value)).toBeNull();
+  });
+});
+
+describe("parseTenantCountPage", () => {
+  it("keeps a whole page number within the bounds", () => {
+    expect(parseTenantCountPage(1)).toBe(1);
+    expect(parseTenantCountPage(7)).toBe(7);
+    expect(parseTenantCountPage(TENANT_LIST_MAX_PAGE)).toBe(TENANT_LIST_MAX_PAGE);
+  });
+
+  it.each([[0], [-1], [1.5], [TENANT_LIST_MAX_PAGE + 1], ["2"], [null], [Number.NaN]])(
+    "falls back to 1 for %j",
+    (value) => {
+      expect(parseTenantCountPage(value)).toBe(1);
+    },
+  );
 });

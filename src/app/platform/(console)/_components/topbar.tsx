@@ -25,12 +25,13 @@ type TopbarProps = {
  * Output: the common responsive shadcn-based console header.
  * Use case: retain route context and accessible controls on every console page.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 export function Topbar({ username, drawerId, drawerOpen, onOpenDrawer, menuToggleRef }: TopbarProps) {
   const pathname = usePathname();
-  const current = findActiveNavItem(pathname);
-  const child = current?.children?.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
+  const current  = findActiveNavItem(pathname);
+  const child    = current?.children?.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
 
   return (
     <header className="flex h-20 shrink-0 items-center gap-3 border-b border-border bg-card/80 px-4 backdrop-blur sm:px-6 lg:px-9">

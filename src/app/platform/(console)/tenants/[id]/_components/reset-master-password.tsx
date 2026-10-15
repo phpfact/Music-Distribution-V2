@@ -53,27 +53,26 @@ type ResetMasterPasswordProps = {
 };
 
 /**
- * "Reset master password" on the Admin login card (§8.5, §9.4): Auto
- * generate or Manual. A generated password is shown once in a result view and
- * dropped from state when that view closes.
- *
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Render "Reset master password" on the Login Information card (§8.5, §9.4).
+ * Input: The tenant id, name and admin username.
+ * Output: The button, its confirmation (Auto generate or Manual with the live
+ *   checklist) and the one-time result dialog of a generated password.
+ * Use case: The details page.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function ResetMasterPassword({
   tenantId,
   tenantName,
   username,
 }: ResetMasterPasswordProps) {
-  const router = useRouter();
-  const flash = useTenantFlash();
-  const uid = useId();
-  const passwordId = `${uid}-password`;
+  const router      = useRouter();
+  const flash       = useTenantFlash();
+  const uid         = useId();
+  const passwordId  = `${uid}-password`;
   const checklistId = `${uid}-checklist`;
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const triggerRef  = useRef<HTMLButtonElement>(null);
 
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<Mode>("auto");
@@ -84,13 +83,13 @@ export function ResetMasterPassword({
   const [pending, startTransition] = useTransition();
 
   /**
-   * Description: Prepare a fresh credential confirmation with old errors and secrets cleared.
-   *
-   * Input: The existing typed arguments and component state.
-   * Output: The existing helper result or state update.
-   * Use case: Tenant management’s existing owner workflow.
+   * Description: Open a fresh reset confirmation.
+   * Input: None.
+   * Output: The dialog opens on Auto with the old password and errors cleared.
+   * Use case: The Reset master password button.
    * Author: Mr. Sachin Sharma
-   * Created: 2026-10-14. Last modified: 2026-10-15.
+   * Created: 2026-10-14
+   * Last modified: 2026-10-15
    */
   function openDialog() {
     setMode("auto");
@@ -101,13 +100,13 @@ export function ResetMasterPassword({
   }
 
   /**
-   * Description: Close an idle credential confirmation and clear its transient secret.
-   *
-   * Input: The existing typed arguments and component state.
-   * Output: The existing helper result or state update.
-   * Use case: Tenant management’s existing owner workflow.
+   * Description: Close the confirmation unless the reset runs.
+   * Input: None.
+   * Output: The dialog closes and the typed password is cleared.
+   * Use case: Cancel, Escape and outside clicks.
    * Author: Mr. Sachin Sharma
-   * Created: 2026-10-14. Last modified: 2026-10-15.
+   * Created: 2026-10-14
+   * Last modified: 2026-10-15
    */
   function close() {
     if (pending) return;
@@ -116,13 +115,15 @@ export function ResetMasterPassword({
   }
 
   /**
-   * Description: Validate the selected credential operation and run its existing Server Action.
-   *
-   * Input: The existing typed arguments and component state.
-   * Output: The existing helper result or state update.
-   * Use case: Tenant management’s existing owner workflow.
+   * Description: Validate the chosen mode and run the reset.
+   * Input: None (reads the mode and the typed password).
+   * Output: A field error (Manual), a failure in the dialog, or success: the dialog
+   *   closes, a generated password is shown once, the flash notice reports it and
+   *   the page data refreshes.
+   * Use case: The confirmation's Reset password button.
    * Author: Mr. Sachin Sharma
-   * Created: 2026-10-14. Last modified: 2026-10-15.
+   * Created: 2026-10-14
+   * Last modified: 2026-10-15
    */
   function confirm() {
     if (pending) return;

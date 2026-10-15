@@ -17,7 +17,7 @@ import { scramSha256Verifier } from "./scram";
 
 /** Exists in every cluster; used for cluster-level statements (roles, CREATE DATABASE). */
 export const MAINTENANCE_DATABASE = "postgres";
-const CONNECT_TIMEOUT_MS = 5_000;
+const CONNECT_TIMEOUT_MS          = 5_000;
 
 /** A login to one database on POSTGRES_HOST. The password is plaintext: never log it. */
 export type DatabaseLogin = { database: string; user: string; password: string; port: number };
@@ -25,14 +25,43 @@ export type DatabaseLogin = { database: string; user: string; password: string; 
 /** Prefix of the COMMENT that marks a role or database as created for a tenant. */
 export const OWNERSHIP_MARKER_PREFIX = "md-tenant:";
 
+/**
+ * Description: Build the COMMENT that marks a role or database as created for a tenant.
+ * Input: The tenant id.
+ * Output: `md-tenant:<id>`.
+ * Use case: Creating a tenant's role and database; adopting them on a retry.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function ownershipMarker(tenantId: string): string {
   return `${OWNERSHIP_MARKER_PREFIX}${tenantId}`;
 }
 
+/**
+ * Description: Name the platform's administrative PostgreSQL login.
+ * Input: None.
+ * Output: POSTGRES_USER from the configuration.
+ * Use case: Reserved names and quoted SQL.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function adminLoginName(): string {
   return getEnv().postgres.user;
 }
 
+/**
+ * Description: Run work on a new, short-lived PostgreSQL connection.
+ * Input: The login, the connection context (for error messages) and the work.
+ * Output: The work's result. A failed connection becomes a ProvisioningError with a
+ *   safe message; the connection is always closed; a dropped connection surfaces
+ *   as the failing query's rejection instead of crashing the process.
+ * Use case: withAdminClient and withLoginClient.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function connect<T>(
   login: DatabaseLogin,
   context: ConnectionContext,
@@ -62,7 +91,15 @@ async function connect<T>(
   }
 }
 
-/** Runs `work` on a new connection as the administrative login (POSTGRES_USER). */
+/**
+ * Description: Run work as the administrative login (POSTGRES_USER).
+ * Input: The database, the port and the work.
+ * Output: The work's result (see connect).
+ * Use case: Every provisioning step that creates, grants or inspects.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function withAdminClient<T>(
   database: string,
   port: number,
@@ -72,7 +109,15 @@ export function withAdminClient<T>(
   return connect({ database, user, password, port }, { login: "admin", host, user, database, port }, work);
 }
 
-/** Runs `work` on a new connection as a tenant's own login. */
+/**
+ * Description: Run work as a tenant's own login.
+ * Input: The tenant login (database, user, plaintext password, port) and the work.
+ * Output: The work's result (see connect).
+ * Use case: Login tests and tenant-admin updates.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function withLoginClient<T>(
   login: DatabaseLogin,
   work: (client: Client) => Promise<T>,
@@ -85,15 +130,29 @@ export function withLoginClient<T>(
   );
 }
 
-/** Names only the server knows that tenants may never use (rules.ts §4). */
+/**
+ * Description: List names only the server knows that tenants may never use (rules.ts §4).
+ * Input: None.
+ * Output: The control-plane database name and the administrative login.
+ * Use case: Database identifier validation on the server.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function reservedDatabaseNames(): string[] {
   const { postgres } = getEnv();
   return [postgres.database, postgres.user];
 }
 
 /**
- * Validates a tenant's database or role name with the tenant rules and quotes
- * it for SQL. A stored name that fails the rules is never sent to PostgreSQL.
+ * Description: Validate a tenant database/role name and quote it for SQL.
+ * Input: The stored name and whether it is a database or a user.
+ * Output: The quoted identifier; throws a ProvisioningError for a name that fails
+ *   the rules: a stored name that fails them is never sent to PostgreSQL.
+ * Use case: Every statement that names a tenant's database or role.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function quoteTenantIdentifier(name: string, kind: DatabaseIdentifierKind): string {
   const result = validateDatabaseIdentifier(name, kind, { reservedNames: reservedDatabaseNames() });
@@ -106,16 +165,42 @@ export function quoteTenantIdentifier(name: string, kind: DatabaseIdentifierKind
   return escapeIdentifier(name);
 }
 
-/** The administrative login, quoted. It comes from the server's configuration, not from input. */
+/**
+ * Description: Quote the administrative login for SQL.
+ * Input: None.
+ * Output: The quoted login (from the configuration, not from input).
+ * Use case: Grant statements.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function quotedAdminLogin(): string {
   return escapeIdentifier(adminLoginName());
 }
 
+/**
+ * Description: Quote a text value as an SQL literal.
+ * Input: The text.
+ * Output: The escaped literal.
+ * Use case: COMMENT statements (ownership markers).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function sqlLiteral(value: string): string {
   return escapeLiteral(value);
 }
 
-/** `PASSWORD '<verifier>'`: the plaintext never appears in the statement (or the server log). */
+/**
+ * Description: Build the PASSWORD clause of CREATE/ALTER ROLE from a SCRAM verifier.
+ * Input: The plaintext password.
+ * Output: `PASSWORD '<verifier>'`: the plaintext never appears in the statement or
+ *   the server log; throws a ProvisioningError for an unusable password.
+ * Use case: Creating a tenant role and setting its password.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function passwordClause(password: string): string {
   let verifier: string;
   try {
@@ -146,6 +231,16 @@ export type RoleInfo = {
 
 export type DatabaseInfo = { name: string; owner: string; comment: string | null };
 
+/**
+ * Description: Look up a role's attributes on an open connection.
+ * Input: The client and the role name.
+ * Output: The role's flags (superuser, create db/role, bypass RLS, login) and
+ *   COMMENT, or null when there is no such role.
+ * Use case: findRole and the existing-database checks.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export async function findRoleWith(client: Client, name: string): Promise<RoleInfo | null> {
   const result = await client.query<{
     rolname: string;
@@ -174,6 +269,15 @@ export async function findRoleWith(client: Client, name: string): Promise<RoleIn
   };
 }
 
+/**
+ * Description: Look up a database's owner and COMMENT on an open connection.
+ * Input: The client and the database name.
+ * Output: The database info, or null when there is no such database.
+ * Use case: findDatabase and the provisioning steps.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export async function findDatabaseWith(client: Client, name: string): Promise<DatabaseInfo | null> {
   const result = await client.query<{ datname: string; owner: string; comment: string | null }>(
     `SELECT datname, pg_get_userbyid(datdba) AS owner, shobj_description(oid, 'pg_database') AS comment
@@ -184,31 +288,67 @@ export async function findDatabaseWith(client: Client, name: string): Promise<Da
   return row ? { name: row.datname, owner: row.owner, comment: row.comment } : null;
 }
 
+/**
+ * Description: Look up a role on the server at a port.
+ * Input: The role name and the port.
+ * Output: The role info, or null.
+ * Use case: roleExists and the provisioning steps.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function findRole(name: string, port: number): Promise<RoleInfo | null> {
   return withAdminClient(MAINTENANCE_DATABASE, port, (client) => findRoleWith(client, name));
 }
 
+/**
+ * Description: Look up a database on the server at a port.
+ * Input: The database name and the port.
+ * Output: The database info, or null.
+ * Use case: databaseExists and the provisioning steps.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function findDatabase(name: string, port: number): Promise<DatabaseInfo | null> {
   return withAdminClient(MAINTENANCE_DATABASE, port, (client) => findDatabaseWith(client, name));
 }
 
-/** Whether a database of this name exists on the server at `port` (creation-time uniqueness check). */
+/**
+ * Description: Tell whether a database of this name exists on the server.
+ * Input: The database name and the port.
+ * Output: True when it exists.
+ * Use case: Creation-time uniqueness checks.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export async function databaseExists(name: string, port: number): Promise<boolean> {
   return (await findDatabase(name, port)) !== null;
 }
 
 /**
- * Whether a role of this name exists. Roles are cluster-wide; `port` picks the
- * server and defaults to POSTGRES_PORT.
+ * Description: Tell whether a role of this name exists (roles are cluster-wide).
+ * Input: The role name and the port (default POSTGRES_PORT).
+ * Output: True when it exists.
+ * Use case: Creation-time uniqueness checks.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function roleExists(name: string, port: number = getEnv().postgres.port): Promise<boolean> {
   return (await findRole(name, port)) !== null;
 }
 
 /**
- * Relations outside the system schemas, e.g. `public.users`. Every schema
- * whose name starts with pg_ is a system one: PostgreSQL forbids that prefix
- * for user schemas.
+ * Description: List the relations outside the system schemas.
+ * Input: An open client on the database to inspect.
+ * Output: Names like `public.users`; every schema starting with pg_ is a system one
+ *   (PostgreSQL forbids that prefix for user schemas).
+ * Use case: Existing-database content checks.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function userRelations(client: Client): Promise<string[]> {
   const result = await client.query<{ name: string }>(
@@ -224,8 +364,13 @@ export async function userRelations(client: Client): Promise<string[]> {
 // Credentials
 
 /**
- * Sets a tenant role's password (as a SCRAM verifier). The caller makes sure
- * the role is the tenant's own, provisioned one.
+ * Description: Set a tenant role's password as a SCRAM verifier.
+ * Input: The role, the plaintext password and the port.
+ * Output: Nothing; the caller makes sure the role is the tenant's own provisioned one.
+ * Use case: Rotate database password.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function setRolePassword(role: string, password: string, port: number): Promise<void> {
   const quoted = quoteTenantIdentifier(role, "user");
@@ -239,7 +384,15 @@ export type LoginTestResult =
   | { ok: true }
   | { ok: false; code: ProvisioningError["code"]; message: string };
 
-/** Signs in with the given credentials and runs `SELECT 1`. Never throws. */
+/**
+ * Description: Sign in with the given credentials and run SELECT 1.
+ * Input: The login.
+ * Output: ok, or the safe ProvisioningError explaining why not. Never throws.
+ * Use case: Updating an existing database's password and the existing-database checks.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export async function testDatabaseLogin(login: DatabaseLogin): Promise<LoginTestResult> {
   try {
     await withLoginClient(login, async (client) => {

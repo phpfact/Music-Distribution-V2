@@ -98,7 +98,7 @@ export type TenantForEdit = {
   baseDomain: string;
 };
 
-const NOT_FOUND = { ok: false, reason: "not_found", message: "This tenant does not exist." } as const;
+const NOT_FOUND   = { ok: false, reason: "not_found", message: "This tenant does not exist." } as const;
 const UNAVAILABLE = { ok: false, reason: "unavailable", message: UNAVAILABLE_MESSAGE } as const;
 const BUSY = {
   ok: false,
@@ -136,15 +136,41 @@ const EDITABLE_SELECT = {
 
 type EditableRow = Prisma.TenantGetPayload<{ select: typeof EDITABLE_SELECT }>;
 
+/**
+ * Description: Load the columns an edit reads and compares.
+ * Input: The tenant id.
+ * Output: The editable row (with domains and the admin-creation step), or null.
+ * Use case: getTenantForEdit and updateTenantProfile.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function loadEditable(id: string): Promise<EditableRow | null> {
   return getControlDb().tenant.findUnique({ where: { id }, select: EDITABLE_SELECT });
 }
 
+/**
+ * Description: Pick a tenant's domain row of one type.
+ * Input: The editable row and the domain type.
+ * Output: The subdomain or custom domain row, or null.
+ * Use case: getTenantForEdit, changedFields and updateTenantProfile.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function domainOf(row: EditableRow, type: "subdomain" | "custom") {
   return row.domains.find((domain) => domain.type === type) ?? null;
 }
 
-/** null for an unknown or malformed id. */
+/**
+ * Description: Load a tenant's saved values for the edit form.
+ * Input: The tenant id from the URL.
+ * Output: The edit DTO (no secrets), or null for an unknown or malformed id.
+ * Use case: The edit page (the form is prefilled with these values).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export async function getTenantForEdit(id: string): Promise<TenantForEdit | null> {
   if (!isUuid(id)) return null;
   const row = await loadEditable(id);
@@ -177,10 +203,29 @@ type EditValues = {
   image: ProfileImageChange;
 };
 
+/**
+ * Description: Read an untrusted value as text.
+ * Input: Any value.
+ * Output: The string, or "" for anything that is not a string.
+ * Use case: validateEdit.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function text(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
+/**
+ * Description: Validate an edit request with the create rules (§4).
+ * Input: The raw request values and PLATFORM_BASE_DOMAIN.
+ * Output: Every field error at once, or the normalized values (custom domain
+ *   converted to punycode; empty means remove).
+ * Use case: updateTenantProfile.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function validateEdit(
   input: UpdateTenantInput,
   baseDomain: string,
@@ -192,11 +237,11 @@ function validateEdit(
     return undefined;
   };
 
-  const fullName = check("fullName", validateFullName(text(input.fullName)));
-  const phone = check("phone", validatePhone(text(input.phone)));
-  const username = check("username", validateTenantUsername(text(input.username)));
-  const email = check("email", validateEmail(text(input.email)));
-  const subdomain = check("subdomain", validateSubdomainLabel(text(input.subdomain)));
+  const fullName        = check("fullName", validateFullName(text(input.fullName)));
+  const phone           = check("phone", validatePhone(text(input.phone)));
+  const username        = check("username", validateTenantUsername(text(input.username)));
+  const email           = check("email", validateEmail(text(input.email)));
+  const subdomain       = check("subdomain", validateSubdomainLabel(text(input.subdomain)));
   const rawCustomDomain = text(input.customDomain);
   const customDomain =
     rawCustomDomain.trim().length === 0
@@ -230,6 +275,15 @@ function validateEdit(
   };
 }
 
+/**
+ * Description: List the fields an edit actually changes.
+ * Input: The saved row and the validated new values.
+ * Output: The changed fields in form order.
+ * Use case: updateTenantProfile (only changes are written and audited).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function changedFields(current: EditableRow, next: EditValues): UpdateTenantField[] {
   const changed = new Set<UpdateTenantField>();
   if (next.fullName !== current.name) changed.add("fullName");
@@ -246,7 +300,15 @@ function changedFields(current: EditableRow, next: EditValues): UpdateTenantFiel
 // ---------------------------------------------------------------------------
 // Steps
 
-/** The edited names held by another tenant, as field errors (empty when all are free). */
+/**
+ * Description: Find edited names that another tenant already holds.
+ * Input: The tenant id, the new values and the changed fields.
+ * Output: Field errors for the taken names (empty when all are free).
+ * Use case: updateTenantProfile.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function takenNames(
   id: string,
   next: EditValues,
@@ -269,12 +331,30 @@ async function takenNames(
   return fieldErrors;
 }
 
+/**
+ * Description: Map an availability name kind to an edit-form field.
+ * Input: The name kind.
+ * Output: username, email, subdomain or customDomain; null for the database names.
+ * Use case: takenNames.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function editField(kind: NameKind): UpdateTenantField | null {
   return kind === "username" || kind === "email" || kind === "subdomain" || kind === "customDomain"
     ? kind
     : null;
 }
 
+/**
+ * Description: Delete a profile image file that is no longer used, best effort.
+ * Input: The storage key (or null) and a word for the log.
+ * Output: Nothing; a failure is logged, never thrown.
+ * Use case: updateTenantProfile (old image after a save, new image after a failure).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function discardFile(key: string | null, why: string): Promise<void> {
   if (!key) return;
   await deleteStoredFile(key).catch((error: unknown) => {
@@ -282,6 +362,16 @@ async function discardFile(key: string | null, why: string): Promise<void> {
   });
 }
 
+/**
+ * Description: Turn a tenant-database admin update problem into the edit result.
+ * Input: The problem.
+ * Output: A username/email field error, "admin not found" or an unavailable message;
+ *   nothing was changed in any case.
+ * Use case: updateTenantProfile.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function adminSyncFailure(problem: Exclude<AdminRowOutcome, { ok: true }>["problem"]): UpdateTenantResult {
   switch (problem) {
     case "username_taken":
@@ -311,7 +401,15 @@ function adminSyncFailure(problem: Exclude<AdminRowOutcome, { ok: true }>["probl
   }
 }
 
-/** The control-plane columns that changed. `updated_at` is always set, so the row is touched (and checked). */
+/**
+ * Description: Build the control-plane update for the changed columns.
+ * Input: The changed fields, the new values and the new image key.
+ * Output: The Prisma update data; updated_at is always set, so the row is touched (and checked).
+ * Use case: updateTenantProfile.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function tenantData(
   changed: ReadonlySet<UpdateTenantField>,
   next: EditValues,
@@ -329,8 +427,16 @@ function tenantData(
 // ---------------------------------------------------------------------------
 
 /**
- * Applies the edit (§8.4). Refused while setup runs; validation and
- * uniqueness problems come back per field, like the create form's.
+ * Description: Apply an edit to a tenant (§8.4).
+ * Input: The tenant id, the raw request values, the acting owner and test dependencies.
+ * Output: ok with the changed fields and whether DNS is pending, field errors (like
+ *   the create form), or a refusal (not found, setup running, unavailable).
+ *   The admin row in the tenant database changes first and is reverted when the
+ *   control plane refuses the edit.
+ * Use case: updateTenantAction (the edit form).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function updateTenantProfile(
   id: string,
@@ -397,7 +503,7 @@ export async function updateTenantProfile(
   }
 
   const subdomainRow = domainOf(current, "subdomain");
-  const customRow = domainOf(current, "custom");
+  const customRow    = domainOf(current, "custom");
   let stage: InsertStage = "other";
   try {
     await getControlDb().$transaction(async (tx) => {
@@ -460,7 +566,7 @@ export async function updateTenantProfile(
       const exists = await getControlDb().tenant.count({ where: { id } }).catch(() => 1);
       return exists === 0 ? NOT_FOUND : BUSY;
     }
-    const kind = uniqueViolationField(error, stage);
+    const kind  = uniqueViolationField(error, stage);
     const field = kind ? editField(kind) : null;
     if (kind && field) return { ok: false, reason: "validation", fieldErrors: { [field]: TAKEN_MESSAGES[kind] } };
     console.error(`[tenants] could not update tenant ${id}: ${describeError(error)}`);
@@ -478,7 +584,16 @@ export async function updateTenantProfile(
   return { ok: true, tenantId: id, changed: changedList, dnsPending };
 }
 
-/** Best effort: puts the admin's old names back after the control plane refused the edit. */
+/**
+ * Description: Put the admin's old names back after the control plane refused the edit.
+ * Input: The tenant id, the saved row, the new values and the changed fields
+ *   (the admin row is renamed back from the new to the saved username/email).
+ * Output: Nothing; best effort, failures are logged.
+ * Use case: updateTenantProfile's failure path.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function revertAdminRow(
   id: string,
   current: EditableRow,

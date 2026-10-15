@@ -11,7 +11,8 @@ import { Dialog as SheetPrimitive } from "radix-ui";
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent sheet behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />;
@@ -22,7 +23,8 @@ function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent sheet trigger behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function SheetTrigger({
   ...props
@@ -35,7 +37,8 @@ function SheetTrigger({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent sheet close behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function SheetClose({
   ...props
@@ -48,7 +51,8 @@ function SheetClose({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent sheet portal behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function SheetPortal({
   ...props
@@ -69,7 +73,8 @@ function SheetPortal({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent sheet overlay behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function SheetOverlay({
   className,
@@ -92,7 +97,8 @@ function SheetOverlay({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent sheet content behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function SheetContent({
   className,
@@ -140,7 +146,8 @@ function SheetContent({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent sheet header behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
@@ -157,7 +164,8 @@ function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent sheet footer behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
@@ -174,7 +182,8 @@ function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent sheet title behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function SheetTitle({
   className,
@@ -194,7 +203,8 @@ function SheetTitle({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent sheet description behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function SheetDescription({
   className,

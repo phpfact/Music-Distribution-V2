@@ -19,12 +19,15 @@ export type NameKind =
 export type NameSet = Partial<Record<NameKind, string | null>>;
 
 /**
- * The names already held by a tenant in the control plane, in one round trip.
- * A missing or null name is not checked. The subdomain label is also the
- * tenant's slug, so both columns are consulted.
- *
- * `excludeTenantId` leaves one tenant's own names out (an edit may keep or
- * reuse them); without it every tenant counts.
+ * Description: Find which tenant names are already held in the control plane, in one round trip.
+ * Input: The names to check (missing or null names are skipped) and an optional
+ *   tenant id whose own names are left out (an edit may keep them).
+ * Output: The set of name kinds already taken. The subdomain label is also the slug,
+ *   so both are consulted. The unique indexes remain the real guarantee.
+ * Use case: Create (step 4), edit and the preview generators.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function takenInControlPlane(
   names: NameSet,
@@ -50,7 +53,7 @@ export async function takenInControlPlane(
               WHERE database_name = ${names.databaseName ?? null} AND id IS DISTINCT FROM ${other}::uuid) AS "databaseName",
       EXISTS (SELECT 1 FROM tenants
               WHERE database_user = ${names.databaseUser ?? null} AND id IS DISTINCT FROM ${other}::uuid) AS "databaseUser"`;
-  const row = rows[0];
+  const row   = rows[0];
   const taken = new Set<NameKind>();
   if (!row) return taken;
   for (const kind of Object.keys(row) as NameKind[]) {
@@ -60,9 +63,14 @@ export async function takenInControlPlane(
 }
 
 /**
- * Whether the database or role already exists on the PostgreSQL server at
- * `port` (another application's, or a leftover). Throws a ProvisioningError
- * when the server cannot be asked.
+ * Description: Check whether a database or role already exists on the PostgreSQL server.
+ * Input: The database name, the user name and the server port.
+ * Output: Which of the two exist (another application's, or a leftover); throws a
+ *   ProvisioningError when the server cannot be asked.
+ * Use case: Create (new database) and the preview generators.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function takenOnServer(
   databaseName: string,

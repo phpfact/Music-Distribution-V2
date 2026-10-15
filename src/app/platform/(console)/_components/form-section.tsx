@@ -3,6 +3,11 @@ import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Icon, type IconName } from "./icons";
 
 type FormSectionProps = {
+  /**
+   * The section's DOM id. The page's secondary menu scrolls to it and
+   * highlights it while it is being read, so it must be unique on the page.
+   */
+  id?: string;
   /** The section's symbol, shown in a tinted tile before the title. */
   icon: IconName;
   title: ReactNode;
@@ -17,13 +22,16 @@ type FormSectionProps = {
 
 /**
  * Description: One card of a long form, labelled by its own title.
- * Input: An icon, a title, an optional description and header action, and the section's fields.
+ * Input: An optional id (secondary-menu target), an icon, a title, an optional
+ *   description and header action, and the section's fields.
  * Output: A `<section>` named by its heading, with a header row and a padded body.
  * Use case: Every section of the create and edit tenant forms, so they share one look.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 export function FormSection({
+  id,
   icon,
   title,
   description,
@@ -33,7 +41,7 @@ export function FormSection({
   const titleId = useId();
 
   return (
-    <section aria-labelledby={titleId}>
+    <section id={id} aria-labelledby={titleId}>
       <Card className="gap-0 py-0">
         <CardHeader className="flex flex-col gap-4 border-b p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-start gap-3">

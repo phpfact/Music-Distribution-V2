@@ -23,7 +23,8 @@ const STATUS_TONES: Record<TenantStatus, BadgeTone> = {
  * Input: semantic tone and label. Output: theme-aware status label.
  * Use case: database, connection and domain states use one component system.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 export function ToneBadge({
   tone,
@@ -51,7 +52,8 @@ export function ToneBadge({
  * Input: persisted tenant status. Output: a textual, semantic shadcn Badge.
  * Use case: directory and dashboard preserve status distinctions and busy feedback.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 export function StatusBadge({ status }: { status: TenantStatus }) {
   return (

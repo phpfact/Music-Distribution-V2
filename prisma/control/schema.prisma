@@ -277,7 +277,10 @@ enum AppearanceTheme {
   @@map("appearance_theme")
 }
 
+/// Brand accents. `neutral` (shadcn's black-and-white look) is the application
+/// default; the colours are selectable in Appearance settings.
 enum AppearanceAccent {
+  neutral
   emerald
   indigo
   violet

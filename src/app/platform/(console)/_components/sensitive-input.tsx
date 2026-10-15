@@ -29,7 +29,8 @@ type SensitiveInputProps = Omit<
  *   Browsers without `-webkit-text-security` support show the text unmasked;
  *   the field still works normally.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 export function SensitiveInput({
   id,

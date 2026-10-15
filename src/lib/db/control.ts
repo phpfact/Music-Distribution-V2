@@ -9,10 +9,13 @@ export type ControlDb = PrismaClient;
 const globalForControlDb = globalThis as typeof globalThis & { __controlDb?: ControlDb };
 
 /**
- * Prisma client for the control-plane database (tenants, domains, plans,
- * provisioning runs, audit events, platform owners and their sessions). It
- * runs on the bounded pool from postgres.ts, so the ORM adds no connections
- * of its own.
+ * Description: Return the shared Prisma client of the control-plane database.
+ * Input: None.
+ * Output: The client (one per process), running on the bounded pg pool.
+ * Use case: Every control-plane read and write.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-13
+ * Last modified: 2026-10-15
  */
 export function getControlDb(): ControlDb {
   globalForControlDb.__controlDb ??= new PrismaClient({ adapter: new PrismaPg(getPool()) });

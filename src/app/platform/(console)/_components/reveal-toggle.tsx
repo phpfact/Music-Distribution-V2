@@ -27,7 +27,8 @@ type RevealToggleProps = {
  * Use case: Shared by PasswordInput, SensitiveInput and SensitiveValue so every
  *   masked value in the console behaves and reads out the same way.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 export function RevealToggle({
   visible,

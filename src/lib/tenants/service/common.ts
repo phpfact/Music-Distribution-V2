@@ -14,18 +14,32 @@ export type TenantActor = { ownerId: string; ipAddress: string | null };
 /** A refusal the browser may show as is. */
 export type ServiceFailure<R extends string> = { ok: false; reason: R; message: string };
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Ids arrive from URLs and form fields: anything else must not reach a uuid
+// column. The one shared check lives in src/lib/uuid.ts.
+export { isUuid } from "@/lib/uuid";
 
-/** Ids arrive from URLs and form fields: anything else must not reach a uuid column. */
-export function isUuid(value: unknown): value is string {
-  return typeof value === "string" && UUID_PATTERN.test(value);
-}
-
-/** The audit fields every owner-initiated change carries (§8.7). */
+/**
+ * Description: Build the audit fields of an owner-initiated change (§8.7).
+ * Input: The acting owner (from the session).
+ * Output: actorType super_admin, the owner id and the client address.
+ * Use case: Every tenant service that records an audit event.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function ownerAudit(actor: TenantActor): Pick<AuditEntry, "actorType" | "actorId" | "ipAddress"> {
   return { actorType: "super_admin", actorId: actor.ownerId, ipAddress: actor.ipAddress };
 }
 
+/**
+ * Description: Describe the acting owner for the provisioning runner.
+ * Input: The acting owner (from the session).
+ * Output: The runner's actor (super_admin, owner id, client address).
+ * Use case: Starting or retrying a tenant's setup.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function provisioningActor(actor: TenantActor): ProvisioningActor {
   return { type: "super_admin", ownerId: actor.ownerId, ipAddress: actor.ipAddress };
 }

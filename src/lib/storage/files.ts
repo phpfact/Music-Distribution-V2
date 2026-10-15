@@ -14,7 +14,7 @@ import { getEnv } from "../env";
  */
 export type ProfileImageExtension = "png" | "jpg" | "webp";
 
-const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+const UUID         = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 const UUID_PATTERN = new RegExp(`^${UUID}$`);
 // Every kind of key the application generates. Lower-case only.
 const STORAGE_KEY_PATTERNS = [new RegExp(`^tenants/${UUID}/profile/${UUID}\\.(png|jpg|webp)$`)];
@@ -27,15 +27,29 @@ export class InvalidStorageKeyError extends Error {
   }
 }
 
-/** A new, unique key for a tenant's profile image. */
+/**
+ * Description: Generate a new, unique storage key for a tenant's profile image.
+ * Input: The tenant id (UUID) and the sniffed file extension.
+ * Output: `tenants/<id>/profile/<uuid>.<ext>`; throws InvalidStorageKeyError for a bad id.
+ * Use case: storeProfileImage.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function profileImageKey(tenantId: string, extension: ProfileImageExtension): string {
   if (!UUID_PATTERN.test(tenantId)) throw new InvalidStorageKeyError();
   return `tenants/${tenantId}/profile/${randomUUID()}.${extension}`;
 }
 
 /**
- * The absolute path of a storage key. Throws InvalidStorageKeyError unless the
- * key is one the server generates and its path stays inside STORAGE_ROOT.
+ * Description: Turn a storage key into an absolute path under STORAGE_ROOT.
+ * Input: A storage key (from the database).
+ * Output: The absolute path. Throws InvalidStorageKeyError unless the key is one the
+ *   server generates and its path stays inside STORAGE_ROOT (no traversal).
+ * Use case: saveFile, readStoredFile and deleteStoredFile.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function resolveStorageKey(key: string): string {
   if (
@@ -49,7 +63,7 @@ export function resolveStorageKey(key: string): string {
     throw new InvalidStorageKeyError();
   }
   // Belt and braces: the pattern already rules out traversal.
-  const root = getEnv().storageRoot;
+  const root     = getEnv().storageRoot;
   const resolved = path.resolve(root, key);
   const relative = path.relative(root, resolved);
   if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
@@ -58,16 +72,32 @@ export function resolveStorageKey(key: string): string {
   return resolved;
 }
 
+/**
+ * Description: Tell whether a filesystem error means "the file does not exist".
+ * Input: Any thrown value.
+ * Output: True for ENOENT.
+ * Use case: readStoredFile and deleteStoredFile.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function isMissingFile(error: unknown): boolean {
   return (error as NodeJS.ErrnoException | null)?.code === "ENOENT";
 }
 
 /**
- * Writes a file atomically: to a temporary file in the same directory, then
- * renamed over the target, so a reader never sees a partial file.
+ * Description: Write a stored file atomically.
+ * Input: The storage key and the bytes.
+ * Output: Nothing. The bytes go to a temporary file in the same directory, which is
+ *   then renamed over the target, so a reader never sees a partial file; the
+ *   temporary file is removed on failure.
+ * Use case: storeProfileImage.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function saveFile(key: string, bytes: Uint8Array): Promise<void> {
-  const target = resolveStorageKey(key);
+  const target    = resolveStorageKey(key);
   const directory = path.dirname(target);
   await mkdir(directory, { recursive: true });
 
@@ -81,7 +111,15 @@ export async function saveFile(key: string, bytes: Uint8Array): Promise<void> {
   }
 }
 
-/** The file's contents, or null when it does not exist. */
+/**
+ * Description: Read a stored file.
+ * Input: The storage key.
+ * Output: The file's contents, or null when it does not exist.
+ * Use case: readProfileImage (the avatar route).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export async function readStoredFile(key: string): Promise<Buffer | null> {
   const target = resolveStorageKey(key);
   try {
@@ -92,7 +130,15 @@ export async function readStoredFile(key: string): Promise<Buffer | null> {
   }
 }
 
-/** Deletes the file; a file that is already gone is not an error. */
+/**
+ * Description: Delete a stored file.
+ * Input: The storage key.
+ * Output: Nothing; a file that is already gone is not an error.
+ * Use case: Replacing or removing a profile image, and cleanup after a failed save.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export async function deleteStoredFile(key: string): Promise<void> {
   const target = resolveStorageKey(key);
   try {

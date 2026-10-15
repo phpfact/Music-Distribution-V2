@@ -22,7 +22,8 @@ type PageHeaderProps = {
  * Output: A `<header>` with the page's only `<h1>`.
  * Use case: Tenant directory, create and edit pages, so every page starts the same way.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 export function PageHeader({
   backHref,

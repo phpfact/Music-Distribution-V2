@@ -31,22 +31,23 @@ type TenantToolbarProps = {
 };
 
 /**
- * Search and status filter of the tenant list. Their state lives in the URL,
- * so it survives a reload and the Back button; every change starts at page 1.
- *
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Render the directory's search box and status filter.
+ * Input: The search and status the page was rendered with.
+ * Output: A search input (debounced, with a loading spinner) and a status select
+ *   (five fixed options, so no search inside the select) plus Clear. Their
+ *   state lives in the URL: it survives a reload and Back; every change starts at page 1.
+ * Use case: The tenant directory card.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function TenantToolbar({ q, status }: TenantToolbarProps) {
   const searchParams = useSearchParams();
   const { pending, navigate } = useListTransition();
   const [search, setSearch] = useState(q);
   const [renderedQ, setRenderedQ] = useState(q);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const id = useId();
+  const timer    = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const id       = useId();
   const searchId = `${id}-search`;
   const statusId = `${id}-status`;
 
@@ -65,13 +66,13 @@ export function TenantToolbar({ q, status }: TenantToolbarProps) {
   );
 
   /**
-   * Description: Update the search draft and debounce the existing URL navigation.
-   *
-   * Input: The existing typed arguments and component state.
-   * Output: The existing helper result or state update.
-   * Use case: Tenant management’s existing owner workflow.
+   * Description: Update the search draft and navigate after a short pause.
+   * Input: The typed text.
+   * Output: The input updates at once; the URL changes 300 ms after typing stops.
+   * Use case: The search input's onChange.
    * Author: Mr. Sachin Sharma
-   * Created: 2026-10-14. Last modified: 2026-10-15.
+   * Created: 2026-10-14
+   * Last modified: 2026-10-15
    */
   function onSearchChange(value: string) {
     setSearch(value);
@@ -83,13 +84,13 @@ export function TenantToolbar({ q, status }: TenantToolbarProps) {
   }
 
   /**
-   * Description: Navigate with the selected status and current pending search draft.
-   *
-   * Input: The existing typed arguments and component state.
-   * Output: The existing helper result or state update.
-   * Use case: Tenant management’s existing owner workflow.
+   * Description: Apply a new status filter together with any pending search text.
+   * Input: The selected status.
+   * Output: The list URL with the new status (page 1).
+   * Use case: The status select's onChange.
    * Author: Mr. Sachin Sharma
-   * Created: 2026-10-14. Last modified: 2026-10-15.
+   * Created: 2026-10-14
+   * Last modified: 2026-10-15
    */
   function onStatusChange(value: string) {
     // Pending keystrokes go along with the new status rather than after it.
@@ -103,13 +104,13 @@ export function TenantToolbar({ q, status }: TenantToolbarProps) {
   }
 
   /**
-   * Description: Cancel deferred searching and reset the URL filters to page one.
-   *
-   * Input: The existing typed arguments and component state.
-   * Output: The existing helper result or state update.
-   * Use case: Tenant management’s existing owner workflow.
+   * Description: Reset the search and the status filter.
+   * Input: None.
+   * Output: The list URL without filters (page 1); any pending search is cancelled.
+   * Use case: The Clear button.
    * Author: Mr. Sachin Sharma
-   * Created: 2026-10-14. Last modified: 2026-10-15.
+   * Created: 2026-10-14
+   * Last modified: 2026-10-15
    */
   function clearFilters() {
     if (timer.current) clearTimeout(timer.current);

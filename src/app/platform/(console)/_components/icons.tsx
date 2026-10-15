@@ -286,7 +286,16 @@ type IconProps = {
   className?: string;
 };
 
-/** A decorative outline icon; the surrounding element carries the accessible name. */
+/**
+ * Description: Render one decorative outline icon from the console's icon set.
+ * Input: The icon name and optional classes.
+ * Output: An aria-hidden SVG in the current text colour; the surrounding element
+ *   carries the accessible name.
+ * Use case: Every console screen.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function Icon({ name, className }: IconProps) {
   return (
     <svg

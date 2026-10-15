@@ -24,15 +24,16 @@ type ConsoleShellProps = {
  * Output: responsive navigation and content using the resolved account width.
  * Use case: preserve layout preferences and accessible mobile navigation.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function ConsoleShell({ username, initialCollapsed, children }: ConsoleShellProps) {
   const [collapsed, setCollapsed] = useState(initialCollapsed);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const menuToggleRef = useRef<HTMLButtonElement>(null);
-  const pathname = usePathname();
+  const pathname      = usePathname();
   const [drawerPath, setDrawerPath] = useState(pathname);
-  const asideId = useId();
+  const asideId  = useId();
   const drawerId = useId();
 
   // Like ThemeRoot's identity reconciliation, reset during render so even
@@ -51,7 +52,8 @@ export function ConsoleShell({ username, initialCollapsed, children }: ConsoleSh
      * Output: closes the Sheet when the viewport reaches the desktop breakpoint.
      * Use case: prevent an invisible mobile trigger from leaving a modal open.
      * Author: Mr. Sachin Sharma
-     * Created: 2026-10-15. Last modified: 2026-10-15.
+     * Created: 2026-10-15
+     * Last modified: 2026-10-15
      */
     function onChange(event: MediaQueryListEvent) {
       if (event.matches) setDrawerOpen(false);
@@ -67,7 +69,8 @@ export function ConsoleShell({ username, initialCollapsed, children }: ConsoleSh
    * Output: updated sidebar width and the established preference cookie.
    * Use case: keep first-paint sidebar width consistent across navigation/reloads.
    * Author: Mr. Sachin Sharma
-   * Created: 2026-10-15. Last modified: 2026-10-15.
+   * Created: 2026-10-15
+   * Last modified: 2026-10-15
    */
   function toggleCollapsed() {
     const next = !collapsed;

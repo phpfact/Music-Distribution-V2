@@ -13,6 +13,8 @@ import type {
   PreviewResult,
   PreviewValues,
 } from "@/lib/tenants/service";
+import type { TenantCountSource } from "@/lib/tenants/rules";
+import type { TenantStatus } from "./labels";
 import type {
   CredentialResult,
   DomainCheckResult,
@@ -96,3 +98,31 @@ export type DatabasePasswordActionResult = CredentialResult;
 
 /** "Check DNS" for the custom domain and the subdomain re-check. */
 export type DomainCheckActionResult = DomainCheckResult;
+
+// ---------------------------------------------------------------------------
+// Count details (actions.ts: loadTenantCountRecordsAction)
+
+export type { TenantCountSource };
+
+/** One tenant in a count-details list: only what the list shows, no contact data or credentials. */
+export type TenantCountRecord = {
+  id: string;
+  name: string;
+  status: TenantStatus;
+  /** ISO 8601. */
+  createdAt: string;
+};
+
+/** One page of the tenants behind a count, or a safe failure message. */
+export type TenantCountRecordsResult =
+  | {
+      ok: true;
+      rows: TenantCountRecord[];
+      total: number;
+      /** The page served (1-based). */
+      page: number;
+      /** At least 1. */
+      pageCount: number;
+      pageSize: number;
+    }
+  | { ok: false; message: string };

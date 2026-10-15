@@ -10,7 +10,8 @@ import { Tooltip as TooltipPrimitive } from "radix-ui";
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent tooltip provider behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function TooltipProvider({
   delayDuration = 0,
@@ -30,7 +31,8 @@ function TooltipProvider({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent tooltip behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function Tooltip({
   ...props
@@ -43,7 +45,8 @@ function Tooltip({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent tooltip trigger behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function TooltipTrigger({
   ...props
@@ -56,7 +59,8 @@ function TooltipTrigger({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent tooltip content behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function TooltipContent({
   className,

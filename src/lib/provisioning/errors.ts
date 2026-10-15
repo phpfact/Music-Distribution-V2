@@ -35,6 +35,15 @@ const TRANSIENT_CODES: ReadonlySet<ProvisioningErrorCode> = new Set([
   "internal",
 ]);
 
+/**
+ * Description: Fit a safe message into its stored length.
+ * Input: The text.
+ * Output: The text, cut with an ellipsis when longer than SAFE_MESSAGE_MAX_LENGTH.
+ * Use case: ProvisioningError construction.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function clip(text: string): string {
   return text.length <= SAFE_MESSAGE_MAX_LENGTH
     ? text
@@ -75,8 +84,17 @@ const NETWORK_CODES = new Set([
 ]);
 // Server states that refuse new work: shutting down, starting up, full.
 const UNAVAILABLE_SQLSTATES = new Set(["57P01", "57P02", "57P03", "53300"]);
-const SQLSTATE_PATTERN = /^[0-9A-Z]{5}$/;
+const SQLSTATE_PATTERN      = /^[0-9A-Z]{5}$/;
 
+/**
+ * Description: Read the code of a thrown error (errno or SQLSTATE).
+ * Input: Any thrown value.
+ * Output: The code text, or undefined.
+ * Use case: sqlState, classifyError and describeForLog.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function errorCode(error: unknown): string | undefined {
   if (typeof error === "object" && error !== null && "code" in error) {
     const code = (error as { code: unknown }).code;
@@ -85,12 +103,30 @@ function errorCode(error: unknown): string | undefined {
   return undefined;
 }
 
-/** The SQLSTATE of a PostgreSQL error, if it is one. */
+/**
+ * Description: Read the SQLSTATE of a PostgreSQL error.
+ * Input: Any thrown value.
+ * Output: The five-character SQLSTATE, or undefined for network and other errors.
+ * Use case: Error classification and unique-violation handling.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function sqlState(error: unknown): string | undefined {
   const code = errorCode(error);
   return code && !NETWORK_CODES.has(code) && SQLSTATE_PATTERN.test(code) ? code : undefined;
 }
 
+/**
+ * Description: Classify an error into a provisioning error code.
+ * Input: Any thrown value.
+ * Output: unreachable, auth_failed, database_missing, permission_denied,
+ *   resource_conflict or internal (from errno codes, SQLSTATEs and pg's own messages).
+ * Use case: connectionError, stepError and migration failures.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function classifyError(error: unknown): ProvisioningErrorCode {
   if (error instanceof ProvisioningError) return error.code;
   const code = errorCode(error);
@@ -124,18 +160,35 @@ export type ConnectionContext = {
   port: number;
 };
 
+/**
+ * Description: Describe which login a failed connection used.
+ * Input: The connection context.
+ * Output: "the platform's administrative login (…)" or "the database user …".
+ * Use case: connectionError messages.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function whoConnects(context: ConnectionContext): string {
   return context.login === "admin"
     ? `the platform's administrative login ("${context.user}")`
     : `the database user "${context.user}"`;
 }
 
-/** A failed connection attempt, explained without the error's own text. */
+/**
+ * Description: Explain a failed connection attempt without the error's own text.
+ * Input: The error and the connection context.
+ * Output: A ProvisioningError with a message telling the owner what to check.
+ * Use case: connect (admin.ts).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function connectionError(error: unknown, context: ConnectionContext): ProvisioningError {
   if (error instanceof ProvisioningError) return error;
-  const code = classifyError(error);
-  const who = whoConnects(context);
-  const where = `database "${context.database}"`;
+  const code    = classifyError(error);
+  const who     = whoConnects(context);
+  const where   = `database "${context.database}"`;
   const options = { cause: error };
   switch (code) {
     case "auth_failed":
@@ -172,12 +225,18 @@ export function connectionError(error: unknown, context: ConnectionContext): Pro
 }
 
 /**
- * An error raised while a step was running. A ProvisioningError is kept as
- * is; anything else gets a generic message naming what was being done.
+ * Description: Wrap an error raised while a provisioning step was running.
+ * Input: The error and what the step was doing.
+ * Output: The ProvisioningError as is, or a new one with a generic message naming
+ *   the activity (the details go to the log).
+ * Use case: Every provisioning step.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function stepError(error: unknown, activity: string): ProvisioningError {
   if (error instanceof ProvisioningError) return error;
-  const code = classifyError(error);
+  const code    = classifyError(error);
   const options = { cause: error };
   switch (code) {
     case "unreachable":
@@ -214,6 +273,15 @@ export function stepError(error: unknown, activity: string): ProvisioningError {
   }
 }
 
+/**
+ * Description: Upper-case the first character of a text.
+ * Input: The text.
+ * Output: The text with its first character upper-cased.
+ * Use case: stepError messages.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
@@ -231,8 +299,14 @@ const REDACTIONS: [RegExp, string][] = [
 ];
 
 /**
- * Removes connection strings, password-like values, verifiers, hashes and
- * every value in `secrets` from a text meant for the log.
+ * Description: Remove credentials from a text meant for the log.
+ * Input: The text and known secret values.
+ * Output: The text without connection strings, password-like values, verifiers,
+ *   hashes and every given secret (longest first).
+ * Use case: describeForLog and the runner's log lines.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function redact(text: string, secrets: readonly string[] = []): string {
   let result = text;
@@ -245,12 +319,17 @@ export function redact(text: string, secrets: readonly string[] = []): string {
 }
 
 /**
- * One line for the log: the error's own message (and its SQLSTATE or errno
- * code), then the cause chain, all redacted.
+ * Description: Describe an error and its cause chain on one redacted log line.
+ * Input: The error and known secret values.
+ * Output: The error's message with its code, then the causes (bounded walk), all redacted.
+ * Use case: The runner and step error logging.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function describeForLog(error: unknown, secrets: readonly string[] = []): string {
   const parts: string[] = [];
-  let current: unknown = error;
+  let current: unknown  = error;
   // A bounded walk: a cause chain could in theory be cyclic.
   for (let depth = 0; current !== undefined && current !== null && depth < 4; depth += 1) {
     const message = current instanceof Error ? current.message : String(current);

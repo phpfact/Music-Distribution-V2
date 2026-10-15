@@ -1,3 +1,5 @@
+import { UUID_PATTERN } from "@/lib/uuid";
+
 /**
  * Whitelisted, account-bound feedback carried across a successful reload.
  * Input: known save/reset codes and the authenticated owner identity.
@@ -11,7 +13,7 @@ export const APPEARANCE_NOTICES = {
   "appearance-personal-applied": "Your appearance is saved. Only your account was updated.",
   "appearance-global-applied": "The platform default and your appearance are saved. Other accounts’ personal overrides are preserved.",
   "appearance-personal-reset": "Your personal override was removed. You now use the platform default.",
-  "appearance-global-reset": "The platform default was reset to Light, Emerald, and Default Width. All personal overrides are preserved.",
+  "appearance-global-reset": "The platform default was reset to Light, Neutral, and Default Width. All personal overrides are preserved.",
 } as const;
 
 export type AppearanceNoticeCode = keyof typeof APPEARANCE_NOTICES;
@@ -22,7 +24,6 @@ export type AppearanceFeedback = {
 };
 
 type NoticeParams = Record<string, string | string[] | undefined>;
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Select a notice only after its owner matches the server-authenticated account.
@@ -34,7 +35,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
  * Last modified: 2026-10-14
  */
 export function appearanceFeedback(params: NoticeParams, authenticatedOwnerId: string): AppearanceFeedback | null {
-  const code = params.notice;
+  const code    = params.notice;
   const ownerId = params.noticeOwner;
   if (typeof code !== "string" || !Object.hasOwn(APPEARANCE_NOTICES, code)) return null;
   if (typeof ownerId !== "string" || !UUID_PATTERN.test(ownerId)) return null;

@@ -9,6 +9,12 @@ import {
   NativeSelectOption,
 } from "@/components/ui/native-select";
 import { Field, describedBy } from "@/app/platform/(console)/_components/field";
+import { CountDetails } from "@/app/platform/(console)/_components/count-details";
+import { EmptyState } from "@/app/platform/(console)/_components/empty-state";
+import { SectionedLayout } from "@/app/platform/(console)/_components/secondary-menu";
+import { SensitiveInput } from "@/app/platform/(console)/_components/sensitive-input";
+import { SensitiveValue } from "@/app/platform/(console)/_components/sensitive-value";
+import { StatCard } from "@/app/platform/(console)/_components/stat-card";
 import { Notice } from "@/app/platform/(console)/_components/notice";
 import { Spinner } from "@/app/platform/(console)/_components/spinner";
 import {
@@ -199,5 +205,96 @@ describe("tenant labels", () => {
       for (const label of Object.values(labels))
         expect(label.trim()).not.toBe("");
     }
+  });
+});
+
+// CLAUDE.md compliance contracts (2026-10-15): secondary menu, masking,
+// clickable counts and the shared empty state.
+describe("CLAUDE.md shared components", () => {
+  it("renders the secondary menu as in-page links in section order", () => {
+    const layoutProps = {
+      items: [
+        { id: "personal", label: "Personal Information" },
+        { id: "login", label: "Login Information" },
+      ],
+      label: "Form sections",
+      children: createElement("section", { id: "personal" }, "A"),
+    };
+    const html = renderToStaticMarkup(createElement(SectionedLayout, layoutProps));
+    expect(html).toContain('aria-label="Form sections"');
+    expect(html.indexOf('href="#personal"')).toBeLessThan(html.indexOf('href="#login"'));
+    // The first section is active before the browser measures anything.
+    expect(html).toMatch(/aria-current="location"[^>]*>[^<]*Personal Information|href="#personal"[^>]*aria-current="location"/);
+  });
+
+  it("masks a sensitive value by default and never puts it in the markup", () => {
+    const html = renderToStaticMarkup(
+      createElement(SensitiveValue, { value: "owner@example.com", noun: "email", monospace: false }),
+    );
+    expect(html).not.toContain("owner@example.com");
+    expect(html).toContain('aria-label="Show email"');
+    expect(html).toContain('aria-pressed="false"');
+  });
+
+  it("masks a sensitive input with CSS while keeping its value and text type", () => {
+    const html = renderToStaticMarkup(
+      createElement(SensitiveInput, { id: "phone", noun: "phone number", defaultValue: "9876543210" }),
+    );
+    expect(html).toContain('type="text"');
+    expect(html).toContain("[-webkit-text-security:disc]");
+    expect(html).toContain('aria-label="Show phone number"');
+  });
+
+  it("makes a count a button that opens its details", () => {
+    const countProps = {
+      label: "Active tenants: 5. Show the records behind this figure.",
+      title: "Active tenants",
+      calculation: "Tenants whose status is Active.",
+      records: createElement("p", null, "records"),
+      children: "5",
+    };
+    const html = renderToStaticMarkup(createElement(CountDetails, countProps));
+    expect(html).toContain("<button");
+    expect(html).toContain('aria-haspopup="dialog"');
+    expect(html).toContain('aria-label="Active tenants: 5. Show the records behind this figure."');
+    // The records mount only when the dialog opens.
+    expect(html).not.toContain("records</p>");
+  });
+
+  it("shows a summary figure as a count button only when it has details", () => {
+    const withDetails = renderToStaticMarkup(
+      createElement(
+        "dl",
+        null,
+        createElement(StatCard, {
+          label: "Total tenants",
+          icon: "building-2",
+          value: 1234,
+          details: { title: "All tenants", calculation: "All of them.", records: null },
+        }),
+      ),
+    );
+    expect(withDetails).toContain("<button");
+    expect(withDetails).toContain("1,234");
+    const withoutFigure = renderToStaticMarkup(
+      createElement("dl", null, createElement(StatCard, { label: "Plans", icon: "credit-card", value: null })),
+    );
+    expect(withoutFigure).not.toContain("<button");
+    expect(withoutFigure).toContain("No data");
+  });
+
+  it("renders an empty state with illustration, heading, description and action", () => {
+    const html = renderToStaticMarkup(
+      createElement(EmptyState, {
+        icon: "building-2",
+        title: "No tenants yet",
+        description: "Create the first tenant.",
+        action: createElement("a", { href: "/platform/tenants/new" }, "Create tenant"),
+      }),
+    );
+    expect(html).toContain("<svg");
+    expect(html).toContain("No tenants yet");
+    expect(html).toContain("Create the first tenant.");
+    expect(html).toContain('href="/platform/tenants/new"');
   });
 });

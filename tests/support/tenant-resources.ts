@@ -33,6 +33,24 @@ export function randomLabel(length = 6): string {
   return text;
 }
 
+const LOWER_LETTERS = "abcdefghijklmnopqrstuvwxyz";
+
+/**
+ * Random lower-case letters: tenant full names allow letters, spaces and
+ * . ' - & only (no digits), so names built for tests use this, not randomLabel.
+ */
+export function randomLetters(length = 6): string {
+  let text = "";
+  for (let i = 0; i < length; i += 1) text += LOWER_LETTERS[randomInt(LOWER_LETTERS.length)];
+  return text;
+}
+
+/** A valid tenant full name for a test: "Test <label as words> <random letters>". */
+export function testTenantName(label: string): string {
+  const words = label.replace(/[^a-z]+/gi, " ").trim();
+  return `Test ${words} ${randomLetters(6)}`;
+}
+
 /** `t_test_<label>_<random>` and `<that>_app`. */
 export function testIdentifiers(label: string): { database: string; user: string } {
   const database = `t_test_${label}_${randomLabel()}`;

@@ -27,15 +27,32 @@ const FORM_ERRORS = {
 } as const;
 
 /**
- * Signs a platform owner in. A Server Action is a public HTTP endpoint, so
- * nothing here relies on the form: every check is made on the server, in
- * authenticatePlatformOwner. The destination is fixed; no return URL is read.
+ * Description: Sign a platform owner in.
+ * Input: The previous form state (unused) and the submitted FormData
+ *   (username, password; untrusted).
+ * Output: On success a session cookie and a redirect to the dashboard (never
+ *   returns); otherwise the form state with field errors or a form error and
+ *   the submitted username (never the password).
+ * Use case: The sign-in form. A Server Action is a public HTTP endpoint, so
+ *   nothing here relies on the form: every check is made on the server, in
+ *   authenticatePlatformOwner. The destination is fixed; no return URL is read.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function loginAction(
   _previousState: LoginFormState,
   formData: FormData,
 ): Promise<LoginFormState> {
-  // The arguments come from the request, so their types are not guaranteed.
+  /**
+   * Description: Read one submitted field without trusting its type.
+   * Input: The field name.
+   * Output: The raw value, or null when the argument is not FormData.
+   * Use case: loginAction.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-10-14
+   * Last modified: 2026-10-15
+   */
   const field = (name: string): unknown =>
     formData instanceof FormData ? formData.get(name) : null;
   const submittedUsername = field("username");

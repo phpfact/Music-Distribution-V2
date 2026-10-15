@@ -40,6 +40,15 @@ export type DatabaseCheck = {
 /** A check with the error code a failure maps to (for the provisioning step). */
 export type DetailedDatabaseCheck = DatabaseCheck & { code?: ProvisioningErrorCode };
 
+/**
+ * Description: Build a passed check.
+ * Input: The check id, label and message.
+ * Output: The check with status "pass".
+ * Use case: Every existing-database check.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 const pass = (id: string, label: string, message: string): DetailedDatabaseCheck => ({
   id,
   label,
@@ -47,6 +56,15 @@ const pass = (id: string, label: string, message: string): DetailedDatabaseCheck
   message,
 });
 
+/**
+ * Description: Build a check that passed with a warning (does not block).
+ * Input: The check id, label and message.
+ * Output: The check with status "warn".
+ * Use case: checkRole (CREATEDB/CREATEROLE).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 const warn = (id: string, label: string, message: string): DetailedDatabaseCheck => ({
   id,
   label,
@@ -54,6 +72,15 @@ const warn = (id: string, label: string, message: string): DetailedDatabaseCheck
   message,
 });
 
+/**
+ * Description: Build a failed check with the error code its failure maps to.
+ * Input: The check id, label, provisioning error code and message.
+ * Output: The check with status "fail".
+ * Use case: Every existing-database check.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 const fail = (
   id: string,
   label: string,
@@ -61,7 +88,15 @@ const fail = (
   message: string,
 ): DetailedDatabaseCheck => ({ id, label, status: "fail", message, code });
 
-/** A failed lookup, reported on the check that needed it. The detail goes to the log only. */
+/**
+ * Description: Report a lookup that could not be made on the check that needed it.
+ * Input: The check id and label, the error and the secrets to redact.
+ * Output: A failed check with a safe message; the detail goes to the log only.
+ * Use case: Every check's error path.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function failedLookup(
   id: string,
   label: string,
@@ -76,6 +111,15 @@ function failedLookup(
 // ---------------------------------------------------------------------------
 // 0. The input itself
 
+/**
+ * Description: Validate the connection details before anything is sent to PostgreSQL.
+ * Input: The login (database, user, password, port).
+ * Output: A failed "Connection details" check, or null when the input is valid.
+ * Use case: runDatabaseChecks.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function validateInput(login: DatabaseLogin): DetailedDatabaseCheck | null {
   const { postgres } = getEnv();
   const label = "Connection details";
@@ -101,8 +145,17 @@ function validateInput(login: DatabaseLogin): DetailedDatabaseCheck | null {
 // ---------------------------------------------------------------------------
 // 1. Sign in as the supplied role
 
+/**
+ * Description: Check 1: sign in with the supplied role.
+ * Input: The login and the secrets to redact.
+ * Output: pass when SELECT 1 works as that role; otherwise the safe failure.
+ * Use case: runDatabaseChecks.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function checkConnection(login: DatabaseLogin, secrets: readonly string[]) {
-  const id = "connection";
+  const id    = "connection";
   const label = `Sign in as ${login.user}`;
   try {
     await withLoginClient(login, async (client) => {
@@ -117,8 +170,19 @@ async function checkConnection(login: DatabaseLogin, secrets: readonly string[])
 // ---------------------------------------------------------------------------
 // 2. The role's attributes
 
+/**
+ * Description: Check 2: the role's attributes.
+ * Input: The login and the secrets to redact.
+ * Output: fail for the administrative login, an unknown role, a superuser or
+ *   BYPASSRLS; warn for CREATEDB/CREATEROLE; pass otherwise (the tenant's login
+ *   must not reach other tenants' data).
+ * Use case: runDatabaseChecks.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function checkRole(login: DatabaseLogin, secrets: readonly string[]) {
-  const id = "role";
+  const id    = "role";
   const label = "Database user privileges";
   if (login.user === adminLoginName()) {
     return fail(
@@ -160,12 +224,21 @@ async function checkRole(login: DatabaseLogin, secrets: readonly string[]) {
 // ---------------------------------------------------------------------------
 // 3. Not used by another tenant
 
+/**
+ * Description: Check 3: the database and user are not used by another tenant.
+ * Input: The login, the tenant being checked (its own row is ignored) and the secrets.
+ * Output: pass, or fail naming the name that another tenant uses.
+ * Use case: runDatabaseChecks.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function checkAvailability(
   login: DatabaseLogin,
   excludeTenantId: string | undefined,
   secrets: readonly string[],
 ) {
-  const id = "availability";
+  const id    = "availability";
   const label = "Not used by another tenant";
   try {
     const others = await getControlDb().tenant.findMany({
@@ -194,9 +267,19 @@ async function checkAvailability(
 const NOT_OURS =
   "The database is not empty and does not hold this platform's schema. It will not be modified: choose an empty database.";
 
+/**
+ * Description: Judge what the database already contains.
+ * Input: An open administrative client on the database.
+ * Output: pass for an empty database or one holding this platform's schema; fail
+ *   otherwise (nothing in it is ever modified or deleted).
+ * Use case: checkContents.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function inspectContents(client: Client) {
-  const id = "contents";
-  const label = "Database contents";
+  const id        = "contents";
+  const label     = "Database contents";
   const relations = await userRelations(client);
   if (relations.length === 0) {
     return pass(id, label, "The database is empty. The schema will be installed.");
@@ -223,6 +306,15 @@ async function inspectContents(client: Client) {
   );
 }
 
+/**
+ * Description: Check 4: what the database already contains.
+ * Input: The login and the secrets to redact.
+ * Output: inspectContents' verdict, or the safe failure when it cannot be read.
+ * Use case: runDatabaseChecks.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function checkContents(login: DatabaseLogin, secrets: readonly string[]) {
   try {
     return await withAdminClient(login.database, login.port, inspectContents);
@@ -234,10 +326,19 @@ async function checkContents(login: DatabaseLogin, secrets: readonly string[]) {
 // ---------------------------------------------------------------------------
 // 5. The administrative login can install the schema
 
+/**
+ * Description: Check 5: the platform can install and update the schema in the database.
+ * Input: The login and the secrets to redact.
+ * Output: pass, or fail with the exact GRANT statements the database owner must run.
+ * Use case: runDatabaseChecks.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function checkAdminAccess(login: DatabaseLogin, secrets: readonly string[]) {
-  const id = "admin_access";
-  const label = "Platform access for schema changes";
-  const admin = escapeIdentifier(adminLoginName());
+  const id       = "admin_access";
+  const label    = "Platform access for schema changes";
+  const admin    = escapeIdentifier(adminLoginName());
   const database = escapeIdentifier(login.database);
   try {
     return await withAdminClient(login.database, login.port, async (client) => {
@@ -282,7 +383,17 @@ async function checkAdminAccess(login: DatabaseLogin, secrets: readonly string[]
 
 // ---------------------------------------------------------------------------
 
-/** Every check with the code its failure maps to. */
+/**
+ * Description: Run every existing-database check (§6.4) side by side.
+ * Input: The login and the tenant being checked (optional).
+ * Output: Each check with its status and the code its failure maps to; an invalid
+ *   input gives only the input check. Running them together means an unreachable
+ *   server costs one connect timeout, not five.
+ * Use case: checkExistingDatabase and the check_database provisioning step.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export async function runDatabaseChecks(
   login: DatabaseLogin,
   options: { excludeTenantId?: string } = {},
@@ -302,9 +413,13 @@ export async function runDatabaseChecks(
 }
 
 /**
- * The §6.4 checks for attaching an existing database. `ok` is false when any
- * check fails; warnings do not block. `excludeTenantId` is the tenant being
- * checked itself, whose own row holds the same names.
+ * Description: Decide whether an existing database may be attached (§6.4).
+ * Input: The login and the tenant being checked (its own row holds the same names).
+ * Output: ok (false when any check fails; warnings do not block) and the checks for the owner.
+ * Use case: Create with an existing database and Test connection.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function checkExistingDatabase(
   login: DatabaseLogin,

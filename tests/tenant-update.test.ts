@@ -45,6 +45,8 @@ import {
   insertProvisioningTenant,
   postgresPort,
   randomLabel,
+  randomLetters,
+  testTenantName,
   TenantResources,
   testIdentifiers,
 } from "./support/tenant-resources";
@@ -160,8 +162,8 @@ function manualInput(label: string, overrides: Partial<CreateTenantInput> = {}):
   const token = randomLabel(6);
   const names = testIdentifiers(label);
   const input: CreateTenantInput = {
-    fullName: `Test ${label} ${token}`,
-    phone: "+44 20 7946 0958",
+    fullName: testTenantName(label),
+    phone: "9876543210",
     username: `test-${label}-${token}`,
     email: `test-${label}-${token}@example.com`,
     masterPassword: `Mp-${randomBytes(12).toString("base64url")}`,
@@ -294,7 +296,7 @@ describe("getTenantForEdit", () => {
       id,
       status: "pending",
       fullName: input.fullName,
-      phone: "+442079460958",
+      phone: "9876543210",
       email: input.email,
       username: input.username,
       subdomain: input.subdomain,
@@ -315,13 +317,13 @@ describe("updateTenantProfile", () => {
   it("writes only the changed fields and audits their names, never their values", async () => {
     const id = await createOk(manualInput("edit"));
     const before = await tenantRow(id);
-    const newName = `Test Renamed ${randomLabel(6)}`;
+    const newName = `Test Renamed ${randomLetters(6)}`;
 
-    const result = await update(id, { fullName: `  ${newName}  `, phone: "+1 (555) 010-9999" });
+    const result = await update(id, { fullName: `  ${newName}  `, phone: "  9123456780 " });
     expect(result).toStrictEqual({ ok: true, tenantId: id, changed: ["fullName", "phone"], dnsPending: false });
 
     const after = await tenantRow(id);
-    expect(after).toStrictEqual({ ...before, name: newName, phone: "+15550109999" });
+    expect(after).toStrictEqual({ ...before, name: newName, phone: "9123456780" });
     const events = await auditEvents(id, "tenant.updated");
     expect(events).toHaveLength(1);
     expect(events[0]?.metadata).toStrictEqual({ fields: ["fullName", "phone"] });

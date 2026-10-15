@@ -24,7 +24,8 @@ type AvatarProps = {
  * Output: the shared shadcn Avatar with the active account accent.
  * Use case: identify tenants and account owners beside their visible names.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 export function Avatar({ name, src, size = "md" }: AvatarProps) {
   return (

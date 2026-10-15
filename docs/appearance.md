@@ -4,11 +4,13 @@ Settings → Appearance persists settings in the control-plane PostgreSQL databa
 Personal overrides belong to `platform_owner_appearances.owner_id`, the authenticated
 Platform Owner identity, with a unique primary key and cascading owner foreign key.
 The separate `platform_appearance` table permits only the singleton `platform` row.
-The supported themes are Light, Dark, and System; accents are Emerald, Indigo,
-Violet, Blue, Rose, and Amber. Width presets are Default Width (96rem console
-cap), Full Width (all available content space), and Focused Width (72rem cap).
-The designated application default is Light/Emerald/Default Width. Mobile gutters
-and navigation remain responsive regardless of the chosen width. Shared presets
+The supported themes are Light, Dark, and System; accents are Neutral (shadcn's
+black-and-white primary), Emerald, Indigo, Violet, Blue, Rose, and Amber. Width
+presets are Default Width (96rem console cap), Full Width (all available content
+space), and Focused Width (72rem cap). The designated application default is
+Light/Neutral/Default Width (CLAUDE.md: shadcn's official neutral appearance by
+default; the base palette follows shadcn's neutral scale in light and dark).
+Mobile gutters and navigation remain responsive regardless of the chosen width. Shared presets
 live in `WIDTH_OPTIONS`; width is validated and persisted with theme and accent.
 No shared browser preference is an authoritative source for an owner's appearance.
 
@@ -24,7 +26,7 @@ none exists. Apply to All atomically changes the singleton platform default and
 updates only the initiating owner's existing personal override to the same complete
 selection. An initiating owner without an override continues to inherit the global
 default; no new personal row is created. Other owners' personal records are never
-changed. Default Theme to All writes Light/Emerald/Default Width as the global
+changed. Default Theme to All writes Light/Neutral/Default Width as the global
 default and preserves every personal override, including the initiating owner's. Login uses the
 global/application default because no authenticated personal identity exists yet.
 System follows the operating system only while the resolved theme is System.

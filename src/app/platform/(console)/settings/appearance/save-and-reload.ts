@@ -28,9 +28,9 @@ export type AppearanceSaveController = {
   hasCommitted: () => boolean;
 };
 
-const SAVE_ERROR = "We couldn’t save your appearance. Your selection is unchanged. Please try again.";
+const SAVE_ERROR     = "We couldn’t save your appearance. Your selection is unchanged. Please try again.";
 const RESPONSE_ERROR = "The save response could not be verified. Your selection is unchanged. Refresh the page before trying again.";
-const ACCOUNT_ERROR = "Your account has changed. Refresh the page before saving appearance settings.";
+const ACCOUNT_ERROR  = "Your account has changed. Refresh the page before saving appearance settings.";
 
 /**
  * Compare all persisted appearance fields without discarding content width.
@@ -82,8 +82,8 @@ export function validSavedAppearanceState(value: unknown, ownerId: string): Appe
   const state = value as Record<string, unknown>;
   if (state.ownerId !== ownerId || typeof state.canManageGlobal !== "boolean") return null;
   const appearance = parseAppearance(state.appearance);
-  const personal = state.personal === null ? null : parseAppearance(state.personal);
-  const global = state.global === null ? null : parseAppearance(state.global);
+  const personal   = state.personal === null ? null : parseAppearance(state.personal);
+  const global     = state.global === null ? null : parseAppearance(state.global);
   if (!appearance || (state.personal !== null && !personal) || (state.global !== null && !global)) return null;
   const resolved = resolveAppearance(personal, global);
   if (state.source !== resolved.source) return null;
@@ -108,7 +108,7 @@ export function validSavedAppearanceState(value: unknown, ownerId: string): Appe
  * Last modified: 2026-10-14
  */
 export function createAppearanceSaveController(dependencies: SaveDependencies): AppearanceSaveController {
-  let pending = false;
+  let pending   = false;
   let committed = false;
 
   /**

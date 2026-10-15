@@ -2,6 +2,7 @@ import "server-only";
 import { getControlDb } from "../db/control";
 import type { TenantDatabase } from "../db/tenant";
 import { readSecret, SecretDecryptionError, SecretNotFoundError } from "../secrets";
+import { UUID_PATTERN } from "@/lib/uuid";
 
 export type TenantDatabaseConfigProblem =
   /** No tenant with this id. */
@@ -26,12 +27,17 @@ export class TenantDatabaseConfigError extends Error {
   }
 }
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /**
- * Where a tenant's data lives and its runtime login, from the control plane and
- * the secret store. The result holds the plaintext password: pass it straight
- * to getTenantDb() and never return, log or serialize it.
+ * Description: Load where a tenant's data lives and its runtime login.
+ * Input: The tenant id.
+ * Output: Database, user, port and the decrypted password; throws
+ *   TenantDatabaseConfigError (not found, incomplete, secret unavailable). The
+ *   result holds the plaintext password: pass it straight to getTenantDb() and
+ *   never return, log or serialize it.
+ * Use case: Tenant admin updates and other tenant-database work.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function loadTenantDatabase(tenantId: string): Promise<TenantDatabase> {
   if (!UUID_PATTERN.test(tenantId)) {

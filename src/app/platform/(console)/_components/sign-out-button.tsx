@@ -12,7 +12,8 @@ import { Spinner } from "./spinner";
  * Output: a native submit button, optionally composed as a shadcn menu item.
  * Use case: preserve progressive sign-out and block repeat submissions.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 export function SignOutButton({ menuItem = false }: { menuItem?: boolean }) {
   const { pending } = useFormStatus();

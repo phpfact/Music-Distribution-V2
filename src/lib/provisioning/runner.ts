@@ -28,6 +28,7 @@ import {
   stepError,
 } from "./errors";
 import { provisioningPlan, STEP_ACTIVITY, STEPS, type StepContext } from "./steps";
+import { UUID_PATTERN } from "@/lib/uuid";
 
 export type ProvisioningActor =
   | { type: "super_admin"; ownerId: string; ipAddress: string | null }
@@ -45,13 +46,21 @@ export type ProvisioningOptions = {
   dnsResolver?: DnsResolver;
 };
 
-const LOCK_NAMESPACE = "md:tenant-provisioning";
+const LOCK_NAMESPACE     = "md:tenant-provisioning";
 const STARTABLE_STATUSES = ["pending", "failed", "provisioning"] as const;
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const INTERRUPTED_MESSAGE =
   "Setup was interrupted before it finished (the server stopped or lost its connection). Retry setup to continue.";
 
+/**
+ * Description: Write one provisioning progress line to the server log.
+ * Input: The tenant id, the attempt number and the text (no secrets).
+ * Output: Nothing.
+ * Use case: Every step of runLocked.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function log(tenantId: string, attempt: number, text: string): void {
   console.info(`[provisioning] tenant ${tenantId} attempt ${attempt} ${text}`);
 }
@@ -65,6 +74,15 @@ type ProvisioningLock = {
   release(): Promise<void>;
 };
 
+/**
+ * Description: Create a dedicated control-plane connection for an advisory lock.
+ * Input: None.
+ * Output: An unconnected pg Client (the lock lives as long as this session).
+ * Use case: tryLock.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function controlPlaneClient(): Client {
   const { postgres } = getEnv();
   const client = new Client({
@@ -82,8 +100,14 @@ function controlPlaneClient(): Client {
 }
 
 /**
- * Tries the tenant's lock on a new connection. Returns null when another
- * session holds it. The connection is closed again in that case.
+ * Description: Try to take the tenant's provisioning lock on a new connection.
+ * Input: The tenant id.
+ * Output: The lock (assertHeld/release), or null when another session holds it (the
+ *   connection is then closed again).
+ * Use case: runProvisioning and isProvisioningRunning.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 async function tryLock(tenantId: string): Promise<ProvisioningLock | null> {
   const { postgres } = getEnv();
@@ -137,7 +161,15 @@ async function tryLock(tenantId: string): Promise<ProvisioningLock | null> {
   };
 }
 
-/** Whether a run holds the tenant's lock right now (e.g. to offer "Retry" or not). */
+/**
+ * Description: Tell whether a run holds the tenant's lock right now.
+ * Input: The tenant id.
+ * Output: True while another session provisions the tenant.
+ * Use case: The details page (whether Retry setup is offered).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export async function isProvisioningRunning(tenantId: string): Promise<boolean> {
   const lock = await tryLock(tenantId);
   if (!lock) return true;
@@ -149,9 +181,15 @@ export async function isProvisioningRunning(tenantId: string): Promise<boolean> 
 // Running
 
 /**
- * Provisions (or continues provisioning) a tenant. Never throws for a failed
- * step: the outcome says what happened, and the run, the tenant row and the
- * audit log record it.
+ * Description: Provision (or continue provisioning) a tenant.
+ * Input: The tenant id, the actor and options (test hooks, DNS resolver).
+ * Output: The outcome: succeeded, failed (code and safe message) or invalid state.
+ *   Never throws for a failed step: the run, the tenant row and the audit log
+ *   record what happened. Only one run per tenant at a time (advisory lock).
+ * Use case: startProvisioning (after a create or a retry).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function runProvisioning(
   tenantId: string,
@@ -185,6 +223,17 @@ export async function runProvisioning(
 
 type RunRecord = { id: string; attempt: number };
 
+/**
+ * Description: Run the remaining steps of the tenant's plan while holding its lock.
+ * Input: The tenant id, the actor, the options and the held lock.
+ * Output: The outcome. Interrupted runs are closed first; finished steps are skipped;
+ *   each step is recorded after it succeeds; a failure closes the run as failed
+ *   with a safe message (details redacted in the log).
+ * Use case: runProvisioning.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function runLocked(
   tenantId: string,
   actor: ProvisioningActor,
@@ -283,7 +332,16 @@ async function runLocked(
   }
 }
 
-/** The tenant's database target, read and decrypted once, on first use. */
+/**
+ * Description: Read and decrypt the tenant's database target once, on first use.
+ * Input: The tenant id and the list collecting secrets to redact.
+ * Output: A loader returning the same target every time; configuration problems
+ *   become invalid-state ProvisioningErrors with safe messages.
+ * Use case: runLocked (steps that need the tenant database).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function lazyTarget(tenantId: string, secrets: string[]): () => Promise<TenantDatabase> {
   let loaded: Promise<TenantDatabase> | undefined;
   return () => {
@@ -310,8 +368,15 @@ function lazyTarget(tenantId: string, secrets: string[]): () => Promise<TenantDa
 }
 
 /**
- * Opens the run: attempt number, tenant `provisioning` and the audit event,
- * all or nothing. Returns null if the tenant left the startable states meanwhile.
+ * Description: Open a provisioning run.
+ * Input: The tenant id and the actor.
+ * Output: The run (id and attempt number), or null when the tenant left the
+ *   startable states meanwhile. Attempt number, status provisioning and the
+ *   audit event are written all or nothing.
+ * Use case: runLocked.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 async function startRun(tenantId: string, actor: ProvisioningActor): Promise<RunRecord | null> {
   return getControlDb().$transaction(async (tx) => {
@@ -344,6 +409,17 @@ async function startRun(tenantId: string, actor: ProvisioningActor): Promise<Run
   });
 }
 
+/**
+ * Description: Close a successful run and activate the tenant.
+ * Input: The tenant id, the run and the plan.
+ * Output: Nothing. In one transaction: every step must be recorded (never active
+ *   with a step missing), the run closes as succeeded, the tenant becomes active
+ *   and tenant.provisioned is audited.
+ * Use case: runLocked.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function finishSucceeded(
   tenantId: string,
   run: RunRecord,
@@ -393,6 +469,16 @@ async function finishSucceeded(
   });
 }
 
+/**
+ * Description: Close a failed run and mark the tenant failed.
+ * Input: The tenant id, the run, the failed step and the error.
+ * Output: Nothing. In one transaction: the run gets the step, code and safe message,
+ *   the tenant becomes failed with that reason and tenant.provisioning_failed is audited.
+ * Use case: runLocked.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function finishFailed(
   tenantId: string,
   run: RunRecord,

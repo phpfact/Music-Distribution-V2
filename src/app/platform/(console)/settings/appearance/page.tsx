@@ -15,7 +15,7 @@ export const metadata: Metadata = { title: "Appearance" };
  * Last modified: 2026-10-14
  */
 export default async function AppearancePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const session = await requirePlatformOwner();
+  const session  = await requirePlatformOwner();
   const feedback = appearanceFeedback(await searchParams, session.owner.id);
   return <AppearanceSettings initialFeedback={feedback} />;
 }

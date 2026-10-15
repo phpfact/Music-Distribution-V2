@@ -28,12 +28,13 @@ const STATUS: Record<
 };
 
 /**
- * Description: Summarize the existing database-connection checks without changing their result.
- * Input: The existing typed arguments and component state.
- * Output: The existing helper result or state update.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Summarize the existing-database checks in one sentence.
+ * Input: Whether all checks passed and the checks.
+ * Output: fail (cannot attach), warn (can attach, review warnings) or pass, with its text.
+ * Use case: ConnectionChecks.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 function overall(
   ok: boolean,
@@ -63,12 +64,13 @@ type ConnectionChecksProps = {
 };
 
 /**
- * The result of "Test connection" (or of the checks a failed create ran).
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Show the result of Test connection (or of a failed create's checks).
+ * Input: Whether the database can be attached and the checks.
+ * Output: A summary alert and every check with its status icon, label and message.
+ * Use case: The create form's Manual database section (existing database).
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function ConnectionChecks({ ok, checks }: ConnectionChecksProps) {
   const summary = overall(ok, checks);
@@ -104,12 +106,13 @@ export function ConnectionChecks({ ok, checks }: ConnectionChecksProps) {
 }
 
 /**
- * Description: Render the check state using its existing icon and semantic status tone.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Draw one check's status icon in its semantic colour.
+ * Input: The check status.
+ * Output: A small round pass/warn/fail icon.
+ * Use case: ConnectionChecks.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 function CheckIcon({ status }: { status: CheckStatus }) {
   const { icon, className } = STATUS[status];

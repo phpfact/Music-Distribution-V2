@@ -2,9 +2,14 @@ import "server-only";
 import { EnvValidationError, getEnv } from "./env";
 
 /**
- * Runs once when the Node.js server starts (see src/instrumentation.ts).
- * Refuses to start with missing or invalid configuration rather than failing
- * later on the first request that happens to need it.
+ * Description: Validate the configuration once when the server starts.
+ * Input: None.
+ * Output: Nothing; logs the non-secret summary, or throws so the server refuses to
+ *   start rather than failing on the first request that needs a value.
+ * Use case: src/instrumentation.ts.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-13
+ * Last modified: 2026-10-15
  */
 export function validateStartupConfig(): void {
   try {

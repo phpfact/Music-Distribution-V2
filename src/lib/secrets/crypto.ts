@@ -11,13 +11,13 @@ import { getEnv } from "../env";
  * to; decrypting with different AAD fails, so a ciphertext copied to another
  * row or purpose is useless.
  */
-const ALGORITHM = "aes-256-gcm";
+const ALGORITHM  = "aes-256-gcm";
 const KEY_LENGTH = 32;
 // 96-bit nonces are what GCM is specified for; a random one per encryption.
-const NONCE_LENGTH = 12;
+const NONCE_LENGTH    = 12;
 const AUTH_TAG_LENGTH = 16;
-const HKDF_SALT = "md-tenant-secrets";
-const HKDF_INFO = "aes-256-gcm v1";
+const HKDF_SALT       = "md-tenant-secrets";
+const HKDF_INFO       = "aes-256-gcm v1";
 
 /** Stored with each record, so the key can be rotated later without guessing. */
 export const SECRET_KEY_VERSION = 1;
@@ -44,7 +44,15 @@ export class SecretDecryptionError extends Error {
   }
 }
 
-/** Derives the AES key from a master secret. Exported for tests. */
+/**
+ * Description: Derive the AES-256 key from the master secret (HKDF-SHA-256).
+ * Input: The master secret.
+ * Output: The 32-byte key.
+ * Use case: currentKey and tests.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-13
+ * Last modified: 2026-10-15
+ */
 export function deriveSecretsKey(masterSecret: string): Buffer {
   return Buffer.from(hkdfSync("sha256", masterSecret, HKDF_SALT, HKDF_INFO, KEY_LENGTH));
 }
@@ -53,6 +61,15 @@ export function deriveSecretsKey(masterSecret: string): Buffer {
 // the master secret so a changed environment (tests) never reuses a stale key.
 let cachedKey: { masterSecret: string; key: Buffer } | undefined;
 
+/**
+ * Description: Return the AES key for the configured master secret, cached.
+ * Input: None.
+ * Output: The key; re-derived when the environment's secret changes (tests).
+ * Use case: encryptSecret and decryptSecret.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-13
+ * Last modified: 2026-10-15
+ */
 function currentKey(): Buffer {
   const masterSecret = getEnv().tenantSecretsKey;
   if (cachedKey?.masterSecret !== masterSecret) {
@@ -61,12 +78,21 @@ function currentKey(): Buffer {
   return cachedKey.key;
 }
 
+/**
+ * Description: Encrypt a secret with AES-256-GCM.
+ * Input: The plaintext, the additional authenticated data and the key.
+ * Output: The nonce, ciphertext and tag (a fresh nonce every time).
+ * Use case: createSecret and replaceSecret.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-13
+ * Last modified: 2026-10-15
+ */
 export function encryptSecret(
   plaintext: string,
   aad: string,
   key: Buffer = currentKey(),
 ): EncryptedSecret {
-  const nonce = randomBytes(NONCE_LENGTH);
+  const nonce  = randomBytes(NONCE_LENGTH);
   const cipher = createCipheriv(ALGORITHM, key, nonce, { authTagLength: AUTH_TAG_LENGTH });
   cipher.setAAD(Buffer.from(aad, "utf8"));
   const ciphertext = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
@@ -78,6 +104,16 @@ export function encryptSecret(
   };
 }
 
+/**
+ * Description: Decrypt and authenticate a stored secret.
+ * Input: The encrypted record, the additional authenticated data and the key.
+ * Output: The plaintext; throws SecretDecryptionError for a wrong key, altered data
+ *   or a truncated tag.
+ * Use case: readSecret.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-13
+ * Last modified: 2026-10-15
+ */
 export function decryptSecret(
   record: EncryptedSecret,
   aad: string,

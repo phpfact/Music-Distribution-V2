@@ -43,6 +43,8 @@ import {
   insertProvisioningTenant,
   postgresPort,
   randomLabel,
+  randomLetters,
+  testTenantName,
   TenantResources,
   testIdentifiers,
 } from "./support/tenant-resources";
@@ -140,8 +142,8 @@ function manualInput(label: string, overrides: Partial<CreateTenantInput> = {}):
   const token = randomLabel(6);
   const names = testIdentifiers(label);
   const input: CreateTenantInput = {
-    fullName: `Test ${label} ${token}`,
-    phone: "+44 20 7946 0958",
+    fullName: testTenantName(label),
+    phone: "9876543210",
     username: `test-${label}-${token}`.replaceAll("_", "-"),
     email: `test-${label}-${token}@example.com`.replaceAll("_", "-"),
     masterPassword: `Mp-${randomBytes(12).toString("base64url")}`,
@@ -261,7 +263,7 @@ let autoTenant: { id: string; password: string; customDomain: string; fullName: 
 
 describe("createTenant", () => {
   it("creates an auto-mode tenant from previewed values, which then provisions to active", SLOW, async () => {
-    const fullName = `Test Auto ${randomLabel(6)}`;
+    const fullName = `Test Auto ${randomLetters(6)}`;
     const preview = await previewGeneratedValues(fullName, actor());
     if (!preview.ok) throw new Error(JSON.stringify(preview));
     const customDomain = `music-${randomLabel(6)}.example.com`;
@@ -380,7 +382,7 @@ describe("createTenant", () => {
     const row = await tenantRow(result.tenantId);
     expect(row).toMatchObject({
       status: "pending",
-      phone: "+442079460958",
+      phone: "9876543210",
       database_name: input.databaseName,
       database_user: input.databaseUser,
       database_port: postgresPort(),
@@ -717,7 +719,8 @@ describe("profile images", () => {
 });
 
 describe("listTenants", () => {
-  const token = randomLabel(6);
+  // Letters only: the token is part of tenant full names, which allow no digits.
+  const token = randomLetters(6);
   const ids: Record<string, string> = {};
 
   beforeAll(async () => {
@@ -732,10 +735,12 @@ describe("listTenants", () => {
       subdomain: `acme-${token}`,
       customDomain: `alpha-${token}.example.org`,
     });
-    await make("percent", `Test 100% ${token}`);
-    await make("percentX", `Test 100x ${token}`);
-    await make("underscore", `Test a_b ${token}`);
-    await make("underscoreX", `Test axb ${token}`);
+    // Names cannot hold % or _ any more (letters only), so the literal-match
+    // cases use the email address, which the search covers too.
+    await make("percent", `Test Percent ${token}`, { email: `pct-100%-${token}@example.com` });
+    await make("percentX", `Test Percentx ${token}`, { email: `pct-100x-${token}@example.com` });
+    await make("underscore", `Test Underscore ${token}`, { email: `us-a_b-${token}@example.com` });
+    await make("underscoreX", `Test Underscorex ${token}`, { email: `us-axb-${token}@example.com` });
     await setStatus(ids.alpha as string, "active");
     await setStatus(ids.percent as string, "suspended");
     await setStatus(ids.percentX as string, "failed");
@@ -759,8 +764,8 @@ describe("listTenants", () => {
   });
 
   it("matches % and _ literally", async () => {
-    expect(await search(`100% ${token}`)).toStrictEqual([ids.percent]);
-    expect(await search(`a_b ${token}`)).toStrictEqual([ids.underscore]);
+    expect(await search(`100%-${token}`)).toStrictEqual([ids.percent]);
+    expect(await search(`a_b-${token}`)).toStrictEqual([ids.underscore]);
     expect(await search(`${token}%`)).toStrictEqual([]);
   });
 
@@ -779,7 +784,7 @@ describe("listTenants", () => {
       name: `Test Listing ${token} Alpha`,
       username: `test-la-${token}`,
       email: `alpha-${token}@example.com`,
-      phone: "+442079460958",
+      phone: "9876543210",
       status: "active",
       statusReason: null,
       subdomainHost: `acme-${token}.${BASE_DOMAIN}`,
@@ -998,6 +1003,8 @@ describe("suspend and reactivate", () => {
     expect(details?.suspension).toStrictEqual({
       at: row?.suspended_at?.toISOString(),
       by: ownerUsername,
+      // A platform owner's username: the page masks it behind an eye button.
+      byIsUsername: true,
       reason,
     });
     expect(await suspendTenant(autoTenant.id, "Again", actor())).toMatchObject({ reason: "invalid_state" });
@@ -1022,6 +1029,13 @@ describe("suspend and reactivate", () => {
     ]);
     expect(details?.history[1]?.reason).toMatch(/Unpaid invoice|Duplicate click/);
     expect(details?.history[0]?.reason).toBeNull();
+    // Owner actions name a username (masked on the page); system events do not.
+    expect(details?.history.map((entry) => [entry.action, entry.actorIsUsername])).toStrictEqual([
+      ["tenant.reactivated", true],
+      ["tenant.suspended", true],
+      ["tenant.provisioned", false],
+      ["tenant.created", true],
+    ]);
   });
 });
 

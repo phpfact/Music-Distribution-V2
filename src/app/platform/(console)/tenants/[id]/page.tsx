@@ -9,8 +9,11 @@ import { requirePlatformOwner } from "@/lib/platform-auth/dal";
 import { getTenantDetails, type TenantDetails } from "@/lib/tenants/service";
 import { Avatar } from "../../_components/avatar";
 import { CopyButton } from "../../_components/copy-button";
+import { CountDetails } from "../../_components/count-details";
+import { EmptyState } from "../../_components/empty-state";
 import { Icon, type IconName } from "../../_components/icons";
 import { Notice } from "../../_components/notice";
+import { SectionedLayout, type SecondaryMenuItem } from "../../_components/secondary-menu";
 import { SensitiveValue } from "../../_components/sensitive-value";
 import { Spinner } from "../../_components/spinner";
 import { StatusBadge, ToneBadge } from "../../_components/status-badge";
@@ -27,7 +30,7 @@ import {
   isSetupInProgress,
   SCHEMA_STATUS_LABELS,
   showsSetupCard,
-  suspensionSentence,
+  suspensionLead,
 } from "../details";
 import { formatDate, formatDateTime, tenantSiteUrl } from "../format";
 import { tenantNoticeMessage, TENANTS_PATH } from "../list-query";
@@ -41,16 +44,43 @@ type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-// Memoized for one request: the metadata and the page read the tenant once.
+/** The page's sections (category-wise), in page order: DOM id, heading and icon. */
+const SECTIONS = {
+  setup:    { id: "tenant-setup-progress", title: "Setup Progress", icon: "loader" },
+  profile:  { id: "tenant-personal-information", title: "Personal Information", icon: "user" },
+  login:    { id: "tenant-login-information", title: "Login Information", icon: "key-round" },
+  database: { id: "tenant-database-information", title: "Database Information", icon: "database" },
+  domains:  { id: "tenant-domain-information", title: "Domain Information", icon: "globe" },
+  history:  { id: "tenant-status-history", title: "Status History", icon: "clock" },
+} as const satisfies Record<string, { id: string; title: string; icon: IconName }>;
+
+// The secondary menu lists every section; the Setup Progress item disappears
+// by itself while that card is not shown (the menu follows the page's DOM).
+const MENU_ITEMS: readonly SecondaryMenuItem[] = Object.values(SECTIONS).map((section) => ({
+  id: section.id,
+  label: section.title,
+  icon: section.icon,
+}));
+
+/**
+ * Description: Load the tenant details once per request for the metadata and the page.
+ * Input: The tenant id from the URL.
+ * Output: The details DTO, or null when there is no such tenant.
+ * Use case: generateMetadata and TenantDetailsPage (React cache: one database read).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 const loadTenant = cache(async (id: string) => getTenantDetails(id));
 
 /**
- * Description: Load an authenticated tenant title without exposing data to signed-out visitors.
- * Input: The existing typed arguments and component state.
- * Output: The existing helper result or state update.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Build the details page's title without exposing data to signed-out visitors.
+ * Input: The route parameters (tenant id).
+ * Output: The tenant's name, or "Tenant not found"; a signed-out visitor is redirected first.
+ * Use case: The browser tab title of /platform/tenants/<id>.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function generateMetadata({
   params,
@@ -62,12 +92,15 @@ export async function generateMetadata({
 }
 
 /**
- * Description: Load protected tenant details, permitted actions and provisioning progress.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Render the protected tenant details page.
+ * Input: The route parameters (tenant id) and search parameters (notice).
+ * Output: The header with the permitted actions, notices, the secondary menu and the
+ *   Setup, Personal, Login, Database, Domain and Status History sections;
+ *   sensitive values are masked; 404 when the tenant does not exist.
+ * Use case: /platform/tenants/<id> — the owner reviews and manages one tenant.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export default async function TenantDetailsPage({
   params,
@@ -79,7 +112,7 @@ export default async function TenantDetailsPage({
   const tenant = await loadTenant(id);
   if (!tenant) notFound();
 
-  const notice = tenantNoticeMessage((await searchParams).notice);
+  const notice         = tenantNoticeMessage((await searchParams).notice);
   const requestHeaders = await headers();
   const siteRequest = {
     host: requestHeaders.get("host"),
@@ -157,24 +190,22 @@ export default async function TenantDetailsPage({
 
         {notice ? <Notice variant="success">{notice}</Notice> : null}
         <TenantFlashNotice />
-        {tenant.suspension ? (
-          <Notice variant="error">
-            {suspensionSentence(tenant.suspension)}
-          </Notice>
-        ) : null}
+        {tenant.suspension ? <SuspensionNotice suspension={tenant.suspension} /> : null}
 
-        {showsSetupCard(tenant.status, tenant.provisioning.canRetry) ? (
-          <SetupCard tenant={tenant} />
-        ) : null}
+        <SectionedLayout items={MENU_ITEMS} contentClassName="flex flex-col gap-6">
+          {showsSetupCard(tenant.status, tenant.provisioning.canRetry) ? (
+            <SetupCard tenant={tenant} />
+          ) : null}
 
-        <div className="grid gap-6 xl:grid-cols-2">
-          <ProfileCard tenant={tenant} />
-          <LoginCard tenant={tenant} />
-          <DatabaseCard tenant={tenant} />
-          <DomainsCard tenant={tenant} siteRequest={siteRequest} />
-        </div>
+          <div className="grid gap-6 2xl:grid-cols-2">
+            <ProfileCard tenant={tenant} />
+            <LoginCard tenant={tenant} />
+            <DatabaseCard tenant={tenant} />
+            <DomainsCard tenant={tenant} siteRequest={siteRequest} />
+          </div>
 
-        <HistoryCard tenant={tenant} />
+          <HistoryCard tenant={tenant} />
+        </SectionedLayout>
 
         <AutoRefresh active={isSetupInProgress(tenant.status)} />
       </div>
@@ -185,7 +216,43 @@ export default async function TenantDetailsPage({
 // ---------------------------------------------------------------------------
 // Building blocks
 
+/**
+ * Description: Render the suspension notice with the suspending owner masked.
+ * Input: The tenant's suspension (time, actor and whether it is a username, reason).
+ * Output: An error notice: "Suspended on <date> by <actor>: <reason>"; a platform
+ *   owner's username is masked behind an eye button, "System" is not.
+ * Use case: The details page of a suspended tenant.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
+ */
+function SuspensionNotice({
+  suspension,
+}: {
+  suspension: NonNullable<TenantDetails["suspension"]>;
+}) {
+  return (
+    <Notice variant="error">
+      <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
+        <span>{suspensionLead(suspension)}</span>
+        {suspension.by ? (
+          <>
+            <span>by</span>
+            {suspension.byIsUsername ? (
+              <SensitiveValue value={suspension.by} noun="owner username" monospace={false} />
+            ) : (
+              <span>{suspension.by}</span>
+            )}
+          </>
+        ) : null}
+        <span>{suspension.reason ? `: ${suspension.reason}` : "."}</span>
+      </span>
+    </Notice>
+  );
+}
+
 type DetailCardProps = {
+  /** The section's DOM id (secondary-menu target). */
   id: string;
   title: string;
   icon: IconName;
@@ -197,17 +264,19 @@ type DetailCardProps = {
 };
 
 /**
- * Description: Render a labelled tenant-detail region using the shared card primitives.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Render one labelled section of the details page as a card.
+ * Input: The section id, title, icon, optional header actions and the body.
+ * Output: A `<section id>` named by its heading, with a fixed-height header row so
+ *   side-by-side cards line up.
+ * Use case: Every details section; the id is the secondary menu's scroll target.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 function DetailCard({ id, title, icon, actions, children }: DetailCardProps) {
-  const titleId = `tenant-${id}`;
+  const titleId = `${id}-title`;
   return (
-    <section aria-labelledby={titleId}>
+    <section id={id} aria-labelledby={titleId}>
       <Card className="h-full min-w-0 gap-0 py-0">
         {/* min-h keeps headers with and without buttons the same height, so side-by-side cards line up. */}
         <CardHeader className="flex min-h-16 flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-3">
@@ -233,12 +302,13 @@ function DetailCard({ id, title, icon, actions, children }: DetailCardProps) {
 }
 
 /**
- * Description: Render the responsive definition-list layout for tenant detail values.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Lay out a details section's label/value pairs.
+ * Input: The DetailRow children.
+ * Output: A responsive definition list (labels beside values from sm).
+ * Use case: Personal, Login and Database Information cards.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 function DetailList({ children }: { children: ReactNode }) {
   return (
@@ -249,12 +319,13 @@ function DetailList({ children }: { children: ReactNode }) {
 }
 
 /**
- * Description: Pair a tenant-detail label with its existing value.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Pair one label with its value in a DetailList.
+ * Input: The label and the value.
+ * Output: A dt/dd pair; long values wrap.
+ * Use case: The details cards.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 function DetailRow({
   label,
@@ -272,24 +343,26 @@ function DetailRow({
 }
 
 /**
- * Description: Render a readable placeholder for optional tenant information.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Show a muted placeholder for an optional value.
+ * Input: The placeholder text (default "—").
+ * Output: The text in the subtle colour.
+ * Use case: Absent phone, database name/user/port, domains.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 function Missing({ children = "—" }: { children?: ReactNode }) {
   return <span className="text-fg-subtle">{children}</span>;
 }
 
 /**
- * Description: Render contextual tenant information with its accessible text and icon.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Show a small informational note in a card.
+ * Input: The note text.
+ * Output: An info icon and the text in the subtle colour.
+ * Use case: Database and Domain Information cards.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 function Note({ children }: { children: ReactNode }) {
   return (
@@ -311,12 +384,14 @@ const STEP_STATES = {
 } as const;
 
 /**
- * Description: Render the provisioning step state using a semantic status tone or spinner.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Draw a setup step's state icon.
+ * Input: The step state.
+ * Output: A spinner while running, otherwise a check, cross or empty circle in the
+ *   state's semantic colour.
+ * Use case: Setup Progress list and the setup-steps dialog.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 function StepIcon({ state }: { state: keyof typeof STEP_STATES }) {
   const className = `size-5 shrink-0 ${STEP_STATES[state].className}`;
@@ -331,17 +406,18 @@ function StepIcon({ state }: { state: keyof typeof STEP_STATES }) {
 }
 
 /**
- * Description: Summarize the existing provisioning state for the live progress announcement.
- * Input: The existing typed arguments and component state.
- * Output: The existing helper result or state update.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Summarize the setup progress in one sentence.
+ * Input: The tenant.
+ * Output: "Setup failed.", "Step n of m: <step>…", "Waiting to start." or "n of m steps done.".
+ * Use case: Setup Progress (announced as the page refreshes) and its count dialog.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 function setupSummary(tenant: TenantDetails): string {
   const { steps } = tenant.provisioning;
   const running = steps.find((step) => step.state === "running");
-  const done = steps.filter((step) => step.state === "done").length;
+  const done    = steps.filter((step) => step.state === "done").length;
   if (tenant.status === "failed") return "Setup failed.";
   if (running) return `Step ${done + 1} of ${steps.length}: ${running.label}…`;
   if (tenant.status === "pending") return "Waiting to start.";
@@ -349,23 +425,27 @@ function setupSummary(tenant: TenantDetails): string {
 }
 
 /**
- * Description: Render existing provisioning steps, errors and permitted retry action.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Render the Setup Progress section.
+ * Input: The tenant.
+ * Output: The progress sentence (opens the steps dialog), the attempt, the last error
+ *   with retry advice, every step with its state and the Retry setup button
+ *   when allowed.
+ * Use case: The details page while setup is unfinished or retryable.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 function SetupCard({ tenant }: { tenant: TenantDetails }) {
   const { steps, attempt, lastError, canRetry } = tenant.provisioning;
   const running = isSetupInProgress(tenant.status);
 
   return (
-    <DetailCard id="setup" title="Setup progress" icon="loader">
+    <DetailCard id={SECTIONS.setup.id} title={SECTIONS.setup.title} icon={SECTIONS.setup.icon}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        {/* Announced as the page refreshes itself, so progress is heard as well as seen. */}
+        {/* Announced as the page refreshes itself, so progress is heard as well as seen.
+            The step count opens the full step list with each step's state. */}
         <p aria-live="polite" className="text-sm font-medium text-fg">
-          {setupSummary(tenant)}
+          <SetupProgressDetails tenant={tenant} />
         </p>
         <p className="text-xs text-fg-subtle">
           {attempt > 0 ? `Attempt ${attempt}` : "Not started yet"}
@@ -414,45 +494,97 @@ function SetupCard({ tenant }: { tenant: TenantDetails }) {
   );
 }
 
+/**
+ * Description: Make the setup progress line a count button with its step list.
+ * Input: The tenant (status and provisioning steps).
+ * Output: The progress sentence as a button; its dialog explains the count and
+ *   lists every step of this tenant's setup with its state.
+ * Use case: Setup Progress (CLAUDE.md count transparency: "3 of 7 steps done").
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
+ */
+function SetupProgressDetails({ tenant }: { tenant: TenantDetails }) {
+  const { steps } = tenant.provisioning;
+  const done = steps.filter((step) => step.state === "done").length;
+  return (
+    <CountDetails
+      label={`${setupSummary(tenant)} Show every setup step.`}
+      title="Setup steps"
+      description={`The steps of ${tenant.name}'s setup, in the order they run.`}
+      calculation={`Steps done ÷ steps in this tenant's setup plan: ${done} of ${steps.length}. A step counts as done only after it finished successfully.`}
+      records={
+        <ol className="flex flex-col divide-y divide-border rounded-lg border border-border">
+          {steps.map((step, index) => (
+            <li key={step.step} className="flex items-center gap-3 px-3 py-2.5 text-sm">
+              <span className="w-6 shrink-0 text-right text-xs text-muted-foreground tabular-nums">
+                {index + 1}.
+              </span>
+              <StepIcon state={step.state} />
+              <span className="min-w-0 flex-1">{step.label}</span>
+              <span className={`text-xs font-medium ${STEP_STATES[step.state].className}`}>
+                {STEP_STATES[step.state].text}
+              </span>
+            </li>
+          ))}
+        </ol>
+      }
+      className="text-sm font-medium text-fg"
+    >
+      {setupSummary(tenant)}
+    </CountDetails>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Cards
 
 /**
- * Description: Render the tenant’s profile values without changing stored information.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Render the Personal Information section.
+ * Input: The tenant.
+ * Output: Name, and the phone and email masked behind eye buttons.
+ * Use case: The details page.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 function ProfileCard({ tenant }: { tenant: TenantDetails }) {
   return (
-    <DetailCard id="profile" title="Profile" icon="user">
+    <DetailCard id={SECTIONS.profile.id} title={SECTIONS.profile.title} icon={SECTIONS.profile.icon}>
       <DetailList>
         <DetailRow label="Name">{tenant.profile.name}</DetailRow>
+        {/* Contact details are sensitive: masked until the eye button is used. */}
         <DetailRow label="Phone">
-          {tenant.profile.phone ?? <Missing>Not provided</Missing>}
+          {tenant.profile.phone ? (
+            <SensitiveValue value={tenant.profile.phone} noun="phone number" monospace={false} />
+          ) : (
+            <Missing>Not provided</Missing>
+          )}
         </DetailRow>
-        <DetailRow label="Email">{tenant.profile.email}</DetailRow>
+        <DetailRow label="Email">
+          <SensitiveValue value={tenant.profile.email} noun="email" monospace={false} />
+        </DetailRow>
       </DetailList>
     </DetailCard>
   );
 }
 
 /**
- * Description: Render login metadata and the permitted master-password reset action.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Render the Login Information section.
+ * Input: The tenant.
+ * Output: The username and email masked behind eye buttons, the 2FA note and the
+ *   Reset master password action (not while setup runs).
+ * Use case: The details page.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 function LoginCard({ tenant }: { tenant: TenantDetails }) {
   return (
     <DetailCard
-      id="login"
-      title="Admin login"
-      icon="key-round"
+      id={SECTIONS.login.id}
+      title={SECTIONS.login.title}
+      icon={SECTIONS.login.icon}
       actions={
         // Setup writes the same login: nothing to offer while it runs.
         tenant.status === "provisioning" ? undefined : (
@@ -468,7 +600,9 @@ function LoginCard({ tenant }: { tenant: TenantDetails }) {
         <DetailRow label="Username">
           <SensitiveValue value={tenant.login.username} noun="username" />
         </DetailRow>
-        <DetailRow label="Email">{tenant.login.email}</DetailRow>
+        <DetailRow label="Email">
+          <SensitiveValue value={tenant.login.email} noun="email" monospace={false} />
+        </DetailRow>
         <DetailRow label="Two-factor authentication">
           <span className="text-fg-muted">
             Not available yet — two-factor sign-in isn&apos;t supported for
@@ -487,20 +621,23 @@ const SCHEMA_TONES = {
 } as const;
 
 /**
- * Description: Render database metadata and permitted credential management controls.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Render the Database Information section.
+ * Input: The tenant.
+ * Output: Mode, name and user and server (masked), port, password status (never the
+ *   password), schema status and the Rotate/Update password action (not while
+ *   setup runs).
+ * Use case: The details page.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 function DatabaseCard({ tenant }: { tenant: TenantDetails }) {
   const { database } = tenant;
   return (
     <DetailCard
-      id="database"
-      title="Database"
-      icon="database"
+      id={SECTIONS.database.id}
+      title={SECTIONS.database.title}
+      icon={SECTIONS.database.icon}
       actions={
         tenant.status === "provisioning" ? undefined : (
           <DatabasePassword
@@ -530,8 +667,9 @@ function DatabaseCard({ tenant }: { tenant: TenantDetails }) {
           )}
         </DetailRow>
         <DetailRow label="Port">{database.port ?? <Missing />}</DetailRow>
+        {/* Connection information: masked until the eye button is used. */}
         <DetailRow label="Server">
-          <span className="font-mono">{database.host}</span>
+          <SensitiveValue value={database.host} noun="database server" />
         </DetailRow>
         <DetailRow label="Password">
           {database.hasPassword ? (
@@ -561,24 +699,28 @@ function DatabaseCard({ tenant }: { tenant: TenantDetails }) {
 }
 
 /**
- * Description: Render the safe DNS verification error using the shared destructive token.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Show a domain check's last error.
+ * Input: The message.
+ * Output: The text in the destructive colour.
+ * Use case: Domain Information.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 function CheckError({ children }: { children: ReactNode }) {
   return <p className="text-sm text-destructive">{children}</p>;
 }
 
 /**
- * Description: Render domain status, DNS instructions and permitted verification actions.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Render the Domain Information section.
+ * Input: The tenant and the console request's host/scheme (for the site link).
+ * Output: The subdomain (link when active) and custom domain with their status, the
+ *   TXT record to add (with copy buttons), last check details and the DNS check
+ *   actions (not while setup runs).
+ * Use case: The details page.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 function DomainsCard({
   tenant,
@@ -591,7 +733,7 @@ function DomainsCard({
   const canCheck = tenant.status !== "provisioning";
 
   return (
-    <DetailCard id="domains" title="Domains" icon="globe">
+    <DetailCard id={SECTIONS.domains.id} title={SECTIONS.domains.title} icon={SECTIONS.domains.icon}>
       <div className="flex flex-col gap-2">
         <h3 className="text-xs font-medium tracking-wider text-fg-subtle uppercase">
           SaaS subdomain
@@ -688,12 +830,13 @@ function DomainsCard({
 }
 
 /**
- * Description: Render a DNS record value with the existing clipboard-copy action.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Show one DNS record field with a copy button.
+ * Input: The field label (Name/Value) and its value.
+ * Output: The value in a code box and a Copy button.
+ * Use case: The custom domain's TXT record instructions.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 function RecordValue({ label, value }: { label: string; value: string }) {
   return (
@@ -721,24 +864,25 @@ const HISTORY_ICONS: Record<keyof typeof HISTORY_LABELS, IconName> = {
 };
 
 /**
- * Description: Render lifecycle history or its informative illustrated empty state.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Render the Status History section.
+ * Input: The tenant.
+ * Output: A timeline of lifecycle events (who, when, reason; owner usernames masked),
+ *   or the shared empty state.
+ * Use case: The details page.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 function HistoryCard({ tenant }: { tenant: TenantDetails }) {
   return (
-    <DetailCard id="history" title="Status history" icon="clock">
+    <DetailCard id={SECTIONS.history.id} title={SECTIONS.history.title} icon={SECTIONS.history.icon}>
       {tenant.history.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-4 text-center">
-          <Icon name="clock" className="size-8 text-muted-foreground" />
-          <p className="font-medium">No events yet</p>
-          <p className="text-sm text-muted-foreground">
-            The tenant’s status changes will appear here.
-          </p>
-        </div>
+        <EmptyState
+          size="sm"
+          icon="clock"
+          title="No events yet"
+          description="The tenant's status changes (setup, suspension, reactivation) will appear here."
+        />
       ) : (
         <ol className="flex flex-col">
           {tenant.history.map((entry, index) => (
@@ -752,11 +896,17 @@ function HistoryCard({ tenant }: { tenant: TenantDetails }) {
                 ) : null}
               </div>
               <div className="min-w-0 flex-1 pt-1.5 pb-5">
-                <p className="text-sm">
+                <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm">
                   <span className="font-medium text-fg">
                     {HISTORY_LABELS[entry.action]}
                   </span>
-                  <span className="text-fg-muted"> by {entry.actor}</span>
+                  <span className="text-fg-muted">by</span>
+                  {/* A platform owner's username is masked; "System" is not sensitive. */}
+                  {entry.actorIsUsername ? (
+                    <SensitiveValue value={entry.actor} noun="owner username" monospace={false} />
+                  ) : (
+                    <span className="text-fg-muted">{entry.actor}</span>
+                  )}
                 </p>
                 <p className="text-xs text-fg-subtle">
                   <time dateTime={entry.occurredAt}>

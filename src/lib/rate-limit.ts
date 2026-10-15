@@ -1,5 +1,6 @@
 import "server-only";
 import { getRedis } from "./redis";
+import { withTimeout } from "./with-timeout";
 
 /**
  * A generic fixed-window rate limiter on Redis, for actions other than the
@@ -29,24 +30,31 @@ const KEY_PREFIX = "rl:";
 // is unreachable, so the whole exchange is bounded here.
 const REDIS_TIMEOUT_MS = 2_000;
 
-async function withTimeout<T>(work: () => Promise<T>): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      work(),
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(
-          () => reject(new Error(`timed out after ${REDIS_TIMEOUT_MS}ms`)),
-          REDIS_TIMEOUT_MS,
-        );
-      }),
-    ]);
-  } finally {
-    clearTimeout(timer);
-  }
+/**
+ * Description: Bound a Redis exchange in time.
+ * Input: The work to run.
+ * Output: The work's result, or a rejection after REDIS_TIMEOUT_MS (shared
+ *   withTimeout helper). getRedis() waits for the first connection, which stays
+ *   pending while Redis is unreachable.
+ * Use case: Every Redis exchange of this limiter (the limiter fails closed).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
+function withRedisTimeout<T>(work: () => Promise<T>): Promise<T> {
+  return withTimeout(work, REDIS_TIMEOUT_MS, () => new Error(`timed out after ${REDIS_TIMEOUT_MS}ms`));
 }
 
-// A wrong rule is a programming error, not an outage: say so loudly.
+/**
+ * Description: Reject a malformed rate-limit rule.
+ * Input: The rule (key, limit, window).
+ * Output: Nothing; throws RangeError for an empty key or a non-positive integer
+ *   limit or window. A wrong rule is a programming error, not an outage: say so loudly.
+ * Use case: consumeRateLimit, before Redis is asked.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function assertValidRule({ key, limit, windowSeconds }: RateLimitRule): void {
   if (!key) throw new RangeError("rate limit key must not be empty");
   if (!Number.isInteger(limit) || limit < 1) {
@@ -57,13 +65,22 @@ function assertValidRule({ key, limit, windowSeconds }: RateLimitRule): void {
   }
 }
 
-/** Counts one call against the rule and says whether it may proceed. */
+/**
+ * Description: Count one call against a rule and say whether it may proceed.
+ * Input: The rule (key, limit per window, window length).
+ * Output: "allowed", "limited" (over the limit in the current window) or
+ *   "unavailable" (Redis unreachable; the caller refuses the action).
+ * Use case: Tenant creation, previews, connection tests, credential and DNS actions.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export async function consumeRateLimit(rule: RateLimitRule): Promise<RateLimitOutcome> {
   assertValidRule(rule);
   const key = `${KEY_PREFIX}${rule.key}`;
 
   try {
-    const replies = await withTimeout(async () => {
+    const replies = await withRedisTimeout(async () => {
       const redis = await getRedis();
       // One transaction: a counter can never be left without an expiry. NX
       // keeps the window fixed, so refused calls do not extend it.

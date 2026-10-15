@@ -24,35 +24,40 @@ const TAGS: Record<FieldTag, { label: string; className: string }> = {
 };
 
 /**
- * Create the hintId shared UI value.
- * Input: component or field parameters. Output: reusable UI or accessible field ID.
- * Use case: consistent application forms and feedback.
+ * Description: Derive the DOM id of a field's hint text.
+ * Input: The control's id.
+ * Output: `<id>-hint`.
+ * Use case: Field and describedBy (aria-describedby wiring).
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function hintId(htmlFor: string): string {
   return `${htmlFor}-hint`;
 }
 
 /**
- * Create the errorId shared UI value.
- * Input: component or field parameters. Output: reusable UI or accessible field ID.
- * Use case: consistent application forms and feedback.
+ * Description: Derive the DOM id of a field's error message.
+ * Input: The control's id.
+ * Output: `<id>-error`.
+ * Use case: Field, describedBy and error summaries.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function errorId(htmlFor: string): string {
   return `${htmlFor}-error`;
 }
 
 /**
- * The ARIA attributes the control inside a Field needs, so its hint and error
- * are read out with it. Spread them onto the input:
- * `<input id={id} {...describedBy(id, { hint, error })} />`.
- * Input: component props or field identifiers. Output: themed UI or ARIA attributes.
- * Use case: preserve shared application semantics across the shadcn migration.
+ * Description: Build the ARIA attributes a control inside a Field needs.
+ * Input: The control's id and whether it has a hint and/or an error.
+ * Output: aria-describedby (hint and error ids) and aria-invalid, so the hint and
+ *   error are read out with the control. Spread them onto the input.
+ * Use case: Every input of the tenant forms.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function describedBy(
   htmlFor: string,
@@ -72,11 +77,15 @@ export function describedBy(
 }
 
 /**
- * A labelled form control with its optional tag, hint and error message.
- * Input: component props or field identifiers. Output: themed UI or ARIA attributes.
- * Use case: preserve shared application semantics across the shadcn migration.
+ * Description: Render a labelled form control with its tag, hint and error.
+ * Input: The label, the control id, required flag, hint, error, tag, a header
+ *   action and the control itself.
+ * Output: The label (red asterisk + "(required)" for screen readers when required),
+ *   the control, the hint, and the error directly below the control.
+ * Use case: Every field of the tenant forms (CLAUDE.md: errors under their field).
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function Field({
   label,

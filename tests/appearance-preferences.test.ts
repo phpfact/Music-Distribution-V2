@@ -54,6 +54,20 @@ describe("supported appearance values", () => {
   });
 });
 
+describe("default theme (CLAUDE.md: shadcn's black-and-white neutral look)", () => {
+  it("defaults to Light / Neutral / Default Width", () => {
+    expect(DEFAULT_APPEARANCE).toStrictEqual({ theme: "light", accent: "neutral", width: "default" });
+  });
+
+  it("lists Neutral first, with shadcn's neutral primary in light and dark", () => {
+    expect(ACCENT_OPTIONS[0]).toStrictEqual({ value: "neutral", label: "Neutral", light: "#171717", dark: "#e5e5e5" });
+    // The colour accents stay selectable.
+    expect(ACCENT_OPTIONS.map((option) => option.value)).toStrictEqual([
+      "neutral", "emerald", "indigo", "violet", "blue", "rose", "amber",
+    ]);
+  });
+});
+
 describe("responsive width presets", () => {
   it("defines the existing cap, available full width, and narrower focused cap centrally", () => {
     expect(WIDTH_OPTIONS.map(({ value, label, maxWidth }) => ({ value, label, maxWidth }))).toStrictEqual([
@@ -66,7 +80,7 @@ describe("responsive width presets", () => {
 });
 
 describe("appearance precedence", () => {
-  it("prefers a personal override, then global, then Light/Emerald", () => {
+  it("prefers a personal override, then global, then Light/Neutral", () => {
     expect(resolveAppearance(personal, global)).toStrictEqual({ appearance: personal, source: "personal" });
     expect(resolveAppearance(null, global)).toStrictEqual({ appearance: global, source: "global" });
     expect(resolveAppearance(null, null)).toStrictEqual({ appearance: DEFAULT_APPEARANCE, source: "default" });

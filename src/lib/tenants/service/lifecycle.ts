@@ -38,9 +38,15 @@ const RETRY_LIMIT = { limit: 10, windowSeconds: 15 * 60 };
 class StateMismatch extends Error {}
 
 /**
- * Moves the tenant from `from` to the new state and records the audit event,
- * in one transaction. Refusals say whether the tenant is missing or merely in
- * another state.
+ * Description: Move a tenant from one status to another with its audit event.
+ * Input: The tenant id, the required current status, the conditional update
+ *   (with its audit row; returns the rows changed) and the wrong-state message.
+ * Output: ok, or a refusal saying whether the tenant is missing or in another state;
+ *   both writes happen in one transaction.
+ * Use case: suspendTenant and reactivateTenant.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 async function transition(
   id: string,
@@ -65,7 +71,16 @@ async function transition(
   }
 }
 
-/** Only from `active`. Data, database and files are kept. */
+/**
+ * Description: Suspend an active tenant.
+ * Input: The tenant id, the reason and the acting owner.
+ * Output: ok, a reason error, or a refusal. Only from active; data, database and
+ *   files are kept; the reason is audited.
+ * Use case: Suspend on the directory and details page.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export async function suspendTenant(
   id: string,
   reason: string,
@@ -102,7 +117,16 @@ export async function suspendTenant(
   return result;
 }
 
-/** Only from `suspended`. `suspended_at` is kept; the history stays in audit_events. */
+/**
+ * Description: Reactivate a suspended tenant.
+ * Input: The tenant id and the acting owner.
+ * Output: ok or a refusal. Only from suspended; suspended_at is kept; the history
+ *   stays in audit_events.
+ * Use case: Reactivate on the directory and details page.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export async function reactivateTenant(id: string, actor: TenantActor): Promise<LifecycleResult> {
   return transition(
     id,
@@ -128,9 +152,15 @@ export async function reactivateTenant(id: string, actor: TenantActor): Promise<
 }
 
 /**
- * Checks that setup may be retried: the tenant failed, or is `provisioning`
- * while no run holds its lock (interrupted). The caller then schedules
- * `startProvisioning`; the runner re-checks the state under its lock.
+ * Description: Check that a tenant's setup may be retried and record the retry.
+ * Input: The tenant id and the acting owner.
+ * Output: ok when the tenant failed, or is provisioning with no run holding its lock
+ *   (interrupted); otherwise a refusal. The caller then schedules
+ *   startProvisioning, and the runner re-checks under its lock.
+ * Use case: Retry setup on the details page.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function retryProvisioning(id: string, actor: TenantActor): Promise<LifecycleResult> {
   if (!isUuid(id)) return NOT_FOUND;

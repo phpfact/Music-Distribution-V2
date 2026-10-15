@@ -158,15 +158,43 @@ type ValidTenant = {
 // ---------------------------------------------------------------------------
 // Validation (§4, §8.1 steps 2-3)
 
+/**
+ * Description: Read one section's Auto-Generate / Manual switch from the request.
+ * Input: The submitted text.
+ * Output: "auto", "manual", or null for anything else.
+ * Use case: validateInput (loginMode, databaseCredentialMode, subdomainMode).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function parseCredentialMode(value: string): CredentialMode | null {
   return value === "auto" || value === "manual" ? value : null;
 }
 
+/**
+ * Description: Read the database mode from the request.
+ * Input: The submitted text.
+ * Output: "provisioned", "existing", or null for anything else.
+ * Use case: validateInput.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function parseDatabaseMode(value: string): DatabaseMode | null {
   return value === "provisioned" || value === "existing" ? value : null;
 }
 
-/** Every field error at once, or the normalized values. */
+/**
+ * Description: Validate the whole create request with the shared tenant rules.
+ * Input: The raw (untrimmed) request values.
+ * Output: Every field error at once, or the normalized tenant values. Auto sections
+ *   have their secrets generated (master password; database password and the
+ *   configured port) whatever the request contains.
+ * Use case: createTenant (§4, §8.1 steps 2-3).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function validateInput(
   input: CreateTenantInput,
 ): { ok: true; value: ValidTenant } | { ok: false; fieldErrors: CreateTenantFieldErrors } {
@@ -182,7 +210,7 @@ function validateInput(
   // Step 1: the three section modes. Each one is checked on its own so the
   // error lands under the switch of the section it belongs to.
   const MODE_REQUIRED = "Choose Auto-Generate or Manual.";
-  const loginMode = parseCredentialMode(input.loginMode);
+  const loginMode     = parseCredentialMode(input.loginMode);
   if (!loginMode) fieldErrors.loginMode = MODE_REQUIRED;
   const databaseCredentialMode = parseCredentialMode(input.databaseCredentialMode);
   if (!databaseCredentialMode) fieldErrors.databaseCredentialMode = MODE_REQUIRED;
@@ -199,9 +227,9 @@ function validateInput(
   }
 
   const fullName = check("fullName", validateFullName(input.fullName));
-  const phone = check("phone", validatePhone(input.phone));
+  const phone    = check("phone", validatePhone(input.phone));
   const username = check("username", validateTenantUsername(input.username));
-  const email = check("email", validateEmail(input.email));
+  const email    = check("email", validateEmail(input.email));
 
   const reservedNames = [env.postgres.database, env.postgres.user];
   const databaseName = check(
@@ -309,7 +337,8 @@ const GENERATED_FIELD_SECTIONS: Record<GeneratedName, keyof CredentialModes> = {
  * Output: True when the name belongs to a section left on Auto-Generate.
  * Use case: A generated name someone took in the meantime gets "regenerate" wording.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function isGeneratedName(kind: NameKind, tenant: ValidTenant): kind is GeneratedName {
   // Email and custom domain are always typed, so they never count as generated.
@@ -323,7 +352,8 @@ function isGeneratedName(kind: NameKind, tenant: ValidTenant): kind is Generated
  * Output: "<value> is no longer available — regenerate." for generated names, else the fixed message.
  * Use case: Availability checks and unique-constraint races during creation.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 function takenMessage(kind: NameKind, tenant: ValidTenant): string {
   // The owner did not type a generated name: it was previewed and someone took
@@ -338,6 +368,17 @@ type AvailabilityOutcome =
   | { ok: true }
   | { ok: false; result: CreateTenantResult };
 
+/**
+ * Description: Check that every name of the new tenant is still free.
+ * Input: The validated tenant and the test dependencies.
+ * Output: ok, field errors ("is no longer available — regenerate" for generated
+ *   names), a port error when a typed port cannot be reached, or unavailable.
+ *   For a new database the PostgreSQL server itself is asked too.
+ * Use case: createTenant (§8.1 step 4).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function checkAvailability(
   tenant: ValidTenant,
   deps: CreateTenantDeps,
@@ -413,7 +454,16 @@ const INDEX_FIELDS: [index: string, field: NameKind][] = [
 
 export type InsertStage = "tenant" | "subdomain" | "customDomain" | "other";
 
-/** The field a unique violation (Prisma P2002) belongs to, or null for any other error. */
+/**
+ * Description: Map a unique violation at insert time to its form field.
+ * Input: The thrown error and the insert stage that failed.
+ * Output: The name kind the violated index protects, or null for any other error.
+ *   Catches races between two concurrent creates.
+ * Use case: createTenant's transaction error handling.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function uniqueViolationField(error: unknown, stage: InsertStage): NameKind | null {
   if (typeof error !== "object" || error === null || (error as { code?: unknown }).code !== "P2002") {
     return null;
@@ -431,8 +481,16 @@ export function uniqueViolationField(error: unknown, stage: InsertStage): NameKi
 // ---------------------------------------------------------------------------
 
 /**
- * Creates the tenant record (§8.1 steps 1-7 and 9). Provisioning is not
- * started here: call `startProvisioning(tenantId, actor)` afterwards.
+ * Description: Create the tenant record (§8.1 steps 1-7 and 9).
+ * Input: The raw request values, the acting owner and optional test dependencies.
+ * Output: The new tenant id (plus the generated master password once, for an Auto
+ *   login), field errors, or a rate-limit/unavailable message. One transaction
+ *   writes the tenant, domains, encrypted database secret, admin password hash and
+ *   audit event. Provisioning is not started here.
+ * Use case: createTenantAction; the caller schedules startProvisioning afterwards.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function createTenant(
   input: CreateTenantInput,
@@ -584,9 +642,14 @@ export async function createTenant(
 }
 
 /**
- * Runs (or continues) the tenant's provisioning; meant for `after()` once the
- * response has been sent. Never throws: the outcome is recorded by the runner
- * and logged here.
+ * Description: Run (or continue) a tenant's provisioning after the response was sent.
+ * Input: The tenant id, the acting owner and runner options.
+ * Output: The runner's outcome. Never throws: the outcome is recorded by the runner
+ *   and logged here.
+ * Use case: next/server after() in createTenantAction and retryProvisioningAction.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function startProvisioning(
   tenantId: string,
@@ -596,7 +659,7 @@ export async function startProvisioning(
   if (!isUuid(tenantId)) return { status: "invalid_state", tenantStatus: "not_found" };
   try {
     const outcome = await runProvisioning(tenantId, provisioningActor(actor), options);
-    const detail = outcome.status === "failed" ? ` (${outcome.code})` : "";
+    const detail  = outcome.status === "failed" ? ` (${outcome.code})` : "";
     console.info(`[tenants] provisioning of ${tenantId} ended: ${outcome.status}${detail}`);
     return outcome;
   } catch (error) {

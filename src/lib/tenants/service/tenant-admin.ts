@@ -19,6 +19,15 @@ export type AdminRowOutcome =
 
 const UNIQUE_VIOLATION = "23505";
 
+/**
+ * Description: Read the violated constraint's name from a pg error.
+ * Input: Any thrown value.
+ * Output: The constraint name, or "".
+ * Use case: updateTenantAdminRow (which unique value is taken).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function constraintOf(error: unknown): string {
   if (typeof error === "object" && error !== null && "constraint" in error) {
     return String((error as { constraint: unknown }).constraint ?? "");
@@ -27,9 +36,16 @@ function constraintOf(error: unknown): string {
 }
 
 /**
- * Applies `change` to the admin row found by `username` (the name on record
- * before this change). Never throws; the detail of a failure goes to the log
- * only (the values are not in it: pg keeps them in `detail`, not `message`).
+ * Description: Change the tenant admin's row in the tenant's own database.
+ * Input: The tenant id, the admin's user name before this change and the change
+ *   (username, email and/or password hash).
+ * Output: ok, or the problem (missing row, username or email taken, unavailable).
+ *   Never throws; runs as the tenant's runtime role on a short-lived connection;
+ *   failure details go to the log only (pg keeps values in `detail`).
+ * Use case: Edit (username/email) and Reset master password.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function updateTenantAdminRow(
   tenantId: string,

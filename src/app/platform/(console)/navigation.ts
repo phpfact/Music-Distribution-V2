@@ -106,6 +106,16 @@ export const PLATFORM_NAV_ITEMS: readonly PlatformNavItem[] = PLATFORM_NAV_SECTI
   (section) => section.items,
 );
 
+/**
+ * Description: Look up one navigation item by id.
+ * Input: The navigation id.
+ * Output: The item (label, href, icon, description, status); throws only if an id
+ *   has no entry (unreachable).
+ * Use case: Sidebar, top bar, dashboard and planned pages.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function getNavItem(id: PlatformNavId): PlatformNavItem {
   const item = PLATFORM_NAV_ITEMS.find((candidate) => candidate.id === id);
   // Unreachable while every id has an entry above.
@@ -113,22 +123,44 @@ export function getNavItem(id: PlatformNavId): PlatformNavItem {
   return item;
 }
 
-/** "/platform/tenants/" and "/platform/tenants" are the same page. */
+/**
+ * Description: Treat a path with and without a trailing slash as the same page.
+ * Input: A pathname.
+ * Output: The pathname without trailing slashes ("/" for the root).
+ * Use case: isNavItemActive.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function normalizePathname(pathname: string): string {
   const trimmed = pathname.replace(/\/+$/, "");
   return trimmed === "" ? "/" : trimmed;
 }
 
 /**
- * True on the item's own page and on any page below it. Matched on whole
- * segments, so "/platform/tenantsx" does not count as "/platform/tenants".
+ * Description: Tell whether a navigation item belongs to the current page.
+ * Input: The item and the current pathname.
+ * Output: True on the item's page and any page below it (whole segments only, so
+ *   "/platform/tenantsx" does not count).
+ * Use case: Sidebar highlighting.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function isNavItemActive(item: PlatformNavItem, pathname: string): boolean {
   const path = normalizePathname(pathname);
   return path === item.href || path.startsWith(`${item.href}/`);
 }
 
-/** The item the pathname belongs to; the most specific one if several match. */
+/**
+ * Description: Find the navigation item the current page belongs to.
+ * Input: The current pathname.
+ * Output: The most specific matching item, or undefined.
+ * Use case: Top bar breadcrumb.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function findActiveNavItem(pathname: string): PlatformNavItem | undefined {
   let active: PlatformNavItem | undefined;
   for (const item of PLATFORM_NAV_ITEMS) {

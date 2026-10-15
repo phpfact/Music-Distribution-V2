@@ -51,6 +51,7 @@ export {
   type DatabaseState,
   getTenantDetails,
   getTenantSummary,
+  listTenantCountRecords,
   listTenants,
   type ProvisioningStepState,
   type TenantDetails,

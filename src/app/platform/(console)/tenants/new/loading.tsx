@@ -4,12 +4,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 // credentials control and the four numbered sections) while it renders, so the
 // tenant list's skeleton one level up is not shown here.
 /**
- * Description: Show accessible skeletons matching the create-tenant form.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Show skeletons shaped like the create page while it loads.
+ * Input: None (Next.js loading convention).
+ * Output: An accessible "Loading" status with placeholder header and sections.
+ * Use case: /platform/tenants/new while it renders.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export default function CreateTenantLoading() {
   return (

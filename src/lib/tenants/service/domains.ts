@@ -24,7 +24,7 @@ export type DomainCheckResult =
 /** For tests: a fake resolver instead of real DNS. */
 export type DomainCheckDeps = { dnsResolver?: DnsResolver };
 
-const NOT_FOUND = { ok: false, reason: "not_found", message: "This tenant does not exist." } as const;
+const NOT_FOUND   = { ok: false, reason: "not_found", message: "This tenant does not exist." } as const;
 const UNAVAILABLE = { ok: false, reason: "unavailable", message: UNAVAILABLE_MESSAGE } as const;
 
 // Each check is a DNS query on the owner's behalf: bounded per owner, shared by both checks.
@@ -33,12 +33,31 @@ const CHECK_LIMIT = { limit: 30, windowSeconds: 5 * 60 };
 /** `tenant_domains.last_check_error` is VARCHAR(300). */
 const CHECK_ERROR_MAX_LENGTH = 300;
 
+/**
+ * Description: Fit a check message into the last_check_error column.
+ * Input: The message.
+ * Output: The message, cut to 300 characters with an ellipsis when longer.
+ * Use case: recordVerdict.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function clip(message: string): string {
   return message.length <= CHECK_ERROR_MAX_LENGTH
     ? message
     : `${message.slice(0, CHECK_ERROR_MAX_LENGTH - 1)}…`;
 }
 
+/**
+ * Description: Rate-limit DNS checks per owner.
+ * Input: The acting owner.
+ * Output: null when allowed; otherwise the rate-limited (30 per 5 minutes) or
+ *   unavailable result. Each check is a DNS query on the owner's behalf.
+ * Use case: verifyCustomDomain and recheckSubdomain.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function limitChecks(actor: TenantActor): Promise<DomainCheckResult | null> {
   const limit = await consumeRateLimit({ key: `tenant-domain-check:${actor.ownerId}`, ...CHECK_LIMIT });
   if (limit === "limited") {
@@ -53,6 +72,15 @@ async function limitChecks(actor: TenantActor): Promise<DomainCheckResult | null
 
 type DomainRow = { id: string; hostname: string; status: string; verificationToken: string | null };
 
+/**
+ * Description: Load one domain row of a tenant.
+ * Input: The tenant id and the domain type.
+ * Output: Whether the tenant exists and its row of that type (or null).
+ * Use case: verifyCustomDomain and recheckSubdomain.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 async function findDomain(
   tenantId: string,
   type: "subdomain" | "custom",
@@ -71,10 +99,16 @@ async function findDomain(
 }
 
 /**
- * Records a check's verdict on the row, if it still has the checked host name.
- * A pass makes the row active (and, when it was not active before and an actor
- * is given, records `tenant.domain_verified` in the same transaction); a
- * failure keeps the status and stores the reason.
+ * Description: Record a DNS check's verdict on the domain row.
+ * Input: The tenant id, the checked row (id and host name), the verdict and
+ *   the audit details (acting owner and domain type), or null for no audit.
+ * Output: Nothing. A pass makes the row active (audited as tenant.domain_verified when
+ *   it was not active and an actor is given); a failure keeps the status and stores
+ *   the reason. Only if the row still has the checked host name.
+ * Use case: Every domain check.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 async function recordVerdict(
   tenantId: string,
@@ -82,8 +116,8 @@ async function recordVerdict(
   verdict: { ok: true } | { ok: false; message: string },
   audit: { actor: TenantActor; domainType: "subdomain" | "custom" } | null,
 ): Promise<void> {
-  const now = new Date();
-  const db = getControlDb();
+  const now   = new Date();
+  const db    = getControlDb();
   const where = { id: row.id, tenantId, hostname: row.hostname };
   if (!verdict.ok) {
     await db.tenantDomain.updateMany({
@@ -116,8 +150,13 @@ async function recordVerdict(
 }
 
 /**
- * Checks the subdomain `label` of the tenant right away and records the
- * verdict (used after a subdomain edit). Never throws.
+ * Description: Check a tenant's subdomain right away and record the verdict.
+ * Input: The tenant id and the subdomain label.
+ * Output: Nothing; never throws.
+ * Use case: After a subdomain edit.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function checkSubdomainRow(
   tenantId: string,
@@ -142,8 +181,13 @@ export async function checkSubdomainRow(
 // ---------------------------------------------------------------------------
 
 /**
- * "Check DNS" for the custom domain: the TXT proof and the address. Pass →
- * `active` (audited); fail → stays `pending` with the reason, which is returned.
+ * Description: "Check DNS" for the custom domain: the TXT proof and the address.
+ * Input: The tenant id and the acting owner.
+ * Output: ok (row active, audited) or a failure with the reason (row stays pending).
+ * Use case: The details page's Check DNS button.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function verifyCustomDomain(
   id: string,
@@ -178,9 +222,14 @@ export async function verifyCustomDomain(
 }
 
 /**
- * Re-runs the subdomain check. A pass makes the row active (audited only when
- * it was not active before); a failure records the reason and leaves the
- * status as it was, like the provisioning `verify` step.
+ * Description: Re-run the subdomain DNS check.
+ * Input: The tenant id and the acting owner.
+ * Output: ok (row active; audited only when it was not active before) or the
+ *   reason; a failure leaves the status as it was, like the provisioning verify step.
+ * Use case: The details page's Re-check button.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function recheckSubdomain(
   id: string,

@@ -30,6 +30,15 @@ const EVICTION_GRACE_MS = 30_000;
 // Map order is least recently used first.
 const globalForTenantDb = globalThis as typeof globalThis & { __tenantDbs?: Map<string, Entry> };
 
+/**
+ * Description: Create a Prisma client for one tenant's database.
+ * Input: The tenant's database target (decrypted login).
+ * Output: A client on its own small pool that releases idle connections.
+ * Use case: getTenantDb.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-13
+ * Last modified: 2026-10-15
+ */
 function createTenantDb(target: TenantDatabase): TenantDb {
   const { postgres } = getEnv();
   const adapter = new PrismaPg(
@@ -54,6 +63,15 @@ function createTenantDb(target: TenantDatabase): TenantDb {
   return new PrismaClient({ adapter });
 }
 
+/**
+ * Description: Disconnect a cached tenant client in the background.
+ * Input: The cache entry.
+ * Output: Nothing; a failure is logged.
+ * Use case: LRU eviction and evictTenantDb.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-13
+ * Last modified: 2026-10-15
+ */
 function close(entry: Entry): void {
   entry.db.$disconnect().catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
@@ -61,6 +79,15 @@ function close(entry: Entry): void {
   });
 }
 
+/**
+ * Description: Tell whether two tenant database targets are identical.
+ * Input: Two targets.
+ * Output: True when database, user, password and port all match.
+ * Use case: getTenantDb (a changed password replaces the cached client).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-13
+ * Last modified: 2026-10-15
+ */
 function sameTarget(a: TenantDatabase, b: TenantDatabase): boolean {
   return (
     a.database === b.database &&
@@ -71,17 +98,19 @@ function sameTarget(a: TenantDatabase, b: TenantDatabase): boolean {
 }
 
 /**
- * Prisma client for one tenant's database.
- *
- * Clients are reused across requests and capped at POSTGRES_TENANT_CLIENTS_MAX;
- * beyond that the least recently used one is closed. Each holds at most
- * POSTGRES_TENANT_POOL_MAX connections and releases them when idle, so the
- * connections in use scale with the tenants active right now, not with the
- * number of tenants.
+ * Description: Return the Prisma client for one tenant's database.
+ * Input: The tenant's database target.
+ * Output: A cached client (reused across requests; capped at
+ *   POSTGRES_TENANT_CLIENTS_MAX, the least recently used is closed), so connections
+ *   scale with the active tenants, not with the number of tenants.
+ * Use case: Tenant-facing data access.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-13
+ * Last modified: 2026-10-15
  */
 export function getTenantDb(target: TenantDatabase): TenantDb {
   const entries = (globalForTenantDb.__tenantDbs ??= new Map<string, Entry>());
-  const now = Date.now();
+  const now     = Date.now();
 
   const existing = entries.get(target.tenantId);
   if (existing) {
@@ -110,15 +139,18 @@ export function getTenantDb(target: TenantDatabase): TenantDb {
 }
 
 /**
- * Closes the cached client of one tenant, if there is one. Called when the
- * tenant is suspended or its database password changes, so no pooled
- * connection keeps using the old state. Unlike LRU eviction this does not wait
- * for the client to be idle: a request still holding it fails, which is the
- * point after a suspension.
+ * Description: Close the cached client of one tenant right away.
+ * Input: The tenant id.
+ * Output: Nothing. Unlike LRU eviction this does not wait for idleness: a request
+ *   still holding it fails, which is the point after a suspension or password change.
+ * Use case: Suspension and database password changes.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-13
+ * Last modified: 2026-10-15
  */
 export function evictTenantDb(tenantId: string): void {
   const entries = globalForTenantDb.__tenantDbs;
-  const entry = entries?.get(tenantId);
+  const entry   = entries?.get(tenantId);
   if (!entries || !entry) return;
   entries.delete(tenantId);
   close(entry);

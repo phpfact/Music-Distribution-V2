@@ -2,6 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { getControlDb, type ControlDb } from "../db/control";
 import { decryptSecret, encryptSecret, SecretDecryptionError } from "./crypto";
+import { UUID_PATTERN } from "@/lib/uuid";
 
 /**
  * Encrypted secrets in the control plane's `secrets` table.
@@ -16,7 +17,6 @@ export type SecretPurpose = "tenant_database_password";
 type SecretsDb = Pick<ControlDb, "secret">;
 
 // The column is a uuid: anything else would make the query itself fail.
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export class SecretNotFoundError extends Error {
   constructor(readonly secretId: string) {
@@ -26,14 +26,28 @@ export class SecretNotFoundError extends Error {
 }
 
 /**
- * Binds a ciphertext to its row and purpose: decrypting it under another id or
- * purpose fails, so a copied value cannot be reused elsewhere.
+ * Description: Build the additional authenticated data that binds a secret to its row and purpose.
+ * Input: The secret id and purpose.
+ * Output: `secret:<id>:<purpose>`: decrypting under another id or purpose fails, so
+ *   a copied value cannot be reused elsewhere.
+ * Use case: createSecret, readSecret and replaceSecret.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-13
+ * Last modified: 2026-10-15
  */
 function secretAad(id: string, purpose: SecretPurpose): string {
   return `secret:${id}:${purpose}`;
 }
 
-/** Encrypts and stores a new secret; returns its id. */
+/**
+ * Description: Encrypt and store a new secret.
+ * Input: The transaction, the purpose and the plaintext.
+ * Output: The new secret's id (generated here because it is part of the AAD).
+ * Use case: Tenant creation (database password).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-13
+ * Last modified: 2026-10-15
+ */
 export async function createSecret(
   tx: SecretsDb,
   purpose: SecretPurpose,
@@ -41,15 +55,21 @@ export async function createSecret(
 ): Promise<string> {
   // Generated here, not by the database: the id is part of the AAD, so it must
   // be known before encrypting.
-  const id = randomUUID();
+  const id        = randomUUID();
   const encrypted = encryptSecret(plaintext, secretAad(id, purpose));
   await tx.secret.create({ data: { id, purpose, ...encrypted } });
   return id;
 }
 
 /**
- * Decrypts a stored secret. Throws SecretNotFoundError, or
- * SecretDecryptionError when the key is wrong or the row was altered.
+ * Description: Decrypt a stored secret.
+ * Input: The secret id, the purpose and the database client.
+ * Output: The plaintext; throws SecretNotFoundError, or SecretDecryptionError when
+ *   the key is wrong or the row was altered.
+ * Use case: loadTenantDatabase.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-13
+ * Last modified: 2026-10-15
  */
 export async function readSecret(
   id: string,
@@ -70,7 +90,15 @@ export async function readSecret(
   }
 }
 
-/** Re-encrypts an existing secret with a new value (fresh nonce). */
+/**
+ * Description: Re-encrypt an existing secret with a new value.
+ * Input: The transaction, the id, the purpose and the new plaintext.
+ * Output: Nothing; a fresh nonce is used.
+ * Use case: Database password rotation and update.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-13
+ * Last modified: 2026-10-15
+ */
 export async function replaceSecret(
   tx: SecretsDb,
   id: string,

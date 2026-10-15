@@ -23,7 +23,8 @@ const VARIANTS: Record<NoticeVariant, { icon: IconName; srLabel: string }> = {
  * Output: an assertive error or a polite status with semantic theme colors.
  * Use case: preserve existing success/error announcements on every screen.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 export function Notice({ variant, title, children, onDismiss }: NoticeProps) {
   const { icon, srLabel } = VARIANTS[variant];

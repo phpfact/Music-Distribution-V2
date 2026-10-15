@@ -30,7 +30,16 @@ export type PlatformSession = {
   owner: { id: string; username: string };
 };
 
-/** Options for the session cookie. `domain` is never set: the cookie stays host-only. */
+/**
+ * Description: Build the session cookie's options.
+ * Input: None (reads NODE_ENV).
+ * Output: httpOnly, Secure in production, SameSite=Lax, path /platform and an 8-hour
+ *   max age. `domain` is never set: the cookie stays host-only.
+ * Use case: Sign-in (set) and sign-out (delete with the same name and path).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function sessionCookieOptions() {
   return {
     httpOnly: true,
@@ -41,26 +50,48 @@ export function sessionCookieOptions() {
   } as const;
 }
 
+/**
+ * Description: Hash a session token for storage and lookup.
+ * Input: The cookie's token.
+ * Output: Its SHA-256 in hex; the database never holds the token itself.
+ * Use case: createSession, validateSession and revokeSession.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
+/**
+ * Description: Compute the oldest last-use time a valid session may have.
+ * Input: The current time.
+ * Output: now minus the 30-minute idle timeout.
+ * Use case: createSession (cleanup) and validateSession.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function idleCutoff(now: Date): Date {
   return new Date(now.getTime() - SESSION_IDLE_TIMEOUT_MS);
 }
 
 /**
- * Starts a session for an owner whose password has just been verified against
- * `expectedPasswordHash`, and returns the token for the cookie.
- *
- * Returns null when the owner no longer exists, is not active, or has a
- * different password hash by now (a rotation committed after the check).
+ * Description: Start a session for an owner whose password was just verified.
+ * Input: The owner id and the password hash the password was verified against.
+ * Output: The token for the cookie, or null when the owner no longer exists, is not
+ *   active, or has a different password hash by now (a rotation committed after
+ *   the check). Expired sessions of the owner are removed in the same transaction.
+ * Use case: authenticatePlatformOwner after a successful password check.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function createSession(
   ownerId: string,
   expectedPasswordHash: string,
 ): Promise<string | null> {
-  const token = randomBytes(TOKEN_BYTES).toString("base64url");
+  const token     = randomBytes(TOKEN_BYTES).toString("base64url");
   const tokenHash = hashToken(token);
 
   const created = await getControlDb().$transaction(async (tx) => {
@@ -100,10 +131,16 @@ export async function createSession(
 }
 
 /**
- * The session a cookie value belongs to, or null. A session is valid while it
- * is within its absolute lifetime, has been used within the idle timeout, and
- * its owner is active. Never returns the password hash. Background preference
- * refreshes pass touch:false so polling does not extend the idle lifetime.
+ * Description: Find the valid session a cookie value belongs to.
+ * Input: The cookie's token and `touch` (false for background refreshes, so polling
+ *   does not extend the idle lifetime).
+ * Output: The session, or null. A session is valid while it is within its absolute
+ *   lifetime, has been used within the idle timeout, and its owner is active.
+ *   Never returns the password hash. Records use at most once a minute.
+ * Use case: getPlatformSession and the appearance refresh action.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function validateSession(
   token: string,
@@ -112,7 +149,7 @@ export async function validateSession(
   // Anything that cannot be a token is rejected without asking the database.
   if (!TOKEN_PATTERN.test(token)) return null;
 
-  const db = getControlDb();
+  const db  = getControlDb();
   const now = new Date();
   const session = await db.platformOwnerSession.findFirst({
     where: {
@@ -145,7 +182,15 @@ export async function validateSession(
   return { sessionId: session.id, owner: session.owner };
 }
 
-/** Ends the session a cookie value belongs to. Does nothing if there is none. */
+/**
+ * Description: End the session a cookie value belongs to.
+ * Input: The cookie's token.
+ * Output: Nothing; does nothing when there is no such session.
+ * Use case: Sign-out and a new sign-in in the same browser.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export async function revokeSession(token: string): Promise<void> {
   if (!TOKEN_PATTERN.test(token)) return;
   await getControlDb().platformOwnerSession.deleteMany({
@@ -154,8 +199,14 @@ export async function revokeSession(token: string): Promise<void> {
 }
 
 /**
- * One line for the log. Prisma puts the cause on the last line of a multi-line
- * message; anything that looks like a connection string is removed.
+ * Description: Turn an error into one safe line for the server log.
+ * Input: Any thrown value.
+ * Output: The cause on one line (Prisma puts it on the last line of a multi-line
+ *   message); anything that looks like a connection string is removed.
+ * Use case: Every `[module] ...` error log line of the server.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function describeError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);

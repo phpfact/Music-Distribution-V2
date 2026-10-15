@@ -8,11 +8,20 @@ import { describeError, SESSION_COOKIE_NAME, validateSession } from "@/lib/platf
 import { getAppearanceState, saveAppearance } from "@/lib/appearance/service";
 import { parseAppearanceUpdate, type Appearance, type AppearanceActionResult } from "@/lib/appearance/preferences";
 
-/** Next's origin/host check also applies; this rejects missing or cross-site origins. */
+/**
+ * Description: Check that a save request comes from this site.
+ * Input: The request headers.
+ * Output: False for a cross-site fetch or a missing/foreign Origin (Next's own
+ *   origin/host check also applies).
+ * Use case: updateAppearanceAction.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function sameOrigin(requestHeaders: Headers): boolean {
   if (requestHeaders.get("sec-fetch-site") === "cross-site") return false;
   const origin = requestHeaders.get("origin");
-  const host = (requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host"))?.split(",")[0]?.trim();
+  const host   = (requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host"))?.split(",")[0]?.trim();
   if (!origin || !host) return false;
   try {
     const url = new URL(origin);
@@ -22,6 +31,17 @@ function sameOrigin(requestHeaders: Headers): boolean {
   }
 }
 
+/**
+ * Description: Save or reset an appearance preference (personal or platform default).
+ * Input: The operation, scope, appearance (apply only) and the account-switch guard.
+ * Output: The new appearance state, or a friendly error (expired session, foreign
+ *   origin, invalid input, account changed, save failure). Rendered pages are
+ *   revalidated after a committed save; details go to the server log.
+ * Use case: Appearance settings' Apply/Default confirmation.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export async function updateAppearanceAction(input: {
   operation: "apply" | "reset";
   scope: "personal" | "global";
@@ -56,13 +76,21 @@ export async function updateAppearanceAction(input: {
   }
 }
 
-/** Refreshes this account's authoritative preferences for another tab or a global change. */
+/**
+ * Description: Re-read this account's authoritative appearance.
+ * Input: None (reads the session cookie without extending its idle time).
+ * Output: The appearance state (global/default for a signed-out browser), or an error.
+ * Use case: ThemeRoot's background refresh (other tabs, focus, interval).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export async function refreshAppearanceAction(): Promise<AppearanceActionResult> {
   try {
     const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
     // Background refreshes must not count as user activity for the idle timeout.
     const session = token ? await validateSession(token, { touch: false }) : null;
-    const state = await getAppearanceState(session?.owner.id);
+    const state   = await getAppearanceState(session?.owner.id);
     return { ok: true, state };
   } catch (error) {
     console.error(`[appearance] could not load preferences: ${describeError(error)}`);

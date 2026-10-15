@@ -51,3 +51,27 @@ The isolated navigation branch passes `npm run typecheck`, `npm run lint`, and `
   Lint, TypeScript and production build pass; actual browser checks were blocked
   by the localhost:3100 permission gate. On 2026-10-15 the user explicitly waived
   browser verification; no rendered interaction results are claimed.
+
+## CLAUDE.md compliance audit (requested 2026-10-15)
+
+- The account menu trigger showed the owner's username in plain text and used
+  it for the avatar initials. It now shows "Platform Owner" with generic
+  initials; the menu label shows the username masked, and a "Show username" /
+  "Hide username" menu item (eye icon) reveals it without closing the menu.
+- `AuthPageGuard` (console layout) reloads a page restored from the browser
+  back/forward cache so a signed-out visitor never sees cached console content.
+- Navigation helpers (`navigation.ts`, `sidebar-preference.ts`) get full doc blocks.
+
+### Change history
+
+- 2026-10-15: Recorded masked account menu and back/forward-cache guard.
+- 2026-10-15: Implemented the masked account menu and AuthPageGuard.
+- 2026-10-15: Code-quality pass (CLAUDE.md): every function in this module's
+  frontend and backend files now has the full doc block (Description, Input,
+  Output, Use case, Author, Created, Last modified; "Created: X. Last modified:
+  Y." one-liners split into two lines); consecutive single-line const/let
+  declarations have their "=" vertically aligned (typed and untyped
+  declarations are aligned in separate groups).
+- 2026-10-15: Verification of the compliance pass: TypeScript (including tests)
+  and ESLint (zero warnings) pass; the full Vitest suite passes in the app
+  container: 37 files, 1136 tests, 1 pre-existing localhost-only skip.

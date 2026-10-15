@@ -45,15 +45,30 @@ export type AuditEntry = {
 /** The application's client or an interactive transaction on it. */
 type AuditDb = Pick<ControlDb, "auditEvent">;
 
-// The column is `inet`: the rate limiter's "unknown" bucket, or anything else
-// that is not an address, would make the insert fail and lose the event.
+/**
+ * Description: Keep only a real IP address for the `inet` audit column.
+ * Input: A client address (may be the limiter's "unknown" bucket).
+ * Output: The address, or null for anything that is not an IP address (which would
+ *   make the insert fail and lose the event).
+ * Use case: recordAudit.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function inetOrNull(value: string | null | undefined): string | null {
   return value && isIP(value) !== 0 ? value : null;
 }
 
 /**
- * Writes one audit event. Pass the transaction that makes the change, so the
- * event is recorded if and only if the change is.
+ * Description: Write one audit event.
+ * Input: The database client or the transaction making the change, and the entry
+ *   (actor, tenant, action, target, metadata without secrets, client address).
+ * Output: Nothing. Pass the transaction that makes the change, so the event is
+ *   recorded if and only if the change is.
+ * Use case: Every tenant and appearance change.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function recordAudit(db: AuditDb, entry: AuditEntry): Promise<void> {
   await db.auditEvent.create({

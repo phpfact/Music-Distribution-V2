@@ -14,7 +14,8 @@ type FormActionsProps = {
  * Use case: Create and edit tenant forms, so "Cancel" and the submit button are
  *   always reachable without scrolling to the end.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 export function FormActions({ note, children }: FormActionsProps) {
   return (
@@ -33,7 +34,8 @@ export function FormActions({ note, children }: FormActionsProps) {
  * Output: "Fields marked * are required." with the asterisk in the destructive colour.
  * Use case: Long forms whose required markers are spread over several cards.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 export function RequiredLegend() {
   return (

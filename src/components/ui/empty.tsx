@@ -6,7 +6,8 @@ import { cn } from "@/lib/utils";
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent empty behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function Empty({ className, ...props }: React.ComponentProps<"div">) {
   return (
@@ -26,7 +27,8 @@ function Empty({ className, ...props }: React.ComponentProps<"div">) {
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent empty header behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function EmptyHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
@@ -61,7 +63,8 @@ const emptyMediaVariants = cva(
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent empty media behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function EmptyMedia({
   className,
@@ -83,7 +86,8 @@ function EmptyMedia({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent empty title behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function EmptyTitle({ className, ...props }: React.ComponentProps<"div">) {
   return (
@@ -100,7 +104,8 @@ function EmptyTitle({ className, ...props }: React.ComponentProps<"div">) {
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent empty description behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function EmptyDescription({ className, ...props }: React.ComponentProps<"p">) {
   return (
@@ -120,7 +125,8 @@ function EmptyDescription({ className, ...props }: React.ComponentProps<"p">) {
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent empty content behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function EmptyContent({ className, ...props }: React.ComponentProps<"div">) {
   return (

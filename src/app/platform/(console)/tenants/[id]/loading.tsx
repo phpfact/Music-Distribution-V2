@@ -3,12 +3,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 // Placeholder blocks shaped like the tenant details page (back link, header,
 // the four cards and the history) while it renders.
 /**
- * Description: Show accessible skeletons matching the tenant detail view.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Show skeletons shaped like the details page while it loads.
+ * Input: None (Next.js loading convention).
+ * Output: An accessible "Loading" status with placeholder header, cards and history.
+ * Use case: /platform/tenants/<id> while it renders.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export default function TenantDetailsLoading() {
   return (

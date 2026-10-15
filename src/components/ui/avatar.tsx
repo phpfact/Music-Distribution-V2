@@ -9,7 +9,8 @@ import { Avatar as AvatarPrimitive } from "radix-ui";
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent avatar behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function Avatar({
   className,
@@ -36,7 +37,8 @@ function Avatar({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent avatar image behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function AvatarImage({
   className,
@@ -56,7 +58,8 @@ function AvatarImage({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent avatar fallback behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function AvatarFallback({
   className,
@@ -79,7 +82,8 @@ function AvatarFallback({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent avatar badge behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function AvatarBadge({ className, ...props }: React.ComponentProps<"span">) {
   return (
@@ -102,7 +106,8 @@ function AvatarBadge({ className, ...props }: React.ComponentProps<"span">) {
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent avatar group behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function AvatarGroup({ className, ...props }: React.ComponentProps<"div">) {
   return (
@@ -122,7 +127,8 @@ function AvatarGroup({ className, ...props }: React.ComponentProps<"div">) {
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent avatar group count behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function AvatarGroupCount({
   className,

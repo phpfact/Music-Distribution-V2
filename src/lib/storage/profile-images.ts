@@ -13,8 +13,7 @@ import {
   saveFile,
 } from "./files";
 import { validateProfileImage } from "./image";
-
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+import { UUID_PATTERN } from "@/lib/uuid";
 
 // The served type follows the stored key's extension, which the server chose
 // from the sniffed bytes; never from what the uploader claimed.
@@ -25,8 +24,14 @@ const CONTENT_TYPES: Record<ProfileImageExtension, string> = {
 };
 
 /**
- * Validates and stores a new profile image for the tenant; returns its key.
- * An invalid image is a result (shown next to the field); a storage failure throws.
+ * Description: Validate and store a new profile image for a tenant.
+ * Input: The tenant id and the uploaded bytes.
+ * Output: The new storage key, or the validation message (shown next to the field);
+ *   a storage failure throws.
+ * Use case: Tenant create and edit services.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function storeProfileImage(
   tenantId: string,
@@ -39,12 +44,31 @@ export async function storeProfileImage(
   return { ok: true, value: key };
 }
 
+/**
+ * Description: Derive the served content type from a stored key's extension.
+ * Input: The storage key.
+ * Output: image/png, image/jpeg or image/webp, or null for an unknown extension.
+ *   The server chose the extension from the sniffed bytes.
+ * Use case: readProfileImage.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function contentTypeOf(key: string): string | null {
   const extension = key.slice(key.lastIndexOf(".") + 1) as ProfileImageExtension;
   return CONTENT_TYPES[extension] ?? null;
 }
 
-/** The tenant's current profile image, or null when it has none (or the file is gone). */
+/**
+ * Description: Read a tenant's current profile image.
+ * Input: The tenant id (UUID-validated here).
+ * Output: The bytes and content type, or null when the tenant has no image, the file
+ *   is gone or the stored key is not one the server generates.
+ * Use case: The protected avatar route.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export async function readProfileImage(
   tenantId: string,
 ): Promise<{ bytes: Uint8Array; contentType: string } | null> {

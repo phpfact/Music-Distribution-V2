@@ -11,7 +11,8 @@ import { DropdownMenu as DropdownMenuPrimitive } from "radix-ui";
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent dropdown menu behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function DropdownMenu({
   ...props
@@ -24,7 +25,8 @@ function DropdownMenu({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent dropdown menu portal behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function DropdownMenuPortal({
   ...props
@@ -45,7 +47,8 @@ function DropdownMenuPortal({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent dropdown menu trigger behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function DropdownMenuTrigger({
   ...props
@@ -63,7 +66,8 @@ function DropdownMenuTrigger({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent dropdown menu content behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function DropdownMenuContent({
   className,
@@ -90,7 +94,8 @@ function DropdownMenuContent({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent dropdown menu group behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function DropdownMenuGroup({
   ...props
@@ -105,7 +110,8 @@ function DropdownMenuGroup({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent dropdown menu item behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function DropdownMenuItem({
   className,
@@ -135,7 +141,8 @@ function DropdownMenuItem({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent dropdown menu checkbox item behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function DropdownMenuCheckboxItem({
   className,
@@ -168,7 +175,8 @@ function DropdownMenuCheckboxItem({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent dropdown menu radio group behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function DropdownMenuRadioGroup({
   ...props
@@ -186,7 +194,8 @@ function DropdownMenuRadioGroup({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent dropdown menu radio item behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function DropdownMenuRadioItem({
   className,
@@ -217,7 +226,8 @@ function DropdownMenuRadioItem({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent dropdown menu label behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function DropdownMenuLabel({
   className,
@@ -244,7 +254,8 @@ function DropdownMenuLabel({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent dropdown menu separator behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function DropdownMenuSeparator({
   className,
@@ -264,7 +275,8 @@ function DropdownMenuSeparator({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent dropdown menu shortcut behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function DropdownMenuShortcut({
   className,
@@ -287,7 +299,8 @@ function DropdownMenuShortcut({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent dropdown menu sub behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function DropdownMenuSub({
   ...props
@@ -300,7 +313,8 @@ function DropdownMenuSub({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent dropdown menu sub trigger behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function DropdownMenuSubTrigger({
   className,
@@ -331,7 +345,8 @@ function DropdownMenuSubTrigger({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent dropdown menu sub content behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function DropdownMenuSubContent({
   className,

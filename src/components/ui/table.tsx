@@ -8,7 +8,8 @@ import { cn } from "@/lib/utils";
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent table behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function Table({ className, ...props }: React.ComponentProps<"table">) {
   return (
@@ -30,7 +31,8 @@ function Table({ className, ...props }: React.ComponentProps<"table">) {
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent table header behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   return (
@@ -47,7 +49,8 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent table body behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function TableBody({ className, ...props }: React.ComponentProps<"tbody">) {
   return (
@@ -64,7 +67,8 @@ function TableBody({ className, ...props }: React.ComponentProps<"tbody">) {
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent table footer behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
   return (
@@ -84,7 +88,8 @@ function TableFooter({ className, ...props }: React.ComponentProps<"tfoot">) {
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent table row behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
   return (
@@ -104,7 +109,8 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent table head behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function TableHead({ className, ...props }: React.ComponentProps<"th">) {
   return (
@@ -124,7 +130,8 @@ function TableHead({ className, ...props }: React.ComponentProps<"th">) {
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent table cell behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function TableCell({ className, ...props }: React.ComponentProps<"td">) {
   return (
@@ -144,7 +151,8 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent table caption behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function TableCaption({
   className,

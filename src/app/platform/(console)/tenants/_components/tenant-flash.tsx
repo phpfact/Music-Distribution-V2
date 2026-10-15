@@ -8,9 +8,17 @@ type TenantFlash = {
 };
 
 const TenantFlashContext = createContext<TenantFlash | null>(null);
-const MessageContext = createContext<{ message: string | null; clear: () => void } | null>(null);
+const MessageContext     = createContext<{ message: string | null; clear: () => void } | null>(null);
 
-/** Lets an action anywhere on the page report its success in one place. */
+/**
+ * Description: Read the page's success-message reporter.
+ * Input: None (must be inside TenantFlashProvider).
+ * Output: show(message), which puts the message in the page's flash notice.
+ * Use case: Lifecycle, credential and DNS actions.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function useTenantFlash(): TenantFlash {
   const value = use(TenantFlashContext);
   // Unreachable while every tenant screen with actions renders the provider.
@@ -18,7 +26,15 @@ export function useTenantFlash(): TenantFlash {
   return value;
 }
 
-/** Holds the latest success message of a tenant page, shown by `<TenantFlashNotice>`. */
+/**
+ * Description: Hold the latest success message of a tenant page.
+ * Input: The page content.
+ * Output: Providers for showing and reading/clearing the message.
+ * Use case: Directory and details pages.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function TenantFlashProvider({ children }: { children: ReactNode }) {
   const [message, setMessage] = useState<string | null>(null);
 
@@ -30,11 +46,17 @@ export function TenantFlashProvider({ children }: { children: ReactNode }) {
 }
 
 /**
- * Where the success message appears. The live region is always there, so the
- * message is announced when it is added, not only seen.
+ * Description: Show the page's success message.
+ * Input: None.
+ * Output: A dismissible success notice inside an always-present live region, so the
+ *   message is announced when it is added.
+ * Use case: Below the page header of the directory and details pages.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function TenantFlashNotice() {
-  const value = use(MessageContext);
+  const value   = use(MessageContext);
   const message = value?.message ?? null;
 
   return (

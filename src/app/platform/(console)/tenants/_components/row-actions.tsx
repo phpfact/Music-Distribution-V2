@@ -35,7 +35,7 @@ export function TenantRowActions({
   status,
 }: TenantRowActionsProps) {
   const [dialog, setDialog] = useState<LifecycleAction | null>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
+  const triggerRef  = useRef<HTMLButtonElement>(null);
   const detailsHref = `${TENANTS_PATH}/${tenantId}`;
 
   return (

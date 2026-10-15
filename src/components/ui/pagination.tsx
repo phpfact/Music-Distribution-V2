@@ -13,7 +13,8 @@ import { buttonVariants, type Button } from "@/components/ui/button";
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent pagination behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function Pagination({ className, ...props }: React.ComponentProps<"nav">) {
   return (
@@ -32,7 +33,8 @@ function Pagination({ className, ...props }: React.ComponentProps<"nav">) {
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent pagination content behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function PaginationContent({
   className,
@@ -52,7 +54,8 @@ function PaginationContent({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent pagination item behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function PaginationItem({ ...props }: React.ComponentProps<"li">) {
   return <li data-slot="pagination-item" {...props} />;
@@ -68,7 +71,8 @@ type PaginationLinkProps = {
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent pagination link behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function PaginationLink({
   className,
@@ -98,7 +102,8 @@ function PaginationLink({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent pagination previous behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function PaginationPrevious({
   className,
@@ -122,7 +127,8 @@ function PaginationPrevious({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent pagination next behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function PaginationNext({
   className,
@@ -146,7 +152,8 @@ function PaginationNext({
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent pagination ellipsis behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function PaginationEllipsis({
   className,

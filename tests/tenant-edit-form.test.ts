@@ -8,6 +8,7 @@ import {
   buildUpdateFormData,
   EDIT_FIELDS,
   type EditValues,
+  hasUnsavedEdits,
   initialEditValues,
   savedTenantHref,
   summarizeEditErrors,
@@ -89,9 +90,28 @@ describe("validateEditForm", () => {
 describe("summarizeEditErrors", () => {
   it("lists the sections with problems in form order, pointing at the first field", () => {
     expect(summarizeEditErrors({ customDomain: "x", email: "y", username: "z", phone: "w" })).toEqual([
-      { id: "profile", title: "Profile", firstField: "phone", count: 1 },
-      { id: "login", title: "Login", firstField: "username", count: 2 },
-      { id: "domain", title: "Domain", firstField: "customDomain", count: 1 },
+      {
+        id: "profile",
+        title: "Personal Information",
+        firstField: "phone",
+        fields: [{ field: "phone", label: "Phone" }],
+      },
+      {
+        id: "login",
+        title: "Login Information",
+        firstField: "username",
+        // Every invalid field is named (no bare counts), in page order.
+        fields: [
+          { field: "username", label: "Username" },
+          { field: "email", label: "Email" },
+        ],
+      },
+      {
+        id: "domain",
+        title: "Domain Information",
+        firstField: "customDomain",
+        fields: [{ field: "customDomain", label: "Custom domain" }],
+      },
     ]);
   });
 
@@ -142,5 +162,18 @@ describe("savedTenantHref", () => {
   it("goes to the details page with the matching notice", () => {
     expect(savedTenantHref(TENANT.id, false)).toBe(`/platform/tenants/${TENANT.id}?notice=updated`);
     expect(savedTenantHref(TENANT.id, true)).toBe(`/platform/tenants/${TENANT.id}?notice=updated-dns`);
+  });
+});
+
+describe("hasUnsavedEdits", () => {
+  it("is false while every value is the saved one and the image is kept", () => {
+    expect(hasUnsavedEdits(values(), values(), { action: "keep", file: null })).toBe(false);
+  });
+
+  it("is true for a changed field or a replaced/removed image", () => {
+    expect(hasUnsavedEdits(values({ phone: "9876543210" }), values(), { action: "keep", file: null })).toBe(true);
+    expect(hasUnsavedEdits(values(), values(), { action: "remove", file: null })).toBe(true);
+    const file = new File([new Uint8Array([1])], "logo.png", { type: "image/png" });
+    expect(hasUnsavedEdits(values(), values(), { action: "replace", file })).toBe(true);
   });
 });

@@ -22,12 +22,14 @@ const BUTTONS = {
 >;
 
 /**
- * A button that opens the confirmation of one lifecycle action (details page).
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Render a button that opens one lifecycle confirmation.
+ * Input: The action (suspend, reactivate, retry), the tenant id and name and an
+ *   optional button variant.
+ * Output: The button and its LifecycleDialog (every lifecycle change is confirmed first).
+ * Use case: The details page header and Setup Progress card.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function LifecycleButton({
   action,

@@ -17,8 +17,14 @@ import { isIpAddress, normalizeHostName, parseHostHeader } from "@/lib/domains/r
 const DEFAULT_BASE_DOMAIN = "localhost";
 
 /**
- * Whether a Host header names the platform's own host. An unparseable or
- * missing header is not the platform.
+ * Description: Tell whether a Host header names the platform's own host.
+ * Input: The Host header and PLATFORM_BASE_DOMAIN.
+ * Output: True for localhost, an IP address or the base domain; false for a tenant
+ *   host or an unparseable/missing header.
+ * Use case: proxy (the console exists only on the platform host).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function isPlatformHost(hostHeader: string | null | undefined, baseDomain: string): boolean {
   const host = parseHostHeader(hostHeader);
@@ -27,12 +33,29 @@ export function isPlatformHost(hostHeader: string | null | undefined, baseDomain
   return host === normalizeHostName(baseDomain);
 }
 
-// Read per request at runtime (the proxy runs on Node.js), not inlined at build time.
-// Same default as src/lib/env.ts, which validates the value at startup.
+/**
+ * Description: Read PLATFORM_BASE_DOMAIN per request at runtime.
+ * Input: None.
+ * Output: The configured base domain, or "localhost" (same default as src/lib/env.ts).
+ * Use case: proxy (the proxy runs on Node.js; the value is not inlined at build time).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function platformBaseDomain(): string {
   return process.env.PLATFORM_BASE_DOMAIN?.trim() || DEFAULT_BASE_DOMAIN;
 }
 
+/**
+ * Description: Keep /platform/** off tenant hosts.
+ * Input: The incoming request.
+ * Output: The request continues on the platform host; on a tenant subdomain or custom
+ *   domain a plain 404 (a tenant host can never reach the console or its login).
+ * Use case: Next.js Proxy for the /platform/:path* matcher.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function proxy(request: NextRequest): NextResponse {
   if (isPlatformHost(request.headers.get("host"), platformBaseDomain())) return NextResponse.next();
   return new NextResponse("Not found", {

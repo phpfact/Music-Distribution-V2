@@ -177,3 +177,116 @@ The module depends on shared console wrappers (Field, FormSection, Notice, Avata
   form model, form, success panel, edit form, detail and directory updated;
   spec (docs/tenant-management.md §8.1, §9.2–9.4) updated; tests extended for
   mixed modes. Directory Created column folded into the Tenant cell.
+
+## CLAUDE.md compliance audit and secondary menu (requested 2026-10-15)
+
+### Requirement
+
+The owner asked that all tenant management code (frontend and backend) follow
+CLAUDE.md, and explicitly asked for a secondary menu in Tenant Management.
+
+### Decisions confirmed with the owner (2026-10-15)
+
+- **Full name:** letters only (any script, e.g. Hindi), spaces and the
+  characters `. ' - &`. No digits, no other symbols. 2–200 characters after
+  trimming and collapsing whitespace. Applies to create and edit, client and
+  server (`validateFullName` in `src/lib/tenants/rules.ts`). Existing tenants
+  whose names contain digits must rename on their next edit (none exist today).
+- **Phone:** optional; when given, an Indian mobile number of exactly 10 digits
+  starting with 6, 7, 8 or 9. Stored as those 10 digits. While typing, every
+  non-digit is removed (`sanitizeIndianMobileInput`); a pasted "+91 98765 43210"
+  or "098765 43210" keeps the 10-digit number. The database CHECK
+  (`^\+?[0-9]{7,15}$`) is unchanged: 10 digits satisfy it, and existing rows
+  are not rewritten. Two stored phones do not match the new rule; the edit form
+  shows their value and asks for a valid number before saving.
+
+### Decisions taken from the CLAUDE.md rules
+
+- **Secondary menu** (shared `SectionedLayout` / `SecondaryMenu`):
+  - Create: Personal Information, Login Information, Database Information,
+    Domain Information.
+  - Edit: Personal Information, Login Information, Domain Information.
+  - Details: Setup Progress (only while shown), Personal Information, Login
+    Information, Database Information, Domain Information, Status History.
+  - Directory: Summary, Tenant Directory (top variant, so the wide table keeps
+    its width).
+  Desktop (lg+) shows a sticky vertical menu beside the content; smaller screens
+  show a sticky horizontal menu above it. Click scrolls smoothly to the section
+  heading; scrolling highlights the visible section; missing sections (success
+  panel, hidden setup card) disappear from the menu automatically.
+- **Category names:** sections are renamed to "Personal Information" (image,
+  full name, phone), "Login Information" (username, email, master password,
+  2FA), "Database Information" and "Domain Information". Email stays under
+  Login Information because it is the tenant admin account's email.
+- **Masking:** email and phone are sensitive. Directory rows/cards, the details
+  Personal and Login cards, and the create/edit inputs mask them with an eye
+  button (`SensitiveValue` / `SensitiveInput`). The database server host is
+  masked too (connection information). Status-history actors and the
+  suspension notice mask platform-owner usernames ("System" is not masked).
+  History entries carry `actorIsUsername`; the suspension carries `byIsUsername`.
+- **Counts:** summary cards (Total, Active, Suspended, Pending setup, "N
+  failed"), the directory total badge and the "Showing a–b of n" line open the
+  shared count-details dialog with the calculation and the exact tenants
+  (server-side pagination through `listTenantCountRecords`). The setup line
+  "x of y steps done" opens a dialog listing every step with its state. Error
+  summaries list the invalid field names (each a link) instead of "n fields
+  need attention".
+- **Risky actions:** Cancel on a create/edit form with unsaved changes asks for
+  confirmation; leaving the success panel while a generated master password is
+  still the only copy ("Create another tenant", "View tenant") asks for
+  confirmation.
+- **Dependent fields:** the section Auto-Generate / Manual switches are disabled
+  while the generated values are loading (the note shows "Preparing values…").
+- **Whitespace:** email, custom domain and identifiers are trimmed on blur.
+- **Empty states:** directory, status history and count-details lists use the
+  shared `EmptyState` (illustration, heading, description, optional action).
+- **Status filter:** the directory status select has five fixed options and is
+  exempt from the searchable-select rule (search would add nothing).
+
+### Change history
+
+- 2026-10-15: Recorded the CLAUDE.md compliance requirements (name and phone
+  rules confirmed by the owner, secondary menu on create/edit/details/directory,
+  category names, masking, clickable counts, risky-action confirmations).
+- 2026-10-15: Implemented the compliance pass:
+  - Rules: `validateFullName` (letters/spaces/. ' - & only), `validatePhone`
+    (Indian 10-digit), `sanitizeIndianMobileInput`, `parseTenantCountSource`,
+    `parseTenantCountPage` in `src/lib/tenants/rules.ts`; tests updated.
+  - Backend: `listTenants` and the new `listTenantCountRecords` share
+    `queryTenantPage` (database pagination); `COUNT_CATEGORY_CONDITIONS` mirror
+    `getTenantSummary`; history entries carry `actorIsUsername`, the suspension
+    `byIsUsername`; `suspensionSentence` replaced by `suspensionLead` (the page
+    renders the masked actor and the reason).
+  - Server Action `loadTenantCountRecordsAction` (actions.ts): owner-only,
+    validated arguments, returns id/name/status/created date only, friendly
+    error with server-side log.
+  - UI: secondary menus (create, edit, details: sidebar variant; directory:
+    top variant), sections renamed to "... Information", masked email/phone/
+    host/actor, count dialogs (`TenantCountRecords`, `tenantSummaryDetails`,
+    `tenantListDetails`, setup steps dialog), error summary lists field names,
+    Cancel confirmation on dirty forms (`hasUnsavedInput`, `hasUnsavedEdits`),
+    success-panel confirmation while a generated password is shown, mode
+    switches disabled while a preview loads, trim-on-blur for email/custom
+    domain, real-time re-validation of fields that show an error.
+  - Shared: ConfirmDialog's inner form stops submit propagation (a dialog
+    opened from inside another form can never submit that form); the Cancel
+    dialogs are rendered outside the forms anyway.
+  - Test data: tenant names in tests use letters only (`randomLetters`,
+    `testTenantName`); the LIKE-escaping test uses `%`/`_` in emails now.
+  - Details grid switches to two columns at 2xl (the menu takes width at xl).
+- 2026-10-15: Code-quality pass (CLAUDE.md): every function in this module's
+  frontend and backend files now has the full doc block (Description, Input,
+  Output, Use case, Author, Created, Last modified; "Created: X. Last modified:
+  Y." one-liners split into two lines); consecutive single-line const/let
+  declarations have their "=" vertically aligned (typed and untyped
+  declarations are aligned in separate groups).
+
+### Known limitations (2026-10-15)
+
+- Rendered-browser verification of the new menus/dialogs was not completed in
+  this pass: creating a verification session needed a token the tool policy
+  would not reveal; the owner can sign in in the in-app browser to check.
+- `next build` was not run (it would overwrite the running dev server's .next).
+- 2026-10-15: Verification of the compliance pass: TypeScript (including tests)
+  and ESLint (zero warnings) pass; the full Vitest suite passes in the app
+  container: 37 files, 1136 tests, 1 pre-existing localhost-only skip.

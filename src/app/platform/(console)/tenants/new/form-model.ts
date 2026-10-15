@@ -134,7 +134,8 @@ export const CONNECTION_FIELDS = [
  * Output: Every section on Auto-Generate, nothing generated, empty manual drafts.
  * Use case: First render of the create form and "Create another tenant".
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function initialFormValues(defaultPort: number): FormValues {
   return {
@@ -165,7 +166,8 @@ export function initialFormValues(defaultPort: number): FormValues {
  * Output: Its section ("login", "database" or "domain").
  * Use case: Per-field decisions (submit, validate) that depend on the section's switch.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 export function sectionOfGeneratedField(field: GeneratedField): ModeSection {
   // Each identifier belongs to exactly one section; the lookup is by membership.
@@ -179,7 +181,8 @@ export function sectionOfGeneratedField(field: GeneratedField): ModeSection {
  * Output: True when some section still needs the server preview.
  * Use case: Request a preview only when something actually uses it (saves the rate limit).
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 export function anySectionAuto(values: FormValues): boolean {
   return MODE_SECTIONS.some((section) => values.modes[section] === "auto");
@@ -203,7 +206,8 @@ export type ModeSwitch = {
  * are not in a preview at all).
  *
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function switchSectionMode(
   values: FormValues,
@@ -246,7 +250,8 @@ export function switchSectionMode(
  * Output: The chosen mode in Manual; always "provisioned" in Auto.
  * Use case: An existing database can only be attached with the Database section on Manual (§8.1 step 3).
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function effectiveDatabaseMode(values: FormValues): DatabaseMode {
   return values.modes.database === "manual" ? values.manual.databaseMode : "provisioned";
@@ -258,10 +263,19 @@ export function effectiveDatabaseMode(values: FormValues): DatabaseMode {
  * Output: Username, subdomain, database name and user: typed (Manual) or previewed (Auto).
  * Use case: Building the FormData and the success panel's list of generated values.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function currentIdentifiers(values: FormValues): Record<GeneratedField, string> {
-  // Reads one identifier from the typed draft or from the latest preview.
+  /**
+   * Description: Read one identifier from its section's source.
+   * Input: The identifier.
+   * Output: The typed value (Manual) or the previewed value (Auto, "" before a preview).
+   * Use case: currentIdentifiers.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-10-14
+   * Last modified: 2026-10-15
+   */
   const pick = (field: GeneratedField): string =>
     values.modes[sectionOfGeneratedField(field)] === "manual"
       ? values.manual[field]
@@ -294,7 +308,8 @@ export type GeneratedSummary = {
  * Use case: Captured at submit so the success panel can show the owner what was
  *   generated, because the Auto sections never displayed those values.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 export function generatedSummary(values: FormValues, baseDomain: string): GeneratedSummary {
   const identifiers = currentIdentifiers(values);
@@ -314,7 +329,8 @@ export function generatedSummary(values: FormValues, baseDomain: string): Genera
  * Output: The errors without that section's mode-dependent fields.
  * Use case: A switch must not leave errors about values that are no longer submitted.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function errorsAfterModeSwitch(
   errors: CreateTenantFieldErrors,
@@ -323,6 +339,15 @@ export function errorsAfterModeSwitch(
   return withoutFields(errors, SECTION_MODE_DEPENDENT_FIELDS[section]);
 }
 
+/**
+ * Description: Remove the given fields from an error map.
+ * Input: The current errors and the fields to drop.
+ * Output: A new error map without those fields (the input is not changed).
+ * Use case: Clearing errors of edited fields, of a switched section and after a new preview.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function withoutFields(
   errors: CreateTenantFieldErrors,
   fields: readonly CreateTenantField[],
@@ -332,7 +357,15 @@ export function withoutFields(
   return next;
 }
 
-/** After a failed create: only a password the server rejected has to be typed again. */
+/**
+ * Description: Clear only the passwords the server rejected after a failed create.
+ * Input: The current values and the server's field errors.
+ * Output: The values with a rejected master or database password emptied; everything else kept.
+ * Use case: After a failed create (CLAUDE.md: never clear input unnecessarily; a rejected secret must be retyped).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function clearRejectedPasswords(
   values: FormValues,
   fieldErrors: CreateTenantFieldErrors,
@@ -343,7 +376,15 @@ export function clearRejectedPasswords(
   return { ...values, manual };
 }
 
-/** After a successful create no typed password stays in memory. */
+/**
+ * Description: Forget every typed password after a successful create.
+ * Input: The current values.
+ * Output: The values with both passwords emptied.
+ * Use case: After a successful create, so no secret stays in component state.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function clearPasswords(values: FormValues): FormValues {
   return { ...values, manual: { ...values.manual, masterPassword: "", databasePassword: "" } };
 }
@@ -384,7 +425,8 @@ export const CREATE_TENANT_FIELDS = Object.keys(FIELD_SECTIONS) as CreateTenantF
  * Output: Its section id.
  * Use case: Focusing a section's switch when the field itself is hidden (Auto).
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 export function sectionOfField(field: CreateTenantField): FormSectionId {
   return FIELD_SECTIONS[field];
@@ -401,10 +443,20 @@ export function sectionOfField(field: CreateTenantField): FormSectionId {
  * unless that section is on Manual when the form is submitted.
  *
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function buildCreateFormData(values: FormValues, profileImage: File | null): FormData {
   const data = new FormData();
+  /**
+   * Description: Append one field to the FormData.
+   * Input: The field name and its value.
+   * Output: Nothing.
+   * Use case: buildCreateFormData.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-10-14
+   * Last modified: 2026-10-15
+   */
   const set = (field: CreateTenantField, value: string | File) => data.append(field, value);
 
   // Step 1: the switches and the database mode.
@@ -450,6 +502,15 @@ const NO_RESERVED_NAMES = { reservedNames: [] as string[] };
 export const NOT_GENERATED_YET =
   "The generated values aren't ready. Select Regenerate, or switch this section to Manual.";
 
+/**
+ * Description: Turn a rule result into an optional error message.
+ * Input: A rule result.
+ * Output: The error message, or undefined when the rule passed.
+ * Use case: validateField.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function errorOf(result: { ok: true } | { ok: false; error: string }): string | undefined {
   return result.ok ? undefined : result.error;
 }
@@ -460,7 +521,8 @@ function errorOf(result: { ok: true } | { ok: false; error: string }): string | 
  * Output: NOT_GENERATED_YET when a valid name has no preview yet, else undefined.
  * Use case: Submitting before the preview arrived (or after it failed).
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function notGeneratedYet(values: FormValues): string | undefined {
   // Without a valid full name, the full name's own error already says what to do.
@@ -474,7 +536,8 @@ function notGeneratedYet(values: FormValues): string | undefined {
  * Output: The error message, or undefined when the field is fine (or not submitted).
  * Use case: Blur validation, submit validation and "Test connection".
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function validateField(
   field: CreateTenantField,
@@ -482,9 +545,9 @@ export function validateField(
   ctx: ValidationContext,
 ): string | undefined {
   const { shared, manual, modes } = values;
-  const loginManual = modes.login === "manual";
+  const loginManual    = modes.login === "manual";
   const databaseManual = modes.database === "manual";
-  const domainManual = modes.domain === "manual";
+  const domainManual   = modes.domain === "manual";
 
   switch (field) {
     case "fullName":
@@ -538,7 +601,15 @@ export function validateField(
   }
 }
 
-/** Every client-side error at once, as the server returns them. */
+/**
+ * Description: Validate the whole create form at once.
+ * Input: The current values and the validation context.
+ * Output: Every client-side error, keyed by field, as the server returns them.
+ * Use case: The submit handler: an invalid form is never sent.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function validateForm(values: FormValues, ctx: ValidationContext): CreateTenantFieldErrors {
   const errors: CreateTenantFieldErrors = {};
   for (const field of CREATE_TENANT_FIELDS) {
@@ -548,7 +619,15 @@ export function validateForm(values: FormValues, ctx: ValidationContext): Create
   return errors;
 }
 
-/** The "Test connection" input after the same checks the server runs first. */
+/**
+ * Description: Check the existing-database fields before Test connection.
+ * Input: The current values and the validation context.
+ * Output: The connection input when valid, otherwise the field errors.
+ * Use case: The Test connection button (Manual database section, existing database).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function validateConnection(
   values: FormValues,
   ctx: ValidationContext,
@@ -570,16 +649,21 @@ export function validateConnection(
 const IMAGE_HEAD_BYTES = 16;
 
 /**
- * The server's checks on a chosen file, before it is uploaded: the size, and
- * the type from the file's first bytes (never its name or claimed type).
- * Null when the file is acceptable.
+ * Description: Run the server's image checks on a chosen file before it is uploaded.
+ * Input: The chosen file.
+ * Output: null when acceptable; otherwise the message: empty file, larger than 2 MB,
+ *   or not PNG/JPEG/WebP judged from its first bytes (never its name or claimed type).
+ * Use case: The profile image pickers of the create and edit forms (shown with an instant preview).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function checkProfileImageFile(file: Blob): Promise<string | null> {
   if (file.size === 0) return "The file is empty. Choose an image file.";
   if (file.size > MAX_PROFILE_IMAGE_BYTES) {
     return "The image is larger than 2 MB. Choose a smaller image.";
   }
-  const head = new Uint8Array(await file.slice(0, IMAGE_HEAD_BYTES).arrayBuffer());
+  const head   = new Uint8Array(await file.slice(0, IMAGE_HEAD_BYTES).arrayBuffer());
   const result = validateProfileImage(head);
   return result.ok ? null : result.error;
 }
@@ -587,31 +671,105 @@ export async function checkProfileImageFile(file: Blob): Promise<string | null> 
 // ---------------------------------------------------------------------------
 // Error summary
 
-/** In the order the form shows them; fields in their visual order within each. */
-export const FORM_SECTIONS: readonly { id: FormSectionId; title: string }[] = [
-  { id: "profile", title: "Tenant profile" },
-  { id: "login", title: "Tenant admin login" },
-  { id: "database", title: "Database" },
-  { id: "domain", title: "Domain" },
+/**
+ * The form's categories (CLAUDE.md category-wise organization) in page order.
+ * `title` is the section heading, the secondary menu label and the error
+ * summary label; `anchor` is the section's DOM id for the secondary menu.
+ */
+export const FORM_SECTIONS: readonly { id: FormSectionId; title: string; anchor: string }[] = [
+  { id: "profile", title: "Personal Information", anchor: "create-tenant-personal-information" },
+  { id: "login", title: "Login Information", anchor: "create-tenant-login-information" },
+  { id: "database", title: "Database Information", anchor: "create-tenant-database-information" },
+  { id: "domain", title: "Domain Information", anchor: "create-tenant-domain-information" },
 ];
+
+/** The label of every field as the error summary names it. */
+export const FIELD_LABELS: Readonly<Record<CreateTenantField, string>> = {
+  fullName: "Full name",
+  phone: "Phone",
+  profileImage: "Profile image",
+  loginMode: "Login values",
+  username: "Username",
+  email: "Email",
+  masterPassword: "Master password",
+  databaseCredentialMode: "Database values",
+  databaseMode: "Database mode",
+  databaseName: "Database name",
+  databaseUser: "Database user",
+  databasePassword: "Database password",
+  databasePort: "Port",
+  subdomainMode: "Subdomain value",
+  subdomain: "SaaS subdomain",
+  customDomain: "Custom domain",
+};
 
 export type SectionSummary = {
   id: FormSectionId;
   title: string;
-  /** The field the summary link focuses. */
+  /** The field the section link focuses. */
   firstField: CreateTenantField;
-  count: number;
+  /** Every invalid field of the section, in page order, with its label. */
+  fields: { field: CreateTenantField; label: string }[];
 };
 
-/** One entry per section with problems, pointing at its first invalid field. */
+/**
+ * Description: Summarize the current errors per form section.
+ * Input: The current field errors.
+ * Output: One entry per section with problems: its title, its first invalid
+ *   field and every invalid field with its label (no bare counts).
+ * Use case: The error summary above the form: each field name is a link that
+ *   focuses that field (CLAUDE.md: no count without its details).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function summarizeErrors(errors: CreateTenantFieldErrors): SectionSummary[] {
   return FORM_SECTIONS.flatMap((section) => {
-    const fields = CREATE_TENANT_FIELDS.filter(
+    // The section's invalid fields, in the order the page shows them.
+    const invalid = CREATE_TENANT_FIELDS.filter(
       (field) => FIELD_SECTIONS[field] === section.id && errors[field],
     );
-    const [firstField] = fields;
-    return firstField ? [{ ...section, firstField, count: fields.length }] : [];
+    const [firstField] = invalid;
+    if (!firstField) return [];
+    return [
+      {
+        id: section.id,
+        title: section.title,
+        firstField,
+        fields: invalid.map((field) => ({ field, label: FIELD_LABELS[field] })),
+      },
+    ];
   });
+}
+
+/**
+ * Description: Tell whether the owner has entered anything that leaving the page would lose.
+ * Input: The current values, the initial values and whether an image is chosen.
+ * Output: True when a typed value, a section switch, the database mode or the
+ *   image differs from the empty form.
+ * Use case: Cancel asks for confirmation only when there is something to lose
+ *   (CLAUDE.md: confirm risky actions).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
+ */
+export function hasUnsavedInput(
+  values: FormValues,
+  initial: FormValues,
+  hasImage: boolean,
+): boolean {
+  /**
+   * Description: Reduce the form values to what the owner entered.
+   *   Note: The preview is generated, not typed: it is not compared.
+   * Input: The form values.
+   * Output: The switches, shared values and manual drafts as JSON (the preview is left out).
+   * Use case: hasUnsavedInput.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-10-15
+   * Last modified: 2026-10-15
+   */
+  const typed = (form: FormValues) => JSON.stringify({ modes: form.modes, shared: form.shared, manual: form.manual });
+  return hasImage || typed(values) !== typed(initial);
 }
 
 // ---------------------------------------------------------------------------
@@ -625,13 +783,21 @@ const PASSWORD_CLASSES = [
   "23456789",
   "!#%*+-=?@^_~",
 ];
-const PASSWORD_ALPHABET = PASSWORD_CLASSES.join("");
-const MASTER_PASSWORD_LENGTH = 20;
+const PASSWORD_ALPHABET       = PASSWORD_CLASSES.join("");
+const MASTER_PASSWORD_LENGTH  = 20;
 const DATABASE_PASSWORD_BYTES = 32;
 
-/** A uniform integer in [0, max): rejection sampling, so there is no modulo bias. */
+/**
+ * Description: Pick a uniform random integer in [0, max) with the browser CSPRNG.
+ * Input: The exclusive upper bound.
+ * Output: The integer; rejection sampling, so there is no modulo bias.
+ * Use case: generateMasterPassword.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function randomIndex(max: number): number {
-  const limit = Math.floor(0x1_0000_0000 / max) * max;
+  const limit  = Math.floor(0x1_0000_0000 / max) * max;
   const buffer = new Uint32Array(1);
   for (;;) {
     crypto.getRandomValues(buffer);
@@ -640,11 +806,29 @@ function randomIndex(max: number): number {
   }
 }
 
+/**
+ * Description: Pick one random character of an alphabet.
+ * Input: The alphabet.
+ * Output: One character, uniformly chosen.
+ * Use case: generateMasterPassword.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function randomCharacter(alphabet: string): string {
   return alphabet[randomIndex(alphabet.length)] as string;
 }
 
-/** 20 characters, one of each class at least, never containing the user name. */
+/**
+ * Description: Generate a master password in the browser.
+ * Input: The username it must not contain.
+ * Output: 20 characters with at least one of each class, shuffled, never containing
+ *   the user name (checked with the same rule as the server).
+ * Use case: The Generate button of the Manual login section.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function generateMasterPassword(username: string): string {
   for (;;) {
     const characters = [
@@ -663,10 +847,18 @@ export function generateMasterPassword(username: string): string {
   }
 }
 
-/** 32 random bytes as base64url: 43 printable ASCII characters, as on the server. */
+/**
+ * Description: Generate a database password in the browser.
+ * Input: None.
+ * Output: 32 random bytes as base64url: 43 printable ASCII characters, as on the server.
+ * Use case: The Generate button of the Manual database section (new database).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function generateDatabasePassword(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(DATABASE_PASSWORD_BYTES));
-  let binary = "";
+  let binary  = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }

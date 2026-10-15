@@ -189,7 +189,7 @@ describe("global defaults and safe resets", () => {
     expect(await reset(a)).toMatchObject({ ok: true });
   });
 
-  it("global reset persists Light/Emerald without discarding either owner's override", async () => {
+  it("global reset persists Light/Neutral without discarding either owner's override", async () => {
     await apply(a, DARK, "global");
     await apply(a, DARK);
     await apply(b, LIGHT);

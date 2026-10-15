@@ -36,8 +36,9 @@ const SESSION_COOKIE = "md_platform_session";
 const THEME_COOKIE = "md_platform_theme";
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
-// The stable start of the signed-in dashboard's greeting (the username follows).
-const WELCOME = "Welcome back,";
+// The signed-in dashboard's heading. The username is no longer part of it (it
+// is sensitive), and the login page's "Welcome back." is a paragraph, not an h1.
+const WELCOME = "Welcome back</h1>";
 const INVALID_CREDENTIALS = "Invalid username or password.";
 const RATE_LIMITED = "Too many sign-in attempts. Try again later.";
 

@@ -5,14 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Empty,
-  EmptyContent,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
-import {
   Pagination as PaginationRoot,
   PaginationContent,
   PaginationItem,
@@ -37,9 +29,13 @@ import {
   type TenantListRow,
 } from "@/lib/tenants/service";
 import { Avatar } from "../_components/avatar";
-import { Icon } from "../_components/icons";
+import { CountDetails } from "../_components/count-details";
+import { EmptyState } from "../_components/empty-state";
+import { Icon, type IconName } from "../_components/icons";
 import { Notice } from "../_components/notice";
 import { PageHeader } from "../_components/page-header";
+import { SectionedLayout, type SecondaryMenuItem } from "../_components/secondary-menu";
+import { SensitiveValue } from "../_components/sensitive-value";
 import { StatCard } from "../_components/stat-card";
 import { StatusBadge } from "../_components/status-badge";
 import { FOCUS_RING } from "../_components/styles";
@@ -49,6 +45,7 @@ import {
   DomainStatusBadge,
   ExistingDatabaseTag,
 } from "./_components/badges";
+import { tenantListDetails, tenantSummaryDetails } from "./_components/count-details-content";
 import {
   TenantListResults,
   TenantListTransition,
@@ -72,23 +69,32 @@ export const metadata: Metadata = { title: getNavItem("tenants").label };
 
 const NEW_TENANT_PATH = `${TENANTS_PATH}/new`;
 
+// The page's sections for the secondary menu (top bar: the table keeps its full width).
+const SECTION_IDS = { summary: "tenant-summary-section", directory: "tenant-directory-section" } as const;
+const MENU_ITEMS: readonly SecondaryMenuItem[] = [
+  { id: SECTION_IDS.summary, label: "Summary", icon: "activity" },
+  { id: SECTION_IDS.directory, label: "Tenant Directory", icon: "building-2" },
+];
+
 type PageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
 /**
- * Description: Load the authenticated tenant directory, summary and URL-selected results.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Render the tenant directory: summary figures, search/filter and the paged list.
+ * Input: The URL search parameters (q, status, page, notice), read on the server.
+ * Output: The protected page: header, notices, secondary menu, clickable
+ *   summary cards and the database-paged tenant table/cards.
+ * Use case: /platform/tenants — the owner reviews and manages all tenants.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export default async function PlatformTenantsPage({ searchParams }: PageProps) {
   // Checked on the server on every request; nothing below renders without it.
   await requirePlatformOwner();
   const params = await searchParams;
-  const query = parseTenantListQuery(params);
+  const query  = parseTenantListQuery(params);
   const notice = tenantNoticeMessage(params.notice);
   const [summary, list] = await Promise.all([
     loadTenantSummary(),
@@ -115,100 +121,165 @@ export default async function PlatformTenantsPage({ searchParams }: PageProps) {
         {notice ? <Notice variant="success">{notice}</Notice> : null}
         <TenantFlashNotice />
 
-        <section aria-labelledby="tenant-summary">
-          <h2 id="tenant-summary" className="sr-only">
-            Tenant summary
-          </h2>
-          {/* Real figures only: when they can't be read, each card says so. */}
-          <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard
-              label="Total tenants"
-              icon="building-2"
-              value={summary?.total ?? null}
-              note={
-                summary ? "Registered on your platform" : SUMMARY_UNAVAILABLE
-              }
-            />
-            <StatCard
-              label="Active"
-              icon="activity"
-              value={summary?.active ?? null}
-              note={summary ? "Accounts marked active" : SUMMARY_UNAVAILABLE}
-            />
-            <StatCard
-              label="Suspended"
-              icon="ban"
-              value={summary?.suspended ?? null}
-              note={
-                summary ? "Access currently suspended" : SUMMARY_UNAVAILABLE
-              }
-            />
-            <StatCard
-              label="Pending setup"
-              icon="clock"
-              value={summary?.pendingSetup ?? null}
-              note={
-                !summary ? (
-                  SUMMARY_UNAVAILABLE
-                ) : summary.failed > 0 ? (
-                  <span className="font-medium text-destructive">
-                    {summary.failed} failed
-                  </span>
-                ) : (
-                  "Awaiting provisioning"
-                )
-              }
-            />
-          </dl>
-        </section>
+        <SectionedLayout items={MENU_ITEMS} variant="top" contentClassName="flex flex-col gap-8">
+          <section id={SECTION_IDS.summary} aria-labelledby="tenant-summary">
+            <h2 id="tenant-summary" className="sr-only">
+              Tenant summary
+            </h2>
+            {/* Real figures only: when they can't be read, each card says so.
+                Every figure opens the exact tenants it counts. */}
+            <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <StatCard
+                label="Total tenants"
+                icon="building-2"
+                value={summary?.total ?? null}
+                note={
+                  summary ? "Registered on your platform" : SUMMARY_UNAVAILABLE
+                }
+                details={summary ? tenantSummaryDetails("all", summary) : undefined}
+              />
+              <StatCard
+                label="Active"
+                icon="activity"
+                value={summary?.active ?? null}
+                note={summary ? "Accounts marked active" : SUMMARY_UNAVAILABLE}
+                details={summary ? tenantSummaryDetails("active", summary) : undefined}
+              />
+              <StatCard
+                label="Suspended"
+                icon="ban"
+                value={summary?.suspended ?? null}
+                note={
+                  summary ? "Access currently suspended" : SUMMARY_UNAVAILABLE
+                }
+                details={summary ? tenantSummaryDetails("suspended", summary) : undefined}
+              />
+              <StatCard
+                label="Pending setup"
+                icon="clock"
+                value={summary?.pendingSetup ?? null}
+                note={
+                  !summary ? (
+                    SUMMARY_UNAVAILABLE
+                  ) : summary.failed > 0 ? (
+                    // The failed figure is a count too: it opens the failed tenants.
+                    <FailedNote failed={summary.failed} details={tenantSummaryDetails("failed", summary)} />
+                  ) : (
+                    "Awaiting provisioning"
+                  )
+                }
+                details={summary ? tenantSummaryDetails("setup", summary) : undefined}
+              />
+            </dl>
+          </section>
 
-        <Card
-          role="region"
-          aria-labelledby="tenant-list"
-          className="min-w-0 gap-0 overflow-hidden py-0"
-        >
-          <CardHeader className="flex flex-wrap items-center justify-between gap-3 py-5">
-            <div className="flex items-center gap-3">
-              <CardTitle
-                id="tenant-list"
-                role="heading"
-                aria-level={2}
-                className="text-base"
-              >
-                Tenant directory
-              </CardTitle>
-              <Badge variant="outline" className="tabular-nums">
-                {list.total}
-              </Badge>
-            </div>
-            <p className="text-xs text-fg-subtle">
-              {query.q || query.status !== "all"
-                ? "Filtered results"
-                : "All registered tenants"}{" "}
-              · Newest first
-            </p>
-          </CardHeader>
-          <TenantListTransition>
-            <TenantToolbar q={query.q} status={query.status} />
-            <TenantListResults>
-              <TenantResults list={list} query={query} />
-            </TenantListResults>
-          </TenantListTransition>
-        </Card>
+          <Card
+            id={SECTION_IDS.directory}
+            role="region"
+            aria-labelledby="tenant-list"
+            className="min-w-0 gap-0 overflow-hidden py-0"
+          >
+            <CardHeader className="flex flex-wrap items-center justify-between gap-3 py-5">
+              <div className="flex items-center gap-3">
+                <CardTitle
+                  id="tenant-list"
+                  role="heading"
+                  aria-level={2}
+                  className="text-base"
+                >
+                  Tenant directory
+                </CardTitle>
+                {/* The result total opens the exact tenants that match the filters. */}
+                <TotalBadge query={query} list={list} />
+              </div>
+              <p className="text-xs text-fg-subtle">
+                {query.q || query.status !== "all"
+                  ? "Filtered results"
+                  : "All registered tenants"}{" "}
+                · Newest first
+              </p>
+            </CardHeader>
+            <TenantListTransition>
+              <TenantToolbar q={query.q} status={query.status} />
+              <TenantListResults>
+                <TenantResults list={list} query={query} />
+              </TenantListResults>
+            </TenantListTransition>
+          </Card>
+        </SectionedLayout>
       </div>
     </TenantFlashProvider>
+  );
+}
+
+/**
+ * Description: Show the directory's result total as a badge that opens its records.
+ * Input: The current list query and the loaded page (for its total and page size).
+ * Output: A badge-styled count button with the shared count-details dialog.
+ * Use case: The "Tenant directory" card header (CLAUDE.md count transparency).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
+ */
+function TotalBadge({ query, list }: { query: TenantListQuery; list: TenantListPage }) {
+  const details = tenantListDetails(query, list.total, list.pageSize);
+  return (
+    <Badge variant="outline" className="tabular-nums">
+      <CountDetails
+        label={`${list.total} tenants in this list. Show them.`}
+        title={details.title}
+        description={details.description}
+        calculation={details.calculation}
+        records={details.records}
+        className="text-xs font-medium no-underline hover:underline"
+      >
+        {list.total}
+      </CountDetails>
+    </Badge>
+  );
+}
+
+/**
+ * Description: Show the "N failed" note of the Pending setup card as a count button.
+ * Input: The number of failed setups and that figure's details.
+ * Output: A destructive-coloured button that opens the failed tenants.
+ * Use case: The Pending setup summary card when at least one setup failed.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
+ */
+function FailedNote({
+  failed,
+  details,
+}: {
+  failed: number;
+  details: ReturnType<typeof tenantSummaryDetails>;
+}) {
+  return (
+    <CountDetails
+      label={`${failed} failed setups. Show the tenants.`}
+      title={details.title}
+      description={details.description}
+      calculation={details.calculation}
+      records={details.records}
+      className="text-xs font-medium text-destructive"
+    >
+      {failed} failed
+    </CountDetails>
   );
 }
 
 // ---------------------------------------------------------------------------
 
 /**
- * Description: Render tenant rows, responsive cards or the appropriate actionable empty state.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Render the directory's results for the current query.
+ * Input: The loaded page and the query.
+ * Output: The table (xl) and cards (smaller screens) with pagination, or the
+ *   matching empty state (no tenants, no matches, page past the end).
+ * Use case: The tenant directory card.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 function TenantResults({
   list,
@@ -221,7 +292,7 @@ function TenantResults({
 
   if (list.total === 0) {
     return filtered ? (
-      <EmptyState
+      <DirectoryEmptyState
         icon="search"
         title="No tenants match your search"
         text="Try another search term or status."
@@ -232,7 +303,7 @@ function TenantResults({
         }
       />
     ) : (
-      <EmptyState
+      <DirectoryEmptyState
         icon="building-2"
         title="No tenants yet"
         text="Create the first tenant to give it its own database and subdomain."
@@ -251,7 +322,7 @@ function TenantResults({
   // A page number past the end (an old link, a hand-edited URL).
   if (list.rows.length === 0) {
     return (
-      <EmptyState
+      <DirectoryEmptyState
         icon="search"
         title="This page is empty"
         text={`There are only ${list.pageCount} ${list.pageCount === 1 ? "page" : "pages"} of results.`}
@@ -282,12 +353,13 @@ function TenantResults({
 }
 
 /**
- * Description: Build the protected avatar URL only when the tenant has a stored profile image.
- * Input: The existing typed arguments and component state.
- * Output: The existing helper result or state update.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Build a row's avatar URL.
+ * Input: The row (id and whether it has a stored image).
+ * Output: The protected avatar route, or null for initials.
+ * Use case: TenantTable and TenantCard.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 function avatarSrc(row: {
   id: string;
@@ -297,12 +369,13 @@ function avatarSrc(row: {
 }
 
 /**
- * Description: Render the lifecycle status and accessible suspension reason.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Show a tenant's status with its suspension reason.
+ * Input: The row.
+ * Output: The status badge; a suspended tenant's reason in the title and for screen readers.
+ * Use case: TenantTable and TenantCard.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 function TenantStatusCell({ row }: { row: TenantListRow }) {
   const reason = row.status === "suspended" ? row.statusReason : null;
@@ -315,12 +388,14 @@ function TenantStatusCell({ row }: { row: TenantListRow }) {
 }
 
 /**
- * Description: Render SaaS and custom domain information with verification status.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Show a tenant's domains.
+ * Input: The row.
+ * Output: The subdomain host and the custom host with its pending state (hosts wrap
+ *   at natural break points).
+ * Use case: TenantTable and TenantCard.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 function DomainCell({ row }: { row: TenantListRow }) {
   return (
@@ -343,12 +418,33 @@ function DomainCell({ row }: { row: TenantListRow }) {
 }
 
 /**
- * Description: Render database provisioning state and existing-database mode.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Render the tenant's email and phone, each masked behind an eye button.
+ * Input: One directory row.
+ * Output: The masked email and, when stored, the masked phone number.
+ * Use case: The Contact column of the directory table (sensitive data rule).
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
+ */
+function ContactCell({ row }: { row: TenantListRow }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-1">
+      <SensitiveValue value={row.email} noun="email" monospace={false} />
+      {row.phone ? (
+        <SensitiveValue value={row.phone} noun="phone number" monospace={false} className="text-fg-subtle" />
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Description: Show a tenant's database state.
+ * Input: The row.
+ * Output: The database state badge and the Existing tag.
+ * Use case: TenantTable and TenantCard.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 function DatabaseCell({ row }: { row: TenantListRow }) {
   return (
@@ -360,12 +456,13 @@ function DatabaseCell({ row }: { row: TenantListRow }) {
 }
 
 /**
- * Description: Render an ISO-backed human-readable creation date.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Show a tenant's creation date.
+ * Input: The row.
+ * Output: A <time> element with the formatted date.
+ * Use case: TenantTable and TenantCard.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 function CreatedCell({ row }: { row: TenantListRow }) {
   return (
@@ -379,14 +476,14 @@ const TH = "px-5 py-3.5 text-[11px] font-semibold tracking-wide";
 const TD = "px-5 py-4 align-middle whitespace-normal";
 
 /**
- * xl and up: below that, next to the sidebar, the six columns would only fit
- * by scrolling sideways and the row actions would sit off-screen.
- *
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Render the directory as a table (xl and up).
+ * Input: The rows of the page.
+ * Output: Tenant, Contact (masked), Domain, Database, Status and Actions columns.
+ *   Below xl the six columns would only fit by scrolling sideways, so cards are used.
+ * Use case: TenantResults.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 function TenantTable({ rows }: { rows: TenantListRow[] }) {
   return (
@@ -439,10 +536,8 @@ function TenantTable({ rows }: { rows: TenantListRow[] }) {
                 </div>
               </TableCell>
               <TableCell className={`${TD} max-w-64`}>
-                <p className="truncate text-fg">{row.email}</p>
-                {row.phone ? (
-                  <p className="mt-0.5 truncate text-fg-subtle">{row.phone}</p>
-                ) : null}
+                {/* Contact details are sensitive: masked until the eye button is used. */}
+                <ContactCell row={row} />
               </TableCell>
               <TableCell className={`${TD} max-w-72`}>
                 <DomainCell row={row} />
@@ -469,12 +564,13 @@ function TenantTable({ rows }: { rows: TenantListRow[] }) {
 }
 
 /**
- * Below xl: the same data as a table row, as a card (two per row from md).
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Render one tenant as a card (below xl).
+ * Input: The row.
+ * Output: The same data as a table row (contact details masked), two per row from md.
+ * Use case: TenantResults.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 function TenantCard({ row }: { row: TenantListRow }) {
   return (
@@ -499,11 +595,15 @@ function TenantCard({ row }: { row: TenantListRow }) {
         </div>
         <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm">
           <dt className="text-fg-muted">Email</dt>
-          <dd className="min-w-0 break-all text-fg">{row.email}</dd>
+          <dd className="min-w-0">
+            <SensitiveValue value={row.email} noun="email" monospace={false} />
+          </dd>
           {row.phone ? (
             <>
               <dt className="text-fg-muted">Phone</dt>
-              <dd className="min-w-0 break-words text-fg">{row.phone}</dd>
+              <dd className="min-w-0">
+                <SensitiveValue value={row.phone} noun="phone number" monospace={false} />
+              </dd>
             </>
           ) : null}
           <dt className="text-fg-muted">Domain</dt>
@@ -532,12 +632,14 @@ function TenantCard({ row }: { row: TenantListRow }) {
 }
 
 /**
- * Description: Render result counts and URL-based pagination without changing query behavior.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Render the result position and the page links.
+ * Input: The loaded page and the query.
+ * Output: "Showing a–b of n · Page x of y" (opens the count dialog with the
+ *   calculation and the tenants) and Previous/Next links that keep the filters.
+ * Use case: TenantResults.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 function Pagination({
   list,
@@ -547,6 +649,8 @@ function Pagination({
   query: TenantListQuery;
 }) {
   const range = pageRowRange(list.page, list.pageSize, list.total);
+  // The "of n" total and the page count open the same records as the header badge.
+  const details = tenantListDetails(query, list.total, list.pageSize);
   const previous =
     list.page > 1 ? tenantListHref({ ...query, page: list.page - 1 }) : null;
   const next =
@@ -559,9 +663,16 @@ function Pagination({
       aria-label="Pagination"
       className="mx-0 flex w-full flex-col gap-3 border-t border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6"
     >
-      <p className="text-sm text-fg-muted">
+      <div className="text-sm text-fg-muted">
         {range ? (
-          <>
+          <CountDetails
+            label={`Showing ${range.first} to ${range.last} of ${list.total} tenants, page ${list.page} of ${list.pageCount}. Show how this is calculated.`}
+            title={details.title}
+            description={details.description}
+            calculation={details.calculation}
+            records={details.records}
+            className="text-sm font-normal text-fg-muted"
+          >
             Showing{" "}
             <span className="font-medium text-fg tabular-nums">
               {range.first}
@@ -574,14 +685,14 @@ function Pagination({
             <span className="font-medium text-fg tabular-nums">
               {list.total}
             </span>
-          </>
+            {list.pageCount > 1 ? (
+              <span className="tabular-nums text-fg-subtle"> · Page {list.page} of {list.pageCount}</span>
+            ) : null}
+          </CountDetails>
         ) : null}
-      </p>
+      </div>
       {list.pageCount > 1 ? (
         <div className="flex items-center gap-2">
-          <span className="mr-2 text-xs tabular-nums text-fg-subtle">
-            Page {list.page} of {list.pageCount}
-          </span>
           <PaginationContent>
             <PaginationItem>
               <PageLink href={previous} icon="chevron-left" label="Previous" />
@@ -597,12 +708,14 @@ function Pagination({
 }
 
 /**
- * Description: Render an available pagination destination or a disabled direction.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Render one pagination direction.
+ * Input: The destination (or null), the icon and the label.
+ * Output: A link button, or a disabled button when there is no such page (it never
+ *   submits or changes the URL).
+ * Use case: Pagination.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 function PageLink({
   href,
@@ -642,37 +755,32 @@ function PageLink({
 }
 
 /**
- * Description: Show an illustrated directory empty state with its recovery action.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Show the directory's empty state (shared EmptyState below the toolbar).
+ * Input: The icon, heading, description and recovery action.
+ * Output: The shared illustrated empty state with a top border under the toolbar.
+ * Use case: No tenants yet, no search results, a page number past the end.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
-function EmptyState({
+function DirectoryEmptyState({
   icon,
   title,
   text,
   action,
 }: {
-  icon: "search" | "building-2";
+  icon: IconName;
   title: string;
   text: string;
   action: ReactNode;
 }) {
   return (
-    <Empty className="rounded-none border-t border-border px-6 py-16">
-      <EmptyHeader>
-        <EmptyMedia
-          variant="icon"
-          className="size-16 rounded-2xl bg-primary/10 text-primary"
-        >
-          <Icon name={icon} className="size-7" />
-        </EmptyMedia>
-        <EmptyTitle>{title}</EmptyTitle>
-        <EmptyDescription>{text}</EmptyDescription>
-      </EmptyHeader>
-      <EmptyContent>{action}</EmptyContent>
-    </Empty>
+    <EmptyState
+      icon={icon}
+      title={title}
+      description={text}
+      action={action}
+      className="rounded-none border-t border-border py-16"
+    />
   );
 }

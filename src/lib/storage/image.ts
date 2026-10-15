@@ -18,11 +18,20 @@ export type SniffedImage = {
   extension: "png" | "jpg" | "webp";
 };
 
-const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+const PNG_SIGNATURE  = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 const JPEG_SIGNATURE = [0xff, 0xd8, 0xff];
-const RIFF = [0x52, 0x49, 0x46, 0x46];
-const WEBP = [0x57, 0x45, 0x42, 0x50];
+const RIFF           = [0x52, 0x49, 0x46, 0x46];
+const WEBP           = [0x57, 0x45, 0x42, 0x50];
 
+/**
+ * Description: Compare bytes at an offset with an expected signature.
+ * Input: The file bytes, the offset and the expected bytes.
+ * Output: True when the file is long enough and the bytes match.
+ * Use case: sniffImage.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function startsWithAt(bytes: Uint8Array, offset: number, expected: number[]): boolean {
   return (
     bytes.length >= offset + expected.length &&
@@ -30,6 +39,16 @@ function startsWithAt(bytes: Uint8Array, offset: number, expected: number[]): bo
   );
 }
 
+/**
+ * Description: Decide an image's type from its first bytes only.
+ * Input: The file bytes.
+ * Output: PNG, JPEG or WebP with its content type and extension, or null. The
+ *   uploader's content type and file name are never trusted; SVG is not supported.
+ * Use case: validateProfileImage.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function sniffImage(bytes: Uint8Array): SniffedImage | null {
   if (startsWithAt(bytes, 0, PNG_SIGNATURE)) {
     return { kind: "png", contentType: "image/png", extension: "png" };
@@ -44,6 +63,16 @@ export function sniffImage(bytes: Uint8Array): SniffedImage | null {
   return null;
 }
 
+/**
+ * Description: Check an uploaded profile image.
+ * Input: The file bytes.
+ * Output: The sniffed image, or the message: empty file, larger than 2 MB, or not
+ *   PNG/JPEG/WebP.
+ * Use case: The image pickers (client) and storeProfileImage (server).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export function validateProfileImage(bytes: Uint8Array): RuleResult<SniffedImage> {
   if (bytes.length === 0) return { ok: false, error: "The file is empty. Choose an image file." };
   if (bytes.length > MAX_PROFILE_IMAGE_BYTES) {

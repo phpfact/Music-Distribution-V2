@@ -11,11 +11,11 @@ import {
   type AppearanceActionResult,
   type AppearanceState,
 } from "./preferences";
+import { UUID_PATTERN } from "@/lib/uuid";
 
 export type { AppearanceState } from "./preferences";
 
 const GLOBAL_ID = "platform";
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 type AppearanceDb = Pick<ControlDb, "platformOwner" | "platformAppearance">;
 
 /**
@@ -24,8 +24,8 @@ type AppearanceDb = Pick<ControlDb, "platformOwner" | "platformAppearance">;
  * Output: The complete resolved appearance, its source, and global permission.
  * Use case: First render, background refresh, and uncached post-transaction results.
  * Author: Mr. Sachin Sharma
- * Created date: 2026-10-14
- * Last modified date: 2026-10-14
+ * Created: 2026-10-14
+ * Last modified: 2026-10-14
  */
 async function readState(db: AppearanceDb, ownerId?: string): Promise<AppearanceState> {
   const [globalRow, owner] = await Promise.all([
@@ -42,7 +42,7 @@ async function readState(db: AppearanceDb, ownerId?: string): Promise<Appearance
       : null,
   ]);
   const personal = parseAppearance(owner?.personalAppearance);
-  const global = parseAppearance(globalRow);
+  const global   = parseAppearance(globalRow);
   return {
     ownerId: owner?.id ?? null,
     personal,
@@ -58,8 +58,8 @@ async function readState(db: AppearanceDb, ownerId?: string): Promise<Appearance
  * Output: The requesting owner's complete resolved appearance state.
  * Use case: Platform layout and Appearance page share one request-local read.
  * Author: Mr. Sachin Sharma
- * Created date: 2026-10-14
- * Last modified date: 2026-10-14
+ * Created: 2026-10-14
+ * Last modified: 2026-10-14
  */
 export const getAppearanceState = cache(async (ownerId?: string): Promise<AppearanceState> => {
   return readState(getControlDb(), ownerId);
@@ -75,8 +75,8 @@ export const getAppearanceState = cache(async (ownerId?: string): Promise<Appear
  * serializes that owner's writes before checking override existence; a shared
  * session lock still protects against revocation after a page was rendered.
  * Author: Mr. Sachin Sharma
- * Created date: 2026-10-14
- * Last modified date: 2026-10-14
+ * Created: 2026-10-14
+ * Last modified: 2026-10-14
  */
 export async function saveAppearance(
   session: PlatformSession,

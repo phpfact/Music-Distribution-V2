@@ -6,7 +6,8 @@ import { Loader2Icon } from "lucide-react";
  * Input: component props. Output: accessible React UI with merged classes.
  * Use case: consistent spinner behavior across application screens.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 function Spinner({ className, ...props }: React.ComponentProps<"svg">) {
   return (

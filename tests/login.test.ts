@@ -229,6 +229,8 @@ describe("[R7] empty input", () => {
     ["an empty username", "", PASSWORD, { username: USERNAME_MESSAGE }],
     ["a username of only white space", "   ", PASSWORD, { username: USERNAME_MESSAGE }],
     ["an empty password", "vt-login-someone", "", { password: PASSWORD_MESSAGE }],
+    // CLAUDE.md: required text fields reject whitespace-only input.
+    ["a password of only white space", "vt-login-someone", "   ", { password: PASSWORD_MESSAGE }],
     ["both empty", "", "", { username: USERNAME_MESSAGE, password: PASSWORD_MESSAGE }],
     ["null values", null, null, { username: USERNAME_MESSAGE, password: PASSWORD_MESSAGE }],
     ["undefined values", undefined, undefined, { username: USERNAME_MESSAGE, password: PASSWORD_MESSAGE }],
@@ -253,12 +255,6 @@ describe("[R7] empty input", () => {
     expect(await keys.count(LoginKeys.ipKey(ip))).toBeNull();
     expect(await keys.count(usernameKey)).toBeNull();
     expect(await keys.count(emptyUsernameKey)).toBe(emptyBefore);
-  });
-
-  it("accepts a password of only white space as a password (and finds it wrong)", async () => {
-    const owner = await newOwner();
-
-    expect(await signIn(owner.username, "   ", await newIp())).toStrictEqual(INVALID_CREDENTIALS);
   });
 });
 

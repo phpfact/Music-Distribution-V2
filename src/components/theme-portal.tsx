@@ -12,7 +12,8 @@ const ThemePortalContext = createContext<HTMLElement | null | undefined>(
  * Input: mounted ThemeRoot element and children. Output: context only, no wrapper.
  * Use case: dialogs, menus and sheets inherit account appearance and system mode.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 export function ThemePortalProvider({
   container,
@@ -33,7 +34,8 @@ export function ThemePortalProvider({
  * Input: enclosing provider. Output: theme ancestor, null while mounting, or undefined.
  * Use case: keep floating components within the single existing theme source.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 export function useThemePortal() {
   return useContext(ThemePortalContext);

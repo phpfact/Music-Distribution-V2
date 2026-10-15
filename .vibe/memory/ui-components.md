@@ -101,3 +101,47 @@ illustrates multiple draft palettes rather than inheriting the active mode.
   FormActions/RequiredLegend and PageHeader; FormSection takes an icon and an
   action slot; PasswordInput reuses RevealToggle (no behaviour change). Lint,
   types and the full suite pass; rendered in the in-app browser.
+
+## Shared components for the CLAUDE.md compliance pass (requested 2026-10-15)
+
+- `SectionedLayout` + `SecondaryMenu` (`_components/secondary-menu.tsx`): the one
+  secondary-menu implementation. Props: the page's sections (`id`, `label`,
+  optional icon) and `variant` ("sidebar": sticky vertical menu beside the
+  content from lg, horizontal above it below lg; "top": sticky horizontal menu
+  at every width, for wide tables). It finds the scroll container (the console's
+  `<main>`), highlights the last section whose heading passed the top offset
+  (the last one once scrolled to the bottom), scrolls smoothly on click (instant
+  with reduced motion) and keeps the clicked item active until the scroll ends.
+  A MutationObserver hides items whose section is not in the DOM, so sections
+  can be added, removed, expanded or collapsed. Sections use
+  `SECTION_SCROLL_MARGIN` so their headings land below the sticky menu.
+- `CountDetails` (`_components/count-details.tsx`): turns a figure into a button
+  that opens a dialog with the calculation and the supporting records
+  (rendered only while open, so lists load on demand).
+- `EmptyState` (`_components/empty-state.tsx`): illustration (icon tile with
+  decorative rings), heading, description and optional action.
+- `SensitiveValue` gains `monospace` (default true) so emails and phones can
+  use the regular font.
+- `StatCard` gains an optional `details` slot: the figure opens it.
+
+### Change history
+
+- 2026-10-15: Recorded the shared secondary menu, count details and empty
+  state components required by CLAUDE.md.
+- 2026-10-15: Implemented SectionedLayout/SecondaryMenu, CountDetails,
+  EmptyState, StatCard details, SensitiveValue `monospace` (now inline-flex so
+  it fits inside sentences), FormSection `id`, AuthPageGuard, masked
+  ProfileMenu. Shared helpers added to remove duplicated logic:
+  `src/lib/with-timeout.ts` (Redis limiters, DNS checks and the readiness
+  route used three copies) and `src/lib/uuid.ts` (`UUID_PATTERN`, `isUuid`,
+  previously copied into nine files). UI contract tests added in
+  tests/console-ui.test.ts.
+- 2026-10-15: Code-quality pass (CLAUDE.md): every function in this module's
+  frontend and backend files now has the full doc block (Description, Input,
+  Output, Use case, Author, Created, Last modified; "Created: X. Last modified:
+  Y." one-liners split into two lines); consecutive single-line const/let
+  declarations have their "=" vertically aligned (typed and untyped
+  declarations are aligned in separate groups).
+- 2026-10-15: Verification of the compliance pass: TypeScript (including tests)
+  and ESLint (zero warnings) pass; the full Vitest suite passes in the app
+  container: 37 files, 1136 tests, 1 pre-existing localhost-only skip.

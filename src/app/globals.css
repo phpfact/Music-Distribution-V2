@@ -9,20 +9,28 @@
   }
 }
 
+/*
+ * Base palette: shadcn's official neutral (black-and-white) scale
+ * (CLAUDE.md "Default Theme"). The accent (--accent-light / --accent-dark) is
+ * the owner's Appearance choice; the default accent "neutral" is shadcn's own
+ * near-black primary, so the default look is pure black and white.
+ * Secondary text uses neutral-600 instead of shadcn's neutral-500 so it keeps
+ * a 4.5:1 contrast on the grey surfaces too.
+ */
 :root, .platform-theme {
   color-scheme: light;
-  --canvas: #f6f7f9;
+  --canvas: #ffffff;
   --surface: #ffffff;
-  --surface-2: #f1f3f6;
-  --line: #e3e7ed;
-  --fg: #182230;
-  --fg-muted: #526071;
-  --fg-subtle: #697586;
-  --accent-light: #047857;
-  --accent-dark: #34d399;
+  --surface-2: #f5f5f5;
+  --line: #e5e5e5;
+  --fg: #0a0a0a;
+  --fg-muted: #525252;
+  --fg-subtle: #737373;
+  --accent-light: #171717;
+  --accent-dark: #e5e5e5;
   --brand: var(--accent-light);
-  --accent-soft: color-mix(in srgb, var(--brand) 9%, transparent);
-  --accent-fg: #ffffff;
+  --accent-soft: color-mix(in srgb, var(--brand) 7%, transparent);
+  --accent-fg: #fafafa;
   /* Semantic shadcn tokens resolve on this same theme ancestor. */
   --background: var(--canvas);
   --foreground: var(--fg);
@@ -51,23 +59,23 @@
   --ring: var(--brand);
   --overlay: rgb(0 0 0 / 0.5);
   --radius: 0.625rem;
-  --card-shadow: 0 2px 8px rgb(16 24 40 / 0.025), 0 12px 24px rgb(16 24 40 / 0.015);
+  --card-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
 }
 
 .dark {
   color-scheme: dark;
-  --canvas: #101419;
-  --surface: #171c23;
-  --surface-2: #222933;
-  --line: #303946;
-  --fg: #eef2f6;
-  --fg-muted: #b6c0cc;
-  --fg-subtle: #9ba8b8;
+  --canvas: #0a0a0a;
+  --surface: #171717;
+  --surface-2: #262626;
+  --line: #2e2e2e;
+  --fg: #fafafa;
+  --fg-muted: #a3a3a3;
+  --fg-subtle: #8f8f8f;
   --brand: var(--accent-dark);
   --accent-soft: color-mix(in srgb, var(--brand) 12%, transparent);
-  --accent-fg: #101419;
+  --accent-fg: #0a0a0a;
   --destructive: #fca5a5;
-  --destructive-foreground: #101419;
+  --destructive-foreground: #0a0a0a;
   --success: #6ee7b7;
   --warning: #fcd34d;
   --info: #93c5fd;
@@ -77,18 +85,18 @@
 @media (prefers-color-scheme: dark) {
   .system {
     color-scheme: dark;
-    --canvas: #101419;
-    --surface: #171c23;
-    --surface-2: #222933;
-    --line: #303946;
-    --fg: #eef2f6;
-    --fg-muted: #b6c0cc;
-    --fg-subtle: #9ba8b8;
+    --canvas: #0a0a0a;
+    --surface: #171717;
+    --surface-2: #262626;
+    --line: #2e2e2e;
+    --fg: #fafafa;
+    --fg-muted: #a3a3a3;
+    --fg-subtle: #8f8f8f;
     --brand: var(--accent-dark);
     --accent-soft: color-mix(in srgb, var(--brand) 12%, transparent);
-    --accent-fg: #101419;
+    --accent-fg: #0a0a0a;
     --destructive: #fca5a5;
-    --destructive-foreground: #101419;
+    --destructive-foreground: #0a0a0a;
     --success: #6ee7b7;
     --warning: #fcd34d;
     --info: #93c5fd;

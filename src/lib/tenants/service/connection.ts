@@ -33,16 +33,27 @@ export type ConnectionTestResult =
 
 const TEST_LIMIT = { limit: 10, windowSeconds: 5 * 60 };
 
+/**
+ * Description: Run the existing-database checks without saving anything (Test connection).
+ * Input: The typed database name, user, password and port, and the acting owner.
+ * Output: The check list ("checked"), field errors ("invalid": nothing was sent to
+ *   PostgreSQL), or a rate-limit/unavailable message. Input is validated before
+ *   the limiter (10 tests per 5 minutes), so typos do not use up attempts.
+ * Use case: The create form's Test connection button (Manual database, existing database).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export async function testDatabaseConnection(
   input: ConnectionTestInput,
   actor: TenantActor,
 ): Promise<ConnectionTestResult> {
   const { postgres } = getEnv();
   const reservedNames = [postgres.database, postgres.user];
-  const name = validateDatabaseIdentifier(input.databaseName, "database", { reservedNames });
-  const user = validateDatabaseIdentifier(input.databaseUser, "user", { reservedNames });
-  const password = validateExistingDatabasePassword(input.databasePassword);
-  const port = parsePort(input.databasePort, postgres.port);
+  const name          = validateDatabaseIdentifier(input.databaseName, "database", { reservedNames });
+  const user          = validateDatabaseIdentifier(input.databaseUser, "user", { reservedNames });
+  const password      = validateExistingDatabasePassword(input.databasePassword);
+  const port          = parsePort(input.databasePort, postgres.port);
 
   // Validated before the limiter, so typos do not use up the owner's attempts.
   const fieldErrors: Partial<Record<ConnectionTestField, string>> = {};

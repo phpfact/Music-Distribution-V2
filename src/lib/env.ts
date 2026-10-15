@@ -37,14 +37,14 @@ export type Env = {
   storageRoot: string;
 };
 
-const PLACEHOLDER_PREFIX = "change-me";
+const PLACEHOLDER_PREFIX           = "change-me";
 const MIN_PRODUCTION_SECRET_LENGTH = 16;
 
 const DEFAULT_PLATFORM_BASE_DOMAIN = "localhost";
 // A basic host name check only; the full domain rules live in
 // src/lib/domains/rules.ts, which is client-safe and kept separate from env.
 const HOSTNAME_LABEL_PATTERN = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
-const HOSTNAME_MAX_LENGTH = 253;
+const HOSTNAME_MAX_LENGTH    = 253;
 
 export class EnvValidationError extends Error {
   constructor(readonly problems: string[]) {
@@ -59,12 +59,30 @@ export class EnvValidationError extends Error {
   }
 }
 
-/** Exported for tests; the application uses getEnv(). */
+/**
+ * Description: Validate the environment into typed configuration.
+ * Input: The environment variables (process.env, or a test object).
+ * Output: The configuration; throws EnvValidationError listing every problem at
+ *   once (variable names only, never values, so it is safe to log).
+ * Use case: getEnv and tests.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-13
+ * Last modified: 2026-10-15
+ */
 export function parseEnv(source: NodeJS.ProcessEnv): Env {
   // Problems name the variable only. Values are never included, so this is safe to log.
   const problems: string[] = [];
   const isProduction = source.NODE_ENV === "production";
 
+  /**
+   * Description: Read a required variable.
+   * Input: The variable name.
+   * Output: The trimmed value; records a problem and returns "" when missing.
+   * Use case: parseEnv.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-10-13
+   * Last modified: 2026-10-15
+   */
   const required = (name: string): string => {
     const value = source[name]?.trim();
     if (!value) {
@@ -74,6 +92,15 @@ export function parseEnv(source: NodeJS.ProcessEnv): Env {
     return value;
   };
 
+  /**
+   * Description: Read a required secret and check it is production-ready.
+   * Input: The variable name.
+   * Output: The value; in production records a problem for a placeholder or a too-short secret.
+   * Use case: parseEnv.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-10-13
+   * Last modified: 2026-10-15
+   */
   const secret = (name: string): string => {
     const value = required(name);
     if (value && isProduction) {
@@ -88,6 +115,15 @@ export function parseEnv(source: NodeJS.ProcessEnv): Env {
     return value;
   };
 
+  /**
+   * Description: Read an optional integer within bounds.
+   * Input: The variable name, the default and the allowed range.
+   * Output: The integer, or the default when unset; records a problem when out of range.
+   * Use case: parseEnv.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-10-13
+   * Last modified: 2026-10-15
+   */
   const integer = (name: string, fallback: number, min: number, max: number): number => {
     const raw = source[name]?.trim();
     if (!raw) return fallback;
@@ -99,8 +135,17 @@ export function parseEnv(source: NodeJS.ProcessEnv): Env {
     return value;
   };
 
+  /**
+   * Description: Read an optional host name.
+   * Input: The variable name and the default.
+   * Output: The host name; records a problem for an invalid one.
+   * Use case: parseEnv.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-10-13
+   * Last modified: 2026-10-15
+   */
   const hostname = (name: string, fallback: string): string => {
-    const value = source[name]?.trim() || fallback;
+    const value  = source[name]?.trim() || fallback;
     const labels = value.split(".");
     const valid =
       value.length <= HOSTNAME_MAX_LENGTH &&
@@ -116,8 +161,16 @@ export function parseEnv(source: NodeJS.ProcessEnv): Env {
     return value;
   };
 
-  // Relative paths are rejected rather than resolved: the directory would then
-  // depend on the working directory the server happens to be started from.
+  /**
+   * Description: Read an optional absolute directory path.
+   * Input: The variable name and the default.
+   * Output: The path; records a problem for a relative one (it would depend on the
+   *   working directory the server is started from).
+   * Use case: parseEnv.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-10-13
+   * Last modified: 2026-10-15
+   */
   const absolutePath = (name: string, fallback: string): string => {
     const value = source[name]?.trim();
     if (!value) return fallback;
@@ -164,7 +217,15 @@ export function parseEnv(source: NodeJS.ProcessEnv): Env {
 
 let cached: Env | undefined;
 
-/** Validated configuration. Throws EnvValidationError listing every problem at once. */
+/**
+ * Description: Return the validated configuration (parsed once).
+ * Input: None.
+ * Output: The configuration; throws EnvValidationError listing every problem.
+ * Use case: The whole server side.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-13
+ * Last modified: 2026-10-15
+ */
 export function getEnv(): Env {
   cached ??= parseEnv(process.env);
   return cached;

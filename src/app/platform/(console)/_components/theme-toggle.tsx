@@ -12,12 +12,13 @@ import { Icon } from "./icons";
  * Output: an accessible shadcn icon button linking to the existing save flow.
  * Use case: expose appearance controls without adding another theme selector.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 export function ThemeToggle() {
   const { state } = useTheme();
   const systemDark = useSystemDark();
-  const dark = state.appearance.theme === "dark" || (state.appearance.theme === "system" && systemDark);
+  const dark       = state.appearance.theme === "dark" || (state.appearance.theme === "system" && systemDark);
 
   return (
     <Tooltip>

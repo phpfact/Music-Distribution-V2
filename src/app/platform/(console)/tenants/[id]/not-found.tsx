@@ -7,12 +7,14 @@ import { TENANTS_PATH } from "../list-query";
 // An unknown or malformed tenant id: said inside the console frame, so the
 // navigation stays usable. Nothing tells a missing tenant from a bad id.
 /**
- * Description: Show a safe tenant-not-found state and return navigation.
- * Input: The existing typed arguments and component state.
- * Output: Accessible React UI.
- * Use case: Tenant management’s existing owner workflow.
+ * Description: Show a safe tenant-not-found state inside the console.
+ * Input: None (Next.js not-found convention).
+ * Output: A card explaining the tenant does not exist, with a way back to the
+ *   directory (a missing tenant and a bad id look the same).
+ * Use case: Unknown or malformed tenant ids.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export default function TenantNotFound() {
   return (

@@ -10,9 +10,18 @@
 import { getPlatformSession } from "@/lib/platform-auth/dal";
 import { describeError } from "@/lib/platform-auth/session";
 import { readProfileImage } from "@/lib/storage/profile-images";
+import { UUID_PATTERN } from "@/lib/uuid";
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
+/**
+ * Description: Build the route's 404 answer.
+ * Input: None.
+ * Output: A plain, uncached 404 (also used without a session, so the route reveals
+ *   nothing about which tenants exist).
+ * Use case: GET.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function notFound(): Response {
   return new Response("Not found", {
     status: 404,
@@ -24,6 +33,16 @@ function notFound(): Response {
   });
 }
 
+/**
+ * Description: Serve a tenant's profile image to the signed-in owner.
+ * Input: The request and the route parameters (tenant id).
+ * Output: The image (sniffed type, nosniff, sandboxed CSP, private cache) or 404
+ *   for no session, a bad id, no image or a read failure (logged).
+ * Use case: GET /platform/tenants/<id>/avatar (avatars in the console).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> },

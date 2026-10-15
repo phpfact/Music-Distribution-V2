@@ -117,3 +117,60 @@ for Light/Dark/System, six accents, portals and responsive layouts were blocked
 by Browser Use's origin gate. On 2026-10-15 the user explicitly instructed
 "skip browser verification". Automated validation is complete and integration
 proceeds under that revised requirement; browser results are not claimed.
+
+## CLAUDE.md compliance audit (requested 2026-10-15)
+
+### Findings
+
+- The application default was Light / Emerald; CLAUDE.md requires shadcn's
+  official black-and-white neutral appearance by default.
+- The base palette (canvas/surface/line/fg tokens) was a blue-grey slate scale.
+- The Appearance page is a settings page with several sections but had no
+  secondary menu.
+- Several files used compact one-line functions and long lines (appearance
+  settings, theme root, preferences, preview) and some functions had no full
+  doc block; the miniature previews hard-coded their own colours.
+
+### Decisions and behaviour after this change
+
+- New accent `neutral` (label "Neutral": #171717 in light, #e5e5e5 in dark),
+  listed first. The application default becomes Light / Neutral / Default
+  Width, used by "Default Theme to Me/All" and when nothing is saved.
+- Additive migration adds `neutral` to the `appearance_accent` enum. Saved
+  personal and platform defaults are NOT rewritten: an owner who saved another
+  accent keeps it until they apply or reset.
+- The base tokens follow shadcn's neutral scale in light and dark (white cards,
+  near-white canvas, neutral greys, near-black text); status colours unchanged.
+- Previews render inside their own `platform-theme` light/dark scope and use
+  the theme tokens instead of hard-coded colours.
+- A sidebar secondary menu lists Currently saved, Accent color, Interface
+  theme, Content width and Preview with scroll-spy.
+- "Discard changes" asks for confirmation when there is an unsaved selection.
+- The success-only reload after saving stays (the owner's earlier explicit
+  requirement overrides the general no-full-reload rule).
+
+### Change history
+
+- 2026-10-15: Recorded the CLAUDE.md compliance requirements (neutral default,
+  shadcn neutral tokens, token-based previews, secondary menu, readability).
+- 2026-10-15: Implemented: `neutral` accent first in ACCENT_OPTIONS and the
+  default (Light/Neutral/Default Width); Prisma enum + migration
+  `20261015120000_appearance_neutral_accent` (applied to the dev database);
+  globals.css base tokens switched to shadcn's neutral scale (light canvas and
+  cards white, neutral greys; dark #0a0a0a/#171717); previews rendered in
+  their own `platform-theme` light/dark scope from tokens; settings page
+  rewritten readably with a sidebar secondary menu and a Discard confirmation;
+  theme-root and preferences reformatted with full doc blocks; the global
+  reset notice now says "Light, Neutral, and Default Width".
+- Saved data on the dev database at the time: platform default system/rose and
+  one personal light/emerald override; they are kept, so those accounts see
+  their saved accent until they apply or reset.
+- 2026-10-15: Code-quality pass (CLAUDE.md): every function in this module's
+  frontend and backend files now has the full doc block (Description, Input,
+  Output, Use case, Author, Created, Last modified; "Created: X. Last modified:
+  Y." one-liners split into two lines); consecutive single-line const/let
+  declarations have their "=" vertically aligned (typed and untyped
+  declarations are aligned in separate groups).
+- 2026-10-15: Verification of the compliance pass: TypeScript (including tests)
+  and ESLint (zero warnings) pass; the full Vitest suite passes in the app
+  container: 37 files, 1136 tests, 1 pre-existing localhost-only skip.

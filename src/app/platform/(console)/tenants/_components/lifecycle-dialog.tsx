@@ -41,7 +41,8 @@ const FAILED = "The action could not be completed. Try again shortly.";
  * Output: guarded confirmations with unchanged lifecycle Server Actions.
  * Use case: preserve reason validation, failure drafts and focus after closing.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-14. Last modified: 2026-10-15.
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function LifecycleDialog({
   action,
@@ -51,7 +52,7 @@ export function LifecycleDialog({
   returnFocusRef,
 }: LifecycleDialogProps) {
   const router = useRouter();
-  const flash = useTenantFlash();
+  const flash  = useTenantFlash();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [shownAction, setShownAction] = useState(action);
@@ -62,6 +63,16 @@ export function LifecycleDialog({
     setError(null);
   }
 
+  /**
+   * Description: Run the confirmed lifecycle action.
+   * Input: The action and, for suspend, the validated reason.
+   * Output: A failure stays in the dialog; success closes it, reports through the
+   *   flash notice and refreshes the server data.
+   * Use case: The three confirmations' onConfirm.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-10-14
+   * Last modified: 2026-10-15
+   */
   function run(current: LifecycleAction, reason?: string) {
     setError(null);
     startTransition(async () => {

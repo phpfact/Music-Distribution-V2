@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   isSetupInProgress,
   showsSetupCard,
-  suspensionSentence,
+  suspensionLead,
 } from "@/app/platform/(console)/tenants/details";
 import {
   formatDate,
@@ -162,15 +162,19 @@ describe("the details page's setup rules", () => {
   });
 });
 
-describe("suspensionSentence", () => {
-  it("names the date, the owner and the reason", () => {
+describe("suspensionLead", () => {
+  // The actor and the reason are rendered by the page: an owner's username is
+  // masked there behind an eye button, so it is no longer part of the text.
+  it("names the date when it is known", () => {
     expect(
-      suspensionSentence({ at: "2026-10-14T07:03:00.000Z", by: "owner", reason: "Unpaid invoice" }),
-    ).toBe("Suspended on 14 Oct 2026, 07:03 UTC by owner: Unpaid invoice");
+      suspensionLead({ at: "2026-10-14T07:03:00.000Z", by: "owner", byIsUsername: true, reason: "Unpaid invoice" }),
+    ).toBe("Suspended on 14 Oct 2026, 07:03 UTC");
   });
 
-  it("leaves out what is unknown", () => {
-    expect(suspensionSentence({ at: null, by: null, reason: null })).toBe("Suspended.");
-    expect(suspensionSentence({ at: null, by: "owner", reason: "Abuse" })).toBe("Suspended by owner: Abuse");
+  it("leaves out an unknown date and never contains the actor or reason", () => {
+    const lead = suspensionLead({ at: null, by: "owner", byIsUsername: true, reason: "Abuse" });
+    expect(lead).toBe("Suspended");
+    expect(lead).not.toContain("owner");
+    expect(lead).not.toContain("Abuse");
   });
 });

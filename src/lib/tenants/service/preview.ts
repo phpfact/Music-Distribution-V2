@@ -40,13 +40,19 @@ export type PreviewResult =
   | { ok: true; values: PreviewValues }
   | ServiceFailure<"rate_limited" | "unavailable">;
 
-const PREVIEW_LIMIT = { limit: 60, windowSeconds: 5 * 60 };
+const PREVIEW_LIMIT        = { limit: 60, windowSeconds: 5 * 60 };
 const SUBDOMAIN_MAX_LENGTH = 63;
 
 /**
- * Free values derived from the full name. An empty or invalid name still
- * gets values (from the fallback base), so the form can show something while
- * the owner is typing.
+ * Description: Generate free values for the create form's Auto-Generate sections.
+ * Input: The typed full name and the acting owner.
+ * Output: A free username, subdomain, database name/user, the port and the base
+ *   domain; or a rate-limit (60 per 5 minutes) or unavailable message. Each
+ *   value is free now; the create call checks again. No passwords here.
+ * Use case: The create form's debounced preview and Regenerate.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function previewGeneratedValues(
   fullName: string,

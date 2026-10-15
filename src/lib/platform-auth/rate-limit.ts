@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { getRedis } from "../redis";
+import { withTimeout } from "../with-timeout";
 
 /**
  * Limits platform owner sign-in attempts, with fixed-window counters in Redis.
@@ -13,12 +14,12 @@ import { getRedis } from "../redis";
  * If Redis cannot be reached the answer is "unavailable" and the caller
  * refuses the sign-in: this fails closed.
  */
-const WINDOW_SECONDS = 15 * 60;
+const WINDOW_SECONDS         = 15 * 60;
 const USERNAME_ATTEMPT_LIMIT = 5;
-const IP_ATTEMPT_LIMIT = 20;
+const IP_ATTEMPT_LIMIT       = 20;
 
 const USERNAME_KEY_PREFIX = "platform-login:user:";
-const IP_KEY_PREFIX = "platform-login:ip:";
+const IP_KEY_PREFIX       = "platform-login:ip:";
 
 // getRedis() waits for the first connection, which stays pending while Redis
 // is unreachable, so the whole exchange is bounded here.
@@ -27,11 +28,20 @@ const REDIS_TIMEOUT_MS = 2_000;
 const UNKNOWN_CLIENT_IP = "unknown";
 // The longest textual IPv6 address (with an embedded IPv4 part) is 45 characters.
 const CLIENT_IP_MAX_LENGTH = 45;
-const CLIENT_IP_PATTERN = /^[0-9a-fA-F:.]+$/;
+const CLIENT_IP_PATTERN    = /^[0-9a-fA-F:.]+$/;
 
 export type LoginAttemptOutcome = "allowed" | "limited" | "unavailable";
 
-/** Anything that does not look like an IP address shares the `unknown` bucket. */
+/**
+ * Description: Normalize a client address for use in a Redis key.
+ * Input: The client address text.
+ * Output: The trimmed, lower-cased address; anything that does not look like an IP
+ *   address (empty, too long, other characters) becomes the shared `unknown` bucket.
+ * Use case: countLoginAttempt and clientIpFromForwardedFor.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function normalizeClientIp(value: string): string {
   const candidate = value.trim();
   if (
@@ -45,59 +55,85 @@ function normalizeClientIp(value: string): string {
 }
 
 /**
- * The client address to rate limit on, from the `X-Forwarded-For` header.
- *
- * Assumes exactly one trusted reverse proxy in front of the app, which appends
- * the address it saw. So only the LAST entry is trusted; earlier entries are
- * whatever the client sent. Without a proxy (development) Next.js fills the
- * header in from the socket when the client sent none.
+ * Description: Read the client address to rate limit on from `X-Forwarded-For`.
+ * Input: The header value (or null).
+ * Output: The normalized last entry of the header. Assumes exactly one trusted
+ *   reverse proxy in front of the app, which appends the address it saw: only the
+ *   LAST entry is trusted; earlier entries are whatever the client sent. Without
+ *   a proxy (development) Next.js fills the header in from the socket.
+ * Use case: Sign-in, tenant actions and appearance actions (rate limits and audit IPs).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function clientIpFromForwardedFor(header: string | null): string {
   return normalizeClientIp(header?.split(",").at(-1) ?? "");
 }
 
-// Hashed: the submitted name may be long, and may be a password typed into the
-// wrong field, which must not sit in Redis in the clear.
+/**
+ * Description: Build the Redis key of a user name's attempt counter.
+ * Input: The normalized submitted user name.
+ * Output: `platform-login:user:<sha256>`. Hashed: the submitted name may be long,
+ *   and may be a password typed into the wrong field, which must not sit in Redis
+ *   in the clear.
+ * Use case: countLoginAttempt and clearLoginAttempts.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function usernameKey(normalizedUsername: string): string {
   const digest = createHash("sha256").update(normalizedUsername).digest("hex");
   return `${USERNAME_KEY_PREFIX}${digest}`;
 }
 
-async function withTimeout<T>(work: () => Promise<T>): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      work(),
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(
-          () => reject(new Error(`timed out after ${REDIS_TIMEOUT_MS}ms`)),
-          REDIS_TIMEOUT_MS,
-        );
-      }),
-    ]);
-  } finally {
-    clearTimeout(timer);
-  }
+/**
+ * Description: Bound a Redis exchange in time.
+ * Input: The work to run.
+ * Output: The work's result, or a rejection after REDIS_TIMEOUT_MS (shared
+ *   withTimeout helper). getRedis() waits for the first connection, which
+ *   stays pending while Redis is unreachable.
+ * Use case: countLoginAttempt and clearLoginAttempts (the limiter fails closed).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
+function withRedisTimeout<T>(work: () => Promise<T>): Promise<T> {
+  return withTimeout(work, REDIS_TIMEOUT_MS, () => new Error(`timed out after ${REDIS_TIMEOUT_MS}ms`));
 }
 
+/**
+ * Description: Log that the rate limiter could not be used.
+ * Input: The error that occurred.
+ * Output: One `[platform-auth]` error line in the server log (no user data).
+ * Use case: countLoginAttempt and clearLoginAttempts.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function reportUnavailable(error: unknown): void {
   const message = error instanceof Error ? error.message : String(error);
   console.error(`[platform-auth] rate limiter unavailable: ${message}`);
 }
 
 /**
- * Counts one sign-in attempt for the submitted user name and the client
- * address, and says whether it may proceed.
+ * Description: Count one sign-in attempt and say whether it may proceed.
+ * Input: The normalized submitted user name and the client address.
+ * Output: "allowed", "limited" (more than 5 per name or 20 per address in 15
+ *   minutes) or "unavailable" (Redis unreachable: the caller refuses the sign-in).
+ * Use case: authenticatePlatformOwner, before the password is checked.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function countLoginAttempt(
   normalizedUsername: string,
   clientIp: string,
 ): Promise<LoginAttemptOutcome> {
   const userKey = usernameKey(normalizedUsername);
-  const ipKey = `${IP_KEY_PREFIX}${normalizeClientIp(clientIp)}`;
+  const ipKey   = `${IP_KEY_PREFIX}${normalizeClientIp(clientIp)}`;
 
   try {
-    const replies = await withTimeout(async () => {
+    const replies = await withRedisTimeout(async () => {
       const redis = await getRedis();
       // One transaction: a counter can never be left without an expiry. NX
       // keeps the window fixed, so blocked attempts do not extend it.
@@ -111,7 +147,7 @@ export async function countLoginAttempt(
     });
 
     const userAttempts = Number(replies[0]);
-    const ipAttempts = Number(replies[2]);
+    const ipAttempts   = Number(replies[2]);
     if (!Number.isInteger(userAttempts) || !Number.isInteger(ipAttempts)) {
       throw new Error("unexpected reply from Redis");
     }
@@ -125,13 +161,18 @@ export async function countLoginAttempt(
 }
 
 /**
- * Forgets the attempts counted for a user name, after a successful sign-in.
- * The client address counter is kept. Never throws: the sign-in has already
- * succeeded, and the counter expires on its own.
+ * Description: Forget the attempts counted for a user name after a successful sign-in.
+ * Input: The normalized user name.
+ * Output: Nothing. The client address counter is kept. Never throws: the sign-in has
+ *   already succeeded, and the counter expires on its own.
+ * Use case: authenticatePlatformOwner.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export async function clearLoginAttempts(normalizedUsername: string): Promise<void> {
   try {
-    await withTimeout(async () => {
+    await withRedisTimeout(async () => {
       const redis = await getRedis();
       await redis.del(usernameKey(normalizedUsername));
     });

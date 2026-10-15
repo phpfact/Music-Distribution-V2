@@ -19,13 +19,28 @@ const KEY_BYTES = 32;
 // risking a verifier that never matches. Our own rules only allow 0x21–0x7E.
 const SASLPREP_IDENTITY = /^[\x20-\x7e]*$/;
 
+/**
+ * Description: Compute an HMAC-SHA-256.
+ * Input: The key and the text.
+ * Output: The digest bytes.
+ * Use case: scramSha256Verifier.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
+ */
 function hmac(key: Buffer, text: string): Buffer {
   return createHmac("sha256", key).update(text).digest();
 }
 
 /**
- * `SCRAM-SHA-256$<iterations>:<salt>$<StoredKey>:<ServerKey>` (base64).
- * Throws a RangeError for a password outside printable ASCII (see above).
+ * Description: Compute a PostgreSQL SCRAM-SHA-256 password verifier.
+ * Input: The password (printable ASCII) and optional iterations/salt (tests).
+ * Output: `SCRAM-SHA-256$<iterations>:<salt>$<StoredKey>:<ServerKey>` (base64);
+ *   throws RangeError for a password outside printable ASCII.
+ * Use case: passwordClause, so plaintext passwords never reach the server log.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-14
+ * Last modified: 2026-10-15
  */
 export function scramSha256Verifier(
   password: string,
@@ -35,12 +50,12 @@ export function scramSha256Verifier(
     throw new RangeError("SCRAM verifiers are only computed for printable ASCII passwords");
   }
   const iterations = options.iterations ?? DEFAULT_ITERATIONS;
-  const salt = options.salt ?? randomBytes(SALT_BYTES);
+  const salt       = options.salt ?? randomBytes(SALT_BYTES);
 
   const saltedPassword = pbkdf2Sync(password, salt, iterations, KEY_BYTES, "sha256");
-  const clientKey = hmac(saltedPassword, "Client Key");
-  const storedKey = createHash("sha256").update(clientKey).digest();
-  const serverKey = hmac(saltedPassword, "Server Key");
+  const clientKey      = hmac(saltedPassword, "Client Key");
+  const storedKey      = createHash("sha256").update(clientKey).digest();
+  const serverKey      = hmac(saltedPassword, "Server Key");
 
   return (
     `SCRAM-SHA-256$${iterations}:${salt.toString("base64")}` +

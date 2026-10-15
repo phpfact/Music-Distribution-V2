@@ -6,7 +6,8 @@ import { twMerge } from "tailwind-merge";
  * Input: conditional class values. Output: one consistent class string.
  * Use case: shared shadcn components with application-specific sizing.
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-15. Last modified: 2026-10-15.
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
  */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
