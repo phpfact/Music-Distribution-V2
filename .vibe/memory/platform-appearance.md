@@ -75,3 +75,35 @@ TypeScript, lint, production build and Git diff checks passed. The additive widt
 migration was applied to the local development database. Browser visual preview
 access was declined earlier in this chat; visual automation was not attempted
 again and no alternative UI automation surface was used.
+
+## shadcn/ui migration requested 2026-10-15
+
+Migrate Appearance's layout, status badges, buttons, and all selection groups to
+the shared shadcn/ui components. Use controlled RadioGroup choices with visible
+labels, descriptions and focus states for accent, theme, content width and apply
+scope. Preserve the complete draft, saved-state comparison, account remounts,
+pending guards, permission checks, confirmation wording and success-only reload
+controller. The existing Appearance provider remains the single source of truth
+for all theme tokens; no new selector or persistence mechanism is introduced.
+The decorative miniature previews intentionally show draft light/dark palettes
+independently of the active workspace and must retain their width illustrations.
+
+The migrated Appearance controls now use the shared Card, Badge, Button, Label
+and Radix-backed RadioGroup components. Theme and width previews are labelled
+choices with visible selected borders; swatches show a contrasting selection
+indicator and use the light/dark preset values from the existing accent registry.
+Scope selection preserves permission restrictions. Every control remains
+disabled during a save, with drafts and errors retained on failure.
+
+ThemeRoot's ThemePortalProvider, introduced by the shared component foundation,
+places Dialog and menu overlays inside the active Appearance scope. Portals
+therefore inherit the same mode, brand and semantic tokens as the console;
+they do not create or persist independent theme state.
+
+The bounded pages migration passed TypeScript, lint and Git diff checks in its
+isolated Docker workspace. Combined business tests and rendered verification are
+owned by the parent migration task, so those results must be recorded after
+integration rather than inferred from static checks.
+
+- 2026-10-15: Migrated Appearance presentation to the shared shadcn/ui system,
+  retaining saved state, drafts, all width choices and success-only reloads.

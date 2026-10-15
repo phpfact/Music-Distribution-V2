@@ -1,27 +1,38 @@
 "use client";
 
-import { FOCUS_RING } from "./_components/styles";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Icon } from "./_components/icons";
 
 type ConsoleErrorProps = {
   error: Error & { digest?: string };
   retry: () => void;
 };
 
-// Shown inside the console frame when a page fails to render, so the
-// navigation stays usable. Like the platform-wide boundary, it deliberately
-// does not display the error: its message and digest stay in the server log.
+/**
+ * Render a safe content-area failure while retaining the console navigation.
+ * Input: Next.js error-boundary props with a retry callback.
+ * Output: a shared Alert and retry Button; no raw error or digest is shown.
+ * Use case: let platform owners retry a page during a temporary outage.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
+ */
 export default function ConsoleError({ retry }: ConsoleErrorProps) {
   return (
-    <div role="alert" className="mx-auto mt-6 max-w-lg rounded-2xl border border-line bg-surface p-8">
-      <h1 className="text-xl font-semibold tracking-tight">Something went wrong</h1>
-      <p className="mt-2 text-fg-muted">The page could not be loaded. Try again shortly.</p>
-      <button
+    <div className="mx-auto mt-6 max-w-lg space-y-6">
+      <Alert variant="destructive">
+        <Icon name="alert-triangle" className="size-4" />
+        <AlertTitle><h1 className="text-xl font-semibold tracking-tight">Something went wrong</h1></AlertTitle>
+        <AlertDescription>The page could not be loaded. Try again shortly.</AlertDescription>
+      </Alert>
+      <Button
         type="button"
         onClick={() => retry()}
-        className={`mt-6 inline-flex h-10 items-center rounded-lg border border-line px-4 text-sm font-medium transition-colors hover:bg-surface-2 ${FOCUS_RING}`}
+        variant="outline"
       >
         Try again
-      </button>
+      </Button>
     </div>
   );
 }
