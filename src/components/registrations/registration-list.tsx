@@ -72,7 +72,7 @@ type RegistrationListProps = {
 /**
  * Description: Render one page of registrations with their review actions.
  * Input: The page of rows, the current query, the list path and the area's actions.
- * Output: A table on wide screens and cards on phones (masked email and
+ * Output: A table on wide screens (xl) and cards below (masked email and
  *   username with eye buttons, status, submitted date, reason/message), the
  *   actions allowed for each status behind confirmation dialogs (Reject asks
  *   for a reason), success/error feedback, an empty state and paging links.
@@ -180,8 +180,8 @@ export function RegistrationList({ page, query, basePath, actions }: Registratio
         />
       ) : (
         <>
-          {/* Wide screens: a table. */}
-          <div className="hidden overflow-x-auto rounded-lg border md:block">
+          {/* Wide screens: a table (from xl, where it fits beside the sidebar and menus). */}
+          <div className="hidden overflow-x-auto rounded-lg border xl:block">
             <Table>
               <TableCaption className="sr-only">Customer registrations</TableCaption>
               <TableHeader>
@@ -221,8 +221,8 @@ export function RegistrationList({ page, query, basePath, actions }: Registratio
             </Table>
           </div>
 
-          {/* Phones: one card per registration. */}
-          <ul className="flex flex-col gap-3 md:hidden">
+          {/* Phones and tablets: one card per registration (actions always visible). */}
+          <ul className="flex flex-col gap-3 xl:hidden">
             {page.rows.map((row) => (
               <li key={row.id} className="flex flex-col gap-3 rounded-lg border bg-card p-4">
                 <div className="flex items-start justify-between gap-3">
@@ -325,9 +325,10 @@ function RowNotes({ row }: { row: RegistrationRow }) {
     );
   }
   if (row.reviewedBy && row.reviewedAt) {
+    // The review is the approval; a later suspension is not attributed here.
     return (
       <p className="mt-1.5 text-xs text-muted-foreground">
-        By {row.reviewedBy}, {formatRegistrationDate(row.reviewedAt)}
+        Approved by {row.reviewedBy}, {formatRegistrationDate(row.reviewedAt)}
       </p>
     );
   }
