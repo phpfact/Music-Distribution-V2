@@ -1,9 +1,13 @@
-import { headers } from "next/headers";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { WelcomePage } from "@/components/workspace/welcome-page";
+import { WorkspaceThemeRoot } from "@/components/workspace/theme-root";
+import { WorkspaceUnavailable } from "@/components/workspace/workspace-unavailable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { resolveHost, type TenantAccess, tenantAccessOf } from "@/lib/domains/resolve";
+import { getPublicAppearance } from "@/lib/workspace/appearance";
+import { getHostResolution, getWorkspace } from "@/lib/workspace/context";
 
 const healthLinks = [
   { href: "/api/health", label: "Liveness", detail: "/api/health" },
@@ -11,50 +15,53 @@ const healthLinks = [
 ];
 
 /**
- * `/` answers on every host. On the platform's own host it is the platform's
- * start page; on a tenant host it goes through the tenant gate
- * (src/lib/domains/resolve.ts) and shows only the tenant's status, since the
- * tenant portal does not exist yet. Reading the Host header makes the page
- * dynamic.
- * Input: the incoming Host header.
- * Output: the infrastructure landing page, tenant gate notice or not-found route.
- * Use case: expose existing host resolution through shared UI components.
+ * Description: Name the browser tab after the tenant on a tenant host.
+ * Input: None (the Host header is read on the server).
+ * Output: "<tenant name>" for a tenant that may be served; otherwise the
+ *   root layout's default title.
+ * Use case: Next.js metadata of "/".
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
+ */
+export async function generateMetadata(): Promise<Metadata> {
+  if ((await getHostResolution()) === "platform") return {};
+  const workspace = await getWorkspace();
+  return workspace.state === "ready" ? { title: workspace.tenant.name } : {};
+}
+
+/**
+ * Description: `/` answers on every host.
+ * Input: The incoming Host header (read on the server).
+ * Output: On the platform's own host the infrastructure start page. On a
+ *   tenant host (subdomain or verified custom domain) the tenant gate decides:
+ *   allowed → the tenant's welcome page in its workspace default appearance;
+ *   suspended / setup unfinished → a friendly notice without tenant data;
+ *   unknown host → the friendly 404 page (never another tenant's data).
+ *   Reading the Host header makes the page dynamic.
+ * Use case: Entry point of every domain (.vibe/memory/platform-host-gate.md).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-15
  * Last modified: 2026-10-15
  */
 export default async function HomePage() {
-  const resolution = await resolveHost((await headers()).get("host"));
-  if (resolution === "platform") return <PlatformHome />;
-  const gate = tenantAccessOf(resolution);
-  if (gate.access === "unknown") notFound();
-  return <TenantStatus gate={gate} />;
-}
+  // Step 1: the platform's own host keeps its start page.
+  if ((await getHostResolution()) === "platform") return <PlatformHome />;
 
-/**
- * Present the existing allowed, suspended or provisioning tenant-gate message.
- * Input: the known tenant's resolved access result.
- * Output: an accessible status Card without exposing tenant configuration.
- * Use case: keep tenant hosts useful until their portal is implemented.
- * Author: Mr. Sachin Sharma
- * Created: 2026-10-15
- * Last modified: 2026-10-15
- */
-function TenantStatus({ gate }: { gate: Exclude<TenantAccess, { access: "unknown" }> }) {
-  const message =
-    gate.access === "allowed"
-      ? `${gate.tenant.name} — the tenant portal isn't available yet.`
-      : gate.access === "suspended"
-        ? "This workspace is suspended."
-        : "This workspace is being set up.";
+  // Step 2: a tenant host goes through the tenant gate.
+  const workspace = await getWorkspace();
+  if (workspace.state === "unknown") notFound();
+  if (workspace.state === "suspended" || workspace.state === "not_ready") {
+    return <WorkspaceUnavailable reason={workspace.state} />;
+  }
+  if (workspace.state === "unavailable") throw new Error("The workspace is temporarily unavailable.");
+
+  // Step 3: the tenant's welcome page in its workspace default appearance.
+  const appearance = await getPublicAppearance(workspace.db);
   return (
-    <main className="mx-auto flex min-h-dvh max-w-xl flex-col justify-center px-6 py-16">
-      <Card role="status">
-        <CardHeader>
-          <CardTitle><h1 className="text-2xl font-semibold tracking-tight">{message}</h1></CardTitle>
-        </CardHeader>
-      </Card>
-    </main>
+    <WorkspaceThemeRoot appearance={appearance}>
+      <WelcomePage tenantName={workspace.tenant.name} />
+    </WorkspaceThemeRoot>
   );
 }
 

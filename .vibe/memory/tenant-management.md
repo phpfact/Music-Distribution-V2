@@ -290,3 +290,18 @@ CLAUDE.md, and explicitly asked for a secondary menu in Tenant Management.
 - 2026-10-15: Verification of the compliance pass: TypeScript (including tests)
   and ESLint (zero warnings) pass; the full Vitest suite passes in the app
   container: 37 files, 1136 tests, 1 pre-existing localhost-only skip.
+
+## Customer registrations for a tenant (requested 2026-10-15)
+
+- The tenant detail page gets a "Registrations" header action (for tenants
+  whose setup has completed: active or suspended) that opens
+  `/platform/tenants/<id>/registrations`, where the Platform Owner reviews the
+  tenant's customer registrations (approve / reject with reason / suspend /
+  reactivate). Business rules, data and security are documented in
+  `customer-registration.md`; this module only adds the entry point.
+
+### Change history
+
+- 2026-10-15: Recorded the Registrations entry point on the tenant detail page.
+
+- 2026-10-16: Implemented as recorded above. Verified: TypeScript, ESLint (0 warnings), full Vitest suite 40 files / 1174 tests passed (new: workspace-rules, workspace-portal with two real provisioned tenants, workspace-http). Browser-verified on a test tenant created in the Platform Owner panel: welcome, login (errors, wrong password, admin by username/email), tenant dashboard, dark theme switch persisting after reload, customer sign-up (validation, pending login blocked), tenant-admin approval, logout + Back, customer dashboard, customer blocked from /tenant, Platform Owner registrations page (count popup, reject with reason), rejected login -> status page -> review request, Platform Owner suspension ending the active session. Not browser-verified yet: "Apply to everyone" appearance, phone/tablet layouts.

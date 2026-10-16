@@ -96,3 +96,27 @@ export async function consumeRateLimit(rule: RateLimitRule): Promise<RateLimitOu
     return "unavailable";
   }
 }
+
+/**
+ * Description: Forget the calls counted for one key.
+ * Input: The rule key (same text as passed to consumeRateLimit, without the prefix).
+ * Output: Nothing. Never throws: the counter expires on its own anyway, so a
+ *   Redis failure is only logged.
+ * Use case: A successful tenant-portal sign-in clears its identifier counter,
+ *   so a person who signs in and out several times is not locked out.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-15
+ * Last modified: 2026-10-15
+ */
+export async function clearRateLimit(key: string): Promise<void> {
+  if (!key) return;
+  try {
+    await withRedisTimeout(async () => {
+      const redis = await getRedis();
+      await redis.del(`${KEY_PREFIX}${key}`);
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`[rate-limit] could not clear a counter: ${message}`);
+  }
+}

@@ -97,10 +97,11 @@ export async function generateMetadata({
  * Output: The header with the permitted actions, notices, the secondary menu and the
  *   Setup, Personal, Login, Database, Domain and Status History sections;
  *   sensitive values are masked; 404 when the tenant does not exist.
- * Use case: /platform/tenants/<id> — the owner reviews and manages one tenant.
+ * Use case: /platform/tenants/<id> — the owner reviews and manages one tenant
+ *   (and opens its customer registrations).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 export default async function TenantDetailsPage({
   params,
@@ -158,6 +159,15 @@ export default async function TenantDetailsPage({
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            {/* Customer sign-ups exist only once the tenant's database is set up. */}
+            {tenant.status === "active" || tenant.status === "suspended" ? (
+              <Button asChild variant="outline">
+                <Link href={`${TENANTS_PATH}/${tenant.id}/registrations`}>
+                  <Icon name="user" className="size-4" />
+                  Registrations
+                </Link>
+              </Button>
+            ) : null}
             <Button asChild variant="outline">
               <Link href={`${TENANTS_PATH}/${tenant.id}/edit`}>
                 <Icon name="pencil" className="size-4" />

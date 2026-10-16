@@ -17,7 +17,13 @@
  * Secondary text uses neutral-600 instead of shadcn's neutral-500 so it keeps
  * a 4.5:1 contrast on the grey surfaces too.
  */
-:root, .platform-theme {
+/*
+ * `.workspace-theme` is the tenant portal's theme root (welcome, login, sign-up,
+ * tenant and customer dashboards); it gets the same base tokens as the
+ * platform console, so both follow shadcn's neutral palette
+ * (.vibe/memory/workspace-appearance.md).
+ */
+:root, .platform-theme, .workspace-theme {
   color-scheme: light;
   --canvas: #ffffff;
   --surface: #ffffff;
@@ -60,6 +66,15 @@
   --overlay: rgb(0 0 0 / 0.5);
   --radius: 0.625rem;
   --card-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+  /* shadcn Sidebar tokens, mapped onto the palette above (tenant portal). */
+  --sidebar: #fafafa;
+  --sidebar-foreground: var(--fg);
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: var(--accent-fg);
+  --sidebar-accent: var(--surface-2);
+  --sidebar-accent-foreground: var(--fg);
+  --sidebar-border: var(--line);
+  --sidebar-ring: var(--brand);
 }
 
 .dark {
@@ -80,6 +95,7 @@
   --warning: #fcd34d;
   --info: #93c5fd;
   --card-shadow: 0 2px 8px rgb(0 0 0 / 0.06), 0 12px 24px rgb(0 0 0 / 0.035);
+  --sidebar: #171717;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -101,6 +117,7 @@
     --warning: #fcd34d;
     --info: #93c5fd;
     --card-shadow: 0 2px 8px rgb(0 0 0 / 0.06), 0 12px 24px rgb(0 0 0 / 0.035);
+    --sidebar: #171717;
   }
 }
 
@@ -145,6 +162,14 @@
   --color-accent-soft: var(--accent-soft);
   --color-accent-fg: var(--accent-fg);
   --shadow-card: var(--card-shadow);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
 }
 
 @layer base {

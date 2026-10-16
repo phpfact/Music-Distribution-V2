@@ -145,3 +145,32 @@ illustrates multiple draft palettes rather than inheriting the active mode.
 - 2026-10-15: Verification of the compliance pass: TypeScript (including tests)
   and ESLint (zero warnings) pass; the full Vitest suite passes in the app
   container: 37 files, 1136 tests, 1 pre-existing localhost-only skip.
+
+## Tenant portal additions (requested 2026-10-15)
+
+- `src/components/ui/sidebar.tsx`: the official shadcn (new-york-v4) Sidebar
+  primitive, adapted to this project (doc blocks, `@/lib/utils`, configurable
+  state-cookie name/path so each area keeps its own sidebar preference,
+  deterministic skeleton width for the React-compiler lint).
+- `src/hooks/use-mobile.ts`: `useIsMobile()` on `useSyncExternalStore`.
+- Sidebar tokens (`--sidebar`, `--sidebar-foreground`, `--sidebar-primary`,
+  `--sidebar-accent`, `--sidebar-border`, `--sidebar-ring`, …) mapped to the
+  existing semantic palette in light and dark; `.workspace-theme` gets the
+  same base tokens as `.platform-theme`.
+- `src/components/dashboard/*`: the dashboard-01 block (AppSidebar, NavMain,
+  NavSecondary, NavUser, SiteHeader, section card, chart/table card shells)
+  as data-driven presentational components. Each role area passes its own
+  navigation, user, sign-out action and links; no auth or data access lives
+  in these components.
+- `src/components/shared/index.ts`: the explicit list of existing
+  presentational wrappers the tenant/customer areas reuse (SectionedLayout,
+  CountDetails, EmptyState, SensitiveValue/Input, PasswordInput,
+  ConfirmDialog, Field, Notice, AuthPageGuard). CLAUDE.md requires a single
+  implementation of each; they hold no auth, session or data logic.
+
+### Change history
+
+- 2026-10-15: Recorded the shadcn Sidebar, use-mobile hook, sidebar tokens,
+  dashboard block components and the shared-wrapper barrel before implementation.
+
+- 2026-10-16: Implemented as recorded above. Verified: TypeScript, ESLint (0 warnings), full Vitest suite 40 files / 1174 tests passed (new: workspace-rules, workspace-portal with two real provisioned tenants, workspace-http). Browser-verified on a test tenant created in the Platform Owner panel: welcome, login (errors, wrong password, admin by username/email), tenant dashboard, dark theme switch persisting after reload, customer sign-up (validation, pending login blocked), tenant-admin approval, logout + Back, customer dashboard, customer blocked from /tenant, Platform Owner registrations page (count popup, reject with reason), rejected login -> status page -> review request, Platform Owner suspension ending the active session. Not browser-verified yet: "Apply to everyone" appearance, phone/tablet layouts.

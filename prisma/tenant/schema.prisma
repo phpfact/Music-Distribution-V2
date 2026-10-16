@@ -59,7 +59,11 @@ model User {
   createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  roles UserRole[]
+  roles        UserRole[]
+  sessions     UserSession[]
+  appearance   UserAppearance?
+  /// The approved sign-up request this customer user was created from.
+  registration CustomerRegistration?
 
   @@index([customerId])
   @@map("users")
@@ -227,4 +231,159 @@ model ReleaseAsset {
   @@index([audioReleaseId])
   @@index([videoReleaseId])
   @@map("release_assets")
+}
+
+// ---------------------------------------------------------------------------
+// Tenant portal: customer sign-up, sessions and appearance
+// (.vibe/memory/customer-registration.md, workspace-auth.md, workspace-appearance.md)
+
+/// Where a customer sign-up request stands. Pending and rejected applicants
+/// have NO `users` row, so they can never hold a dashboard session.
+enum RegistrationStatus {
+  pending
+  approved
+  rejected
+
+  @@map("registration_status")
+}
+
+/// Who reviewed a registration: a Platform Owner (id in the control plane)
+/// or one of the tenant's own staff users (id in this database).
+enum ReviewerType {
+  platform_owner
+  tenant_user
+
+  @@map("reviewer_type")
+}
+
+/// The signed-in area a session belongs to. A session of one area is never
+/// accepted by the other (also bound into the token hash).
+enum SessionArea {
+  tenant
+  customer
+
+  @@map("session_area")
+}
+
+/// Themes of the tenant portal (workspace appearance).
+enum AppearanceTheme {
+  light
+  dark
+  system
+
+  @@map("appearance_theme")
+}
+
+/// Accent colours of the tenant portal; `neutral` is the application default.
+enum AppearanceAccent {
+  neutral
+  emerald
+  indigo
+  violet
+  blue
+  rose
+  amber
+
+  @@map("appearance_accent")
+}
+
+/// Content width presets of the tenant portal.
+enum AppearanceWidth {
+  default
+  full
+  focused
+
+  @@map("appearance_width")
+}
+
+/// A public customer sign-up request, waiting for (or after) approval.
+model CustomerRegistration {
+  id                   String             @id @default(uuid(7)) @db.Uuid
+  fullName             String             @map("full_name") @db.VarChar(200)
+  /// Lower-case (checked in the database).
+  email                String             @db.VarChar(320)
+  /// Same format as users.username (checked in the database).
+  username             String             @db.VarChar(64)
+  /// Argon2id hash in PHC format; copied to the user on approval. Never the password.
+  passwordHash         String             @map("password_hash") @db.VarChar(255)
+  accountType          CustomerType       @map("account_type")
+  status               RegistrationStatus @default(pending)
+  /// Required once rejected (checked in the database). Shown to the applicant.
+  rejectionReason      String?            @map("rejection_reason") @db.VarChar(500)
+  /// The applicant's optional message when asking for a new review.
+  reviewRequestMessage String?            @map("review_request_message") @db.VarChar(1000)
+  reviewRequestedAt    DateTime?          @map("review_requested_at") @db.Timestamptz(3)
+  reviewedAt           DateTime?          @map("reviewed_at") @db.Timestamptz(3)
+  reviewedByType       ReviewerType?      @map("reviewed_by_type")
+  /// Not a foreign key: a Platform Owner's id lives in the control plane.
+  reviewedById         String?            @map("reviewed_by_id") @db.Uuid
+  /// The customer user created on approval (required once approved, checked in the database).
+  userId               String?            @unique @map("user_id") @db.Uuid
+  user                 User?              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  sessions RegistrationSession[]
+
+  // One open (pending or rejected) request per email and per username:
+  // partial unique indexes in the tenant_portal migration.
+  @@index([status, createdAt])
+  @@map("customer_registrations")
+}
+
+/// A signed-in session of a tenant staff user or a customer user. Only the
+/// SHA-256 of `<tenantId>:<area>:<token>` is stored; the token is in the cookie.
+model UserSession {
+  id         String      @id @default(uuid(7)) @db.Uuid
+  userId     String      @map("user_id") @db.Uuid
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  area       SessionArea
+  tokenHash  String      @unique @map("token_hash") @db.Char(64)
+  createdAt  DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastUsedAt DateTime    @default(now()) @map("last_used_at") @db.Timestamptz(3)
+  expiresAt  DateTime    @map("expires_at") @db.Timestamptz(3)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("user_sessions")
+}
+
+/// A limited session of a rejected applicant: it opens only the registration
+/// status page (reason and review request), never a dashboard.
+model RegistrationSession {
+  id             String               @id @default(uuid(7)) @db.Uuid
+  registrationId String               @map("registration_id") @db.Uuid
+  registration   CustomerRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  tokenHash      String               @unique @map("token_hash") @db.Char(64)
+  createdAt      DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastUsedAt     DateTime             @default(now()) @map("last_used_at") @db.Timestamptz(3)
+  expiresAt      DateTime             @map("expires_at") @db.Timestamptz(3)
+
+  @@index([registrationId])
+  @@index([expiresAt])
+  @@map("registration_sessions")
+}
+
+/// The workspace default appearance, set by the tenant administrator. Exactly
+/// one row (CHECK on id). Applies to public pages and users without an override.
+model WorkspaceAppearance {
+  id        String           @id @default("workspace") @db.VarChar(32)
+  theme     AppearanceTheme
+  accent    AppearanceAccent
+  width     AppearanceWidth  @default(default)
+  updatedAt DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("workspace_appearance")
+}
+
+/// One personal appearance override per user of this tenant.
+model UserAppearance {
+  userId    String           @id @map("user_id") @db.Uuid
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  theme     AppearanceTheme
+  accent    AppearanceAccent
+  width     AppearanceWidth  @default(default)
+  updatedAt DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("user_appearances")
 }

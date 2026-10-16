@@ -18,7 +18,16 @@ export type AuditAction =
   | "tenant.database_password_updated"
   | "tenant.domain_verified"
   | "appearance.applied"
-  | "appearance.reset";
+  | "appearance.reset"
+  // Tenant portal (.vibe/memory/customer-registration.md, workspace-appearance.md)
+  | "customer_registration.submitted"
+  | "customer_registration.approved"
+  | "customer_registration.rejected"
+  | "customer_registration.review_requested"
+  | "customer_account.suspended"
+  | "customer_account.reactivated"
+  | "workspace_appearance.applied"
+  | "workspace_appearance.reset";
 
 type AuditMetadataValue = string | number | boolean | null | string[];
 
