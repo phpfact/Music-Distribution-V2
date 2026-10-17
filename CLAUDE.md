@@ -246,3 +246,55 @@ Order: understand requirement → inspect module → understand architecture/beh
 - _Appearance Customization:_ Users must be able to change their dashboard appearance through the Appearance settings in their own panel.
 - _Strict Theme Compatibility:_ Every component must fully support Light Mode, Dark Mode, and user-selected appearance themes without visual inconsistencies or broken functionality.
 - _Consistent Implementation:_ Apply theme settings across all applicable components, forms, tables, dialogs, popups, dropdowns, menus, charts, and dashboard pages. Never hardcode colors or create components that bypass the theme system.
+
+# STRICT RULES: Multi-Tenant Isolation, Hierarchy, and Authorization
+
+## 1. Absolute Tenant Isolation
+
+- Every Tenant must be **100% isolated** from every other Tenant. ABC Tenant must never access XYZ Tenant's data, and vice versa.
+- A Tenant can access only its own data, Sub-Tenants, Customers, and their Sub-Customers.
+- No Tenant or Sub-Tenant may view, modify, delete, or access another Tenant's data under any circumstances.
+- Never trust a client-supplied tenant ID. Enforce tenant ownership and isolation on the backend for every request and database operation.
+
+## 2. Strict User Hierarchy
+
+Maintain this hierarchy: **Platform Owner → Tenant → Sub-Tenant / Customer → Sub-Customer**, with Sub-Tenants and Customers treated as separate branches under their owning Tenant.
+
+- Each Tenant manages only its own Sub-Tenants, Customers, and Sub-Customers.
+- Each Customer can access only its own data and its own Sub-Customers' data.
+- A Customer must never access another Customer's data or another Customer's Sub-Customers.
+- A Sub-Customer must never access another Sub-Customer's or Customer's data, or any Tenant or Platform Owner restricted data.
+- A Sub-Tenant can access only its own authorized data and the permissions explicitly granted by its parent Tenant.
+- Sub-Platform Owners can access only the Platform Owner modules and data permitted by their assigned roles.
+
+## 3. Platform Owner Administrative Access
+
+- The Platform Owner can view and manage all Tenants and their authorized data from the Platform Owner panel without logging into individual Tenant accounts.
+- The Platform Owner can perform operations on behalf of a selected Tenant, including creating and managing that Tenant's Customers and Sub-Customers, wherever the Platform Owner's authorized capabilities permit.
+- Platform Owner cross-tenant access must be explicitly authorized, securely scoped to the selected Tenant, and audited.
+- Platform Owner administrative access must never grant Tenants access to one another's data or bypass the isolation of Customer and Sub-Customer data.
+
+## 4. Strict Role and Privilege Isolation
+
+- Platform Owner, Sub-Platform Owner, Tenant, Sub-Tenant, Customer, and Sub-Customer access must follow their own authorization boundaries.
+- Each user can have **exactly one assigned role**. Multiple roles and permission merging are prohibited.
+- Every role must contain only permissions belonging to its authorized panel and delegation scope.
+- Master Platform, Master Tenant, and Master Customer roles must remain strictly isolated. Each master role grants access only to its own panel's authorized capabilities, never another panel's permissions.
+- Administrators can assign only privileges they are authorized to delegate. Never allow privilege escalation through role creation, role editing, user creation, or manipulated requests.
+
+## 5. Backend Enforcement and Immediate Revocation
+
+- Enforce authentication, current permissions, account status, resource ownership, and hierarchy on **every protected backend operation**. Hiding menus or buttons is never sufficient.
+- If a privilege is removed, disabled, or revoked, access must stop immediately after the change is committed. Do not rely on logout, browser refresh, or session expiration.
+- Permission changes, role changes, account suspension, and disabled modules must invalidate or update all relevant authorization caches and active-session permission state.
+- Never trust stale session permissions, client-side checks, or user-supplied roles and ownership identifiers.
+
+## 6. Security, Data Integrity, and Testing
+
+- Apply tenant and customer ownership filters to every relevant database query, API, server action, file access, export, download, and background operation.
+- Prevent cross-tenant and cross-customer IDOR, unauthorized data leakage, privilege escalation, and access through direct URLs or manually constructed requests.
+- Preserve existing functionality while migrating all existing dynamic modules and actions into the centralized authorization system.
+- Log sensitive administrative actions and role/permission changes without exposing passwords, secrets, or credentials.
+- Add automated negative tests proving that cross-tenant access, cross-customer access, unauthorized role assignment, and revoked permissions are rejected.
+
+**NON-NEGOTIABLE RULE: No Tenant, Sub-Tenant, Customer, or Sub-Customer may access data outside its explicitly authorized hierarchy. Only the Platform Owner may perform authorized cross-tenant administrative operations. Enforce every rule on the backend; never assume the frontend provides security.**
