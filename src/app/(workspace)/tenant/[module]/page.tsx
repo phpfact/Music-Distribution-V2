@@ -25,11 +25,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
  * Input: The route's `module` segment.
  * Output: The "coming soon" page for a planned module; 404 for anything else.
  *   Requires a tenant staff session like every /tenant page.
- * Use case: /tenant/releases, /artists, /labels, /customers, /distribution,
- *   /analytics, /royalties.
+ * Use case: /tenant/releases, /artists, /labels, /distribution, /analytics,
+ *   /royalties (/tenant/customers is a real module since 2026-10-17).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-16
- * Last modified: 2026-10-16
+ * Last modified: 2026-10-17
  */
 export default async function TenantModulePage({ params }: PageProps) {
   await requireTenantUser();

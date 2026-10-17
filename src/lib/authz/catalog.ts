@@ -89,6 +89,8 @@ const MODULES = [
   { key: "platform.modules", domain: "platform", label: "Platform Modules", description: "The platform-wide switch of every platform module.", core: true, sortOrder: 700 },
   // Tenant domain (tenant database)
   { key: "tenant.registrations", domain: "tenant", label: "Customer Registrations", description: "Customer sign-up requests and customer accounts.", core: false, sortOrder: 100 },
+  // Added 2026-10-17 (.vibe/memory/customer-management.md): sorted right after registrations.
+  { key: "tenant.customers", domain: "tenant", label: "Customers", description: "The workspace's customer accounts: artists, labels and white-label partners.", core: false, sortOrder: 150 },
   { key: "tenant.appearance", domain: "tenant", label: "Workspace Appearance", description: "The default appearance of the workspace.", core: false, sortOrder: 200 },
   { key: "tenant.roles", domain: "tenant", label: "Roles & Privileges", description: "Tenant roles and the privileges they grant.", core: true, sortOrder: 300 },
   { key: "tenant.users", domain: "tenant", label: "Sub-Tenants", description: "The tenant's team accounts.", core: true, sortOrder: 400 },
@@ -164,6 +166,10 @@ const PERMISSIONS = [
   { key: "tenant.registrations.view", module: "tenant.registrations", action: "view", label: "View customer registrations", description: "Open the customer registrations page and its counts.", requires: [], sortOrder: 110 },
   { key: "tenant.registrations.review", module: "tenant.registrations", action: "review", label: "Approve and reject registrations", description: "Approve or reject customer registrations.", requires: ["tenant.registrations.view"], sortOrder: 120 },
   { key: "tenant.registrations.suspend", module: "tenant.registrations", action: "suspend", label: "Suspend and reactivate customer accounts", description: "Suspend or reactivate approved customer accounts.", requires: ["tenant.registrations.view"], sortOrder: 130 },
+  // tenant.customers (.vibe/memory/customer-management.md)
+  { key: "tenant.customers.view", module: "tenant.customers", action: "view", label: "View customers", description: "Open the customers list, its counts and the dashboard's active customers figure.", requires: [], sortOrder: 160 },
+  { key: "tenant.customers.create", module: "tenant.customers", action: "create", label: "Create customers", description: "Create customer accounts that can log in right away.", requires: ["tenant.customers.view"], sortOrder: 170 },
+  { key: "tenant.customers.suspend", module: "tenant.customers", action: "suspend", label: "Suspend and reactivate customers", description: "Suspend a customer (and with it its sub-customers) and reactivate it again.", requires: ["tenant.customers.view"], sortOrder: 180 },
   // tenant.appearance
   { key: "tenant.appearance.manage_workspace", module: "tenant.appearance", action: "manage_workspace", label: "Manage workspace appearance", description: "Apply or reset the workspace default appearance.", requires: [], sortOrder: 210 },
   // tenant.roles (core)

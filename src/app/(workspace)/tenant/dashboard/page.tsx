@@ -1,6 +1,7 @@
 import { ArrowRight, Clock } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { CustomerRecords } from "@/components/customers/customer-records";
 import { PageHeading } from "@/components/dashboard/page-heading";
 import { SectionCard, SectionCards } from "@/components/dashboard/section-cards";
 import { formatRegistrationDate } from "@/components/registrations/format";
@@ -12,8 +13,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { requireTenantAccess } from "@/lib/authz/workspace";
+import type { CustomerSummary } from "@/lib/workspace/customer-rules";
+import { getCustomerSummary } from "@/lib/workspace/customers";
 import { getRegistrationSummary, listRecentRegistrations } from "@/lib/workspace/registrations";
 import { accountTypeLabel, type RegistrationRow, type RegistrationSummary } from "@/lib/workspace/rules";
+import { loadTenantCustomerRecordsAction } from "../customers/actions";
 import { TENANT_REGISTRATIONS_PATH } from "../navigation";
 import { loadTenantRegistrationRecordsAction } from "../registrations/actions";
 
@@ -31,15 +35,16 @@ const SECTIONS = {
  * Input: None (tenant from the Host header, user and privileges from the tenant
  *   area session).
  * Output: Welcome heading; a warning notice when the user has no active role;
- *   summary cards (real registration counts with details popups only with
- *   tenant.registrations.view, honest "coming soon" cards for unbuilt modules);
- *   the activity card (empty until analytics exist); the recent registrations
- *   table (tenant.registrations.view only). No invented figures.
+ *   summary cards (real counts with details popups: Pending approvals with
+ *   tenant.registrations.view, Active customers with tenant.customers.view;
+ *   honest "coming soon" cards for unbuilt modules); the activity card (empty
+ *   until analytics exist); the recent registrations table
+ *   (tenant.registrations.view only). No invented figures.
  * Use case: /tenant/dashboard — the landing page after a tenant staff sign-in
  *   (available to every active staff user; widgets are filtered by privilege).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-16
- * Last modified: 2026-10-16
+ * Last modified: 2026-10-17
  */
 export default async function TenantDashboardPage() {
   // Step 1: the signed-in staff user of this host (redirects to /login otherwise).
@@ -49,6 +54,10 @@ export default async function TenantDashboardPage() {
   const canSeeRegistrations = area.authz.can("tenant.registrations.view");
   const summary             = canSeeRegistrations ? await getRegistrationSummary(area.db) : null;
   const recent              = canSeeRegistrations ? await listRecentRegistrations(area.db, 5) : [];
+
+  // Step 2b: the customers figure (every active main customer), only with the customers privilege.
+  const canSeeCustomers = area.authz.can("tenant.customers.view");
+  const customers       = canSeeCustomers ? await getCustomerSummary(area.db) : null;
 
   // The menu follows the sections that are actually shown.
   const menuItems: SecondaryMenuItem[] = [SECTIONS.overview, SECTIONS.activity];
@@ -68,7 +77,7 @@ export default async function TenantDashboardPage() {
       <div className="px-4 lg:px-6">
         <SectionedLayout items={menuItems} variant="top" contentClassName="flex flex-col gap-4 md:gap-6">
           <section id={SECTIONS.overview.id} aria-label="Overview">
-            <OverviewCards summary={summary} />
+            <OverviewCards summary={summary} customers={customers} />
           </section>
 
           <section id={SECTIONS.activity.id} aria-labelledby={`${SECTIONS.activity.id}-title`}>
@@ -102,43 +111,45 @@ export default async function TenantDashboardPage() {
 
 /**
  * Description: Render the summary cards of the dashboard.
- * Input: The registration counts (null without tenant.registrations.view).
- * Output: Pending approvals and Active customers (clickable real counts, only
- *   when the counts were loaded, i.e. with the privilege) and the Releases and
- *   Royalties cards, which say the modules are not available yet instead of
- *   showing numbers.
+ * Input: The registration counts (null without tenant.registrations.view) and
+ *   the customer counts (null without tenant.customers.view).
+ * Output: Pending approvals (registrations) and Active customers (every active
+ *   main customer: sign-ups and customers added by the tenant) as clickable
+ *   real counts, each only when its counts were loaded (i.e. with its
+ *   privilege), and the Releases and Royalties cards, which say the modules
+ *   are not available yet instead of showing numbers.
  * Use case: TenantDashboardPage.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-16
- * Last modified: 2026-10-16
+ * Last modified: 2026-10-17
  */
-function OverviewCards({ summary }: { summary: RegistrationSummary | null }) {
+function OverviewCards({ summary, customers }: { summary: RegistrationSummary | null; customers: CustomerSummary | null }) {
   return (
     <SectionCards className="px-0 lg:px-0">
-      {/* Gated widgets: hidden entirely without the registrations privilege. */}
+      {/* Gated widgets: each is hidden entirely without its privilege. */}
       {summary ? (
-        <>
-          <SectionCard
-            label="Pending approvals"
-            value={<FigureDetails summary={summary} kind="pending" />}
-            badge={
-              summary.pending > 0 ? (
-                <Badge variant="outline" className="gap-1">
-                  <Clock aria-hidden="true" />
-                  Needs review
-                </Badge>
-              ) : undefined
-            }
-            footerTitle="Sign-ups waiting for your decision"
-            footerDescription="Approve or reject them on the Registrations page"
-          />
-          <SectionCard
-            label="Active customers"
-            value={<FigureDetails summary={summary} kind="active" />}
-            footerTitle="Approved accounts that can log in"
-            footerDescription="Artists, labels and white-label partners"
-          />
-        </>
+        <SectionCard
+          label="Pending approvals"
+          value={<PendingApprovalsFigure summary={summary} />}
+          badge={
+            summary.pending > 0 ? (
+              <Badge variant="outline" className="gap-1">
+                <Clock aria-hidden="true" />
+                Needs review
+              </Badge>
+            ) : undefined
+          }
+          footerTitle="Sign-ups waiting for your decision"
+          footerDescription="Approve or reject them on the Registrations page"
+        />
+      ) : null}
+      {customers ? (
+        <SectionCard
+          label="Active customers"
+          value={<ActiveCustomersFigure customers={customers} />}
+          footerTitle="Customer accounts that can log in"
+          footerDescription="Approved sign-ups and customers you added"
+        />
       ) : null}
       <SectionCard
         label="Releases"
@@ -159,28 +170,51 @@ function OverviewCards({ summary }: { summary: RegistrationSummary | null }) {
 }
 
 /**
- * Description: Make a registration figure open its exact records (CLAUDE.md count transparency).
- * Input: The counts and which figure (pending or active).
+ * Description: Make the pending-approvals figure open its exact registrations (CLAUDE.md count transparency).
+ * Input: The registration counts.
  * Output: The figure as a button opening the details popup with the calculation and the records.
- * Use case: OverviewCards.
+ * Use case: OverviewCards (tenant.registrations.view).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-16
- * Last modified: 2026-10-16
+ * Last modified: 2026-10-17
  */
-function FigureDetails({ summary, kind }: { summary: RegistrationSummary; kind: "pending" | "active" }) {
-  const value   = summary[kind];
-  const title   = kind === "pending" ? "Pending approvals" : "Active customers";
-  const formula =
-    kind === "pending"
-      ? "Registrations whose status is Pending, including those whose applicant asked for a new review."
-      : "Approved registrations whose customer account is active.";
+function PendingApprovalsFigure({ summary }: { summary: RegistrationSummary }) {
+  const value = summary.pending;
+  const title = "Pending approvals";
 
   return (
     <CountDetails
       label={`${title}: ${value}. Show the registrations behind this figure.`}
       title={title}
-      calculation={`${formula} Currently ${value}.`}
-      records={<RegistrationRecords filter={kind} caption={title} loadRecords={loadTenantRegistrationRecordsAction} />}
+      calculation={`Registrations whose status is Pending, including those whose applicant asked for a new review. Currently ${value}.`}
+      records={<RegistrationRecords filter="pending" caption={title} loadRecords={loadTenantRegistrationRecordsAction} />}
+      className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl"
+    >
+      {value}
+    </CountDetails>
+  );
+}
+
+/**
+ * Description: Make the active-customers figure open its exact customers (CLAUDE.md count transparency).
+ * Input: The customer counts.
+ * Output: The figure as a button opening the details popup with the calculation
+ *   and the active main customers (sign-ups and customers added by the tenant).
+ * Use case: OverviewCards (tenant.customers.view; .vibe/memory/customer-management.md).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-17
+ * Last modified: 2026-10-17
+ */
+function ActiveCustomersFigure({ customers }: { customers: CustomerSummary }) {
+  const value = customers.active;
+  const title = "Active customers";
+
+  return (
+    <CountDetails
+      label={`${title}: ${value}. Show the customers behind this figure.`}
+      title={title}
+      calculation={`Main customers whose status is Active — approved sign-ups and customers you added (sub-customers are not counted). Currently ${value}.`}
+      records={<CustomerRecords filter="active" caption={title} loadRecords={loadTenantCustomerRecordsAction} />}
       className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl"
     >
       {value}

@@ -88,3 +88,17 @@
   `/tenant/[module]` placeholder for these two segments (static routes win;
   the placeholder still serves the planned modules). Details:
   `role-privilege-management.md` → "Workspace RBAC pages".
+
+## Customers module (2026-10-17)
+
+- Navigation: "Customers" in the Business group is a real link to
+  `/tenant/customers` (shown only with `tenant.customers.view`); it is no
+  longer a planned "coming soon" module. Releases, Artists, Labels,
+  Distribution, Analytics and Royalties stay placeholders.
+- Dashboard: "Active customers" now counts every active MAIN customer
+  (approved sign-ups + customers created by the tenant), opens the exact
+  customers in its popup and is shown with `tenant.customers.view`.
+  "Pending approvals" and the recent registrations table stay on
+  `tenant.registrations.view`. Details: `customer-management.md`.
+- Change history: 2026-10-17 — Customers link + Active customers card moved
+  to the Customers module.

@@ -275,3 +275,27 @@ nothing here reads a session, a database or `server-only` code.
 - Both exported from `src/components/shared/index.ts`; dashboard icon
   `shield-check` added to `src/components/dashboard/icons.tsx`.
 - Change history: 2026-10-16 — added for RBAC enforcement.
+
+## Customers module additions (2026-10-17)
+
+- `AccountTypeField` (`src/components/shared/account-type-field.tsx`, exported
+  from `@/components/shared`): the required Artist / Label / White Label
+  card-style radio choice with asterisk, error text and ARIA wiring. Used by
+  the tenant "Add customer" form; the sign-up and Sub-Customer forms still
+  have their own inline copies (candidates to adopt it later).
+- `PagedRecords` (`src/components/rbac/rbac-records.tsx`) is now exported so
+  other popups (customers) reuse the same loading / error / empty / paging shell.
+- `CountDetails` fix: the records now sit in a `min-w-0` wrapper. The dialog is
+  a CSS grid, so a wide records table used to stretch the grid column past the
+  dialog (clipped table and calculation text, the whole dialog scrolling
+  sideways — seen in the Sub-Tenants popup too, 714px content in a 670px
+  dialog at a 1024px viewport). Now the records' own `overflow-x-auto` box
+  scrolls instead. Browser-checked 2026-10-17 on the tenant dashboard
+  "Active customers" popup.
+- Known (pre-existing, not changed): the top variant of `SectionedLayout`
+  (sticky `-mx-4` menu bar) makes tenant list pages 4px wider than the
+  viewport at 1024px (Registrations, Sub-Tenants and Customers alike); no
+  overflow at 375px or 768px.
+- Change history: 2026-10-17 — AccountTypeField, exported PagedRecords,
+  CountDetails min-w-0 fix.
+

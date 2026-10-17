@@ -314,3 +314,43 @@ describe("customer RBAC pages", () => {
     expect(response.location).toMatch(/\/login$/);
   });
 });
+
+// Customers module (.vibe/memory/customer-management.md): same page contract as the RBAC pages.
+describe("tenant Customers pages", () => {
+  const pages: [path: string, rendered: string][] = [
+    ["/tenant/customers", "Total customers"],
+    ["/tenant/customers/new", "Create customer"],
+  ];
+
+  it("answer the access-denied state without tenant.customers.* and render with Master Tenant", async () => {
+    for (const [path, rendered] of pages) {
+      // The clerk's role only holds tenant.registrations.view.
+      const denied = await get(path, staffCookie(tokens.clerk));
+      expect(denied.status, path).toBe(200);
+      expect(denied.body, path).toContain(DENIED);
+      expect(denied.body, path).not.toContain(rendered);
+
+      const allowed = await get(path, staffCookie(tokens.master));
+      expect(allowed.status, path).toBe(200);
+      expect(allowed.body, path).not.toContain(DENIED);
+      expect(allowed.body, path).toContain(rendered);
+    }
+  });
+
+  it("list this tenant's signed-up customers with their source, never sub-customers", async () => {
+    const response = await get("/tenant/customers", staffCookie(tokens.master));
+    expect(response.status).toBe(200);
+    expect(response.body).toContain("Http Xena Label");
+    expect(response.body).toContain("Sign-up");
+    // A sub-customer is never listed as a customer.
+    expect(response.body).not.toContain("Http Sub Customer");
+  });
+
+  it("never open for a customer session (redirect to the login page)", async () => {
+    for (const [path] of pages) {
+      const response = await get(path, customerCookie(tokens.customerMaster));
+      expect([302, 303, 307, 308], path).toContain(response.status);
+      expect(response.location, path).toMatch(/\/login$/);
+    }
+  });
+});

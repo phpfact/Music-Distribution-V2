@@ -26,6 +26,8 @@ export type AuditAction =
   | "customer_registration.review_requested"
   | "customer_account.suspended"
   | "customer_account.reactivated"
+  // Customers module (.vibe/memory/customer-management.md): an account created by tenant staff.
+  | "customer_account.created"
   | "workspace_appearance.applied"
   | "workspace_appearance.reset"
   // Role and privilege management (.vibe/memory/role-privilege-management.md).

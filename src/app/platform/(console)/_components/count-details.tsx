@@ -40,12 +40,13 @@ type CountDetailsProps = {
  * Input: The trigger's name and content, the dialog's title/description, the
  *   calculation text and the records element.
  * Output: A link-styled button; pressing it opens a themed dialog with the
- *   calculation and the records.
+ *   calculation and the records. A wide records table scrolls inside its own
+ *   box instead of widening (and clipping) the dialog.
  * Use case: CLAUDE.md "Count Transparency": dashboard and tenant summary
  *   figures, the directory total, setup progress. Every count can be verified.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-15
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-17
  */
 export function CountDetails({
   label,
@@ -91,7 +92,10 @@ export function CountDetails({
             </div>
           </div>
 
-          {open ? records : null}
+          {/* The dialog is a CSS grid: without min-w-0 a wide table would stretch the
+              grid column past the dialog (clipped, whole dialog scrolling sideways);
+              with it, the records' own overflow-x-auto box scrolls instead. */}
+          <div className="min-w-0">{open ? records : null}</div>
         </DialogContent>
       </Dialog>
     </>

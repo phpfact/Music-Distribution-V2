@@ -70,6 +70,7 @@ privilege (`requires`), plus the explicit dependencies listed.
 | Module key | Label | Core | Privileges |
 |---|---|---|---|
 | `tenant.registrations` | Customer Registrations | no | `view`, `review` (approve/reject), `suspend` (suspend/reactivate customer accounts) |
+| `tenant.customers` | Customers | no | `view` (Customers page, counts, dashboard "Active customers"), `create` (add a customer account), `suspend` (suspend/reactivate main customers) — added 2026-10-17, see `customer-management.md` |
 | `tenant.appearance` | Workspace Appearance | no | `manage_workspace` (apply/reset the workspace default) |
 | `tenant.roles` | Roles & Privileges | yes | `view`, `create`, `edit`, `delete` |
 | `tenant.users` | Sub-Tenants | yes | `view`, `create`, `edit`, `suspend` |
@@ -555,6 +556,9 @@ Platform tenant actions return `{ ok: false, reason: "forbidden", message }`
 | `/tenant/registrations`, `loadTenantRegistrationRecordsAction`, dashboard registration cards / recent table / quick action | `tenant.registrations.view` |
 | `approveTenantRegistrationAction`, `rejectTenantRegistrationAction` (+ buttons) | `tenant.registrations.review` |
 | `suspendTenantCustomerAction`, `reactivateTenantCustomerAction` (+ buttons) | `tenant.registrations.suspend` |
+| `/tenant/customers` (list, summary popups via `loadTenantCustomerRecordsAction`), sidebar Customers link, dashboard "Active customers" card | `tenant.customers.view` |
+| `/tenant/customers/new`, `createTenantCustomerAction`, "Add customer" buttons | `tenant.customers.create` |
+| `setTenantCustomerStatusAction` (+ Suspend/Reactivate buttons) | `tenant.customers.suspend` |
 | `saveTenantAppearanceAction` scope workspace (action authorizes first; `saveViewerAppearance` re-checks `canManageWorkspace`); Workspace section of the page | `tenant.appearance.manage_workspace` |
 
 Session only (by design): the three dashboards (widgets filtered), personal
@@ -1011,3 +1015,9 @@ tenants; Server Actions invoked like Next.js does).
   stale fingerprint/old form/suspended accounts, two tenant DB clients,
   partial-update failure, hidden navigation vs direct calls, static Server
   Action guard scan). No production behaviour change.
+- 2026-10-17: New tenant module `tenant.customers` (view, create, suspend;
+  not core) for the tenant Customers module (`customer-management.md`);
+  tenant migration `20261017090000_tenant_customers` upserts the three
+  privileges into `permissions`. The sub-user service's identity conflict
+  messages moved to `identityConflictErrors` (`src/lib/workspace/identity.ts`),
+  shared with customer creation (same texts, no behaviour change).

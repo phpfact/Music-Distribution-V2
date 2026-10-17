@@ -15,6 +15,17 @@ import { permissionKeysOfDomain, permissionsOfDomain } from "@/lib/authz/catalog
 import { connectTo, createTestDatabase, dropTestDatabase } from "./support/postgres";
 
 const RBAC_MIGRATION = "20261016120000_rbac";
+/**
+ * Privileges a LATER tenant migration added to the catalog (the rbac migration
+ * alone never writes them): 20261017090000_tenant_customers
+ * (.vibe/memory/customer-management.md).
+ */
+const ADDED_AFTER_RBAC: readonly string[] = ["tenant.customers.view", "tenant.customers.create", "tenant.customers.suspend"];
+/** The tenant and customer privileges the rbac migration itself mirrors. */
+const rbacTenantKeys = (): string[] =>
+  [...permissionsOfDomain("tenant"), ...permissionsOfDomain("customer")]
+    .map((permission) => permission.key)
+    .filter((key) => !ADDED_AFTER_RBAC.includes(key));
 const devDatabase    = process.env.PLATFORM_TEST_DEV_DATABASE ?? "";
 const SCRATCH        = { control: `${devDatabase}_rbac_ctl_test`, tenant: `${devDatabase}_rbac_tnt_test` } as const;
 
@@ -197,9 +208,26 @@ describe("tenant rbac migration", () => {
       { key: "master_customer", name: "Master Customer", domain: "customer", system_key: "master_customer", status: "active", is_system: true },
       { key: "owner", name: "Master Tenant", domain: "tenant", system_key: "master_tenant", status: "active", is_system: true },
     ]);
-    expect(first.permissions).toHaveLength(permissionKeysOfDomain("tenant").length + permissionKeysOfDomain("customer").length);
+    expect(first.permissions).toHaveLength(rbacTenantKeys().length);
 
     await client.query(rbac);
+    expect(await tenantSnapshot(client)).toStrictEqual(first);
+  });
+
+  it("the later tenant migrations complete the catalog mirror and can run again", async () => {
+    const { client, rbac } = await legacyDatabase("tenant");
+    await client.query(rbac);
+    const later = migrationsOf("tenant").filter((migration) => migration.name > RBAC_MIGRATION);
+    for (const migration of later) await client.query(migration.sql);
+
+    // Every catalog privilege of both workspace domains, nothing else.
+    const first = (await tenantSnapshot(client)) as { permissions: { key: string }[] };
+    expect(first.permissions.map((permission) => permission.key)).toStrictEqual(
+      [...permissionsOfDomain("tenant"), ...permissionsOfDomain("customer")].map((permission) => permission.key).sort(),
+    );
+
+    // Running them again changes nothing (idempotent upserts).
+    for (const migration of later) await client.query(migration.sql);
     expect(await tenantSnapshot(client)).toStrictEqual(first);
   });
 
@@ -277,9 +305,7 @@ describe("tenant rbac migration", () => {
 
     // Step 3: the catalog replaced the legacy privilege (its links are gone).
     expect(snapshot.grants).toStrictEqual([]);
-    expect(snapshot.permissions.map((permission) => permission.key)).toStrictEqual(
-      [...permissionsOfDomain("tenant"), ...permissionsOfDomain("customer")].map((permission) => permission.key).sort(),
-    );
+    expect(snapshot.permissions.map((permission) => permission.key)).toStrictEqual(rbacTenantKeys().sort());
 
     // Step 4: a suspended approved account suspends its main customer row too.
     expect(snapshot.customers).toStrictEqual([

@@ -132,12 +132,13 @@ function Pager({ page, onPage }: { page: PageView<unknown>; onPage: (page: numbe
  * Description: Shared shell of a paged records popup (loading, error, empty, rows, paging).
  * Input: The page loader, the empty state, and a renderer for one loaded page.
  * Output: The current state of the list with Previous/Next paging.
- * Use case: Role, user and sub-user records popups.
+ * Use case: Role, user and sub-user records popups; exported for the tenant
+ *   Customers popups (src/components/customers/customer-records.tsx).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-16
- * Last modified: 2026-10-16
+ * Last modified: 2026-10-17
  */
-function PagedRecords<Row>({
+export function PagedRecords<Row>({
   load,
   empty,
   render,

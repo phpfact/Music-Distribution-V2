@@ -46,3 +46,6 @@ export {
 // state of protected pages and the background privilege refresh of the shells.
 export { AccessDenied, NO_ACTIVE_ROLE_LABEL, NO_ACTIVE_ROLE_NOTICE, NoActiveRoleNotice } from "./access-denied";
 export { PermissionSync, type PermissionCheckResult } from "./permission-sync";
+// Customers module (.vibe/memory/customer-management.md): the required
+// Artist / Label / White Label choice of a customer form.
+export { AccountTypeField } from "./account-type-field";

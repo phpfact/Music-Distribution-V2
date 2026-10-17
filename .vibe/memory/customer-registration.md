@@ -148,3 +148,14 @@
 - Change history: 2026-10-16 — owner-only checks replaced by privileges.
 - Change history: 2026-10-16 — identity advisory lock moved to
   `src/lib/workspace/identity.ts` (shared with sub-user creation); behaviour unchanged.
+
+## Customers module sync (2026-10-17)
+
+- Tenant staff can also create customers directly (`customer-management.md`);
+  those have no registration row. Sign-up and created customers share the
+  identity rules (one email/username per tenant, the same advisory lock).
+- The Customers page can suspend / reactivate a signed-up customer as well
+  (by customer id): it switches the same user + main customer rows, so the
+  Registrations page shows the same Active / Suspended state.
+- The tenant dashboard's "Active customers" figure now comes from the
+  Customers module (all active main customers), not from registrations.

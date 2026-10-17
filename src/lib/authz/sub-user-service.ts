@@ -21,7 +21,7 @@ import type { AuditMetadata } from "@/lib/audit";
 import { hashPassword } from "@/lib/platform-auth/password";
 import { validateEmail, validateFullName, validateTenantUsername } from "@/lib/tenants/rules";
 import { isUuid } from "@/lib/uuid";
-import type { IdentityClaim, IdentityConflicts } from "@/lib/workspace/identity";
+import { identityConflictErrors, type IdentityConflicts } from "@/lib/workspace/identity";
 import { textOf, validateAccountType, type AccountType } from "@/lib/workspace/rules";
 import { toPolicyActor, type AuthzActor } from "./actor";
 import {
@@ -100,20 +100,6 @@ const MESSAGES = {
   identityRace: "This username or email address was just taken. Choose another one.",
 } as const;
 
-// What a taken identity says, per field and per kind of claim.
-const IDENTITY_MESSAGES: Record<"username" | "email", Record<IdentityClaim, string>> = {
-  username: {
-    account: "This username is already taken. Choose another one.",
-    pending: "A pending customer registration already uses this username. Choose another one.",
-    rejected: "A customer registration already uses this username. Choose another one.",
-  },
-  email: {
-    account: "Another account already uses this email address.",
-    pending: "A pending customer registration already uses this email address.",
-    rejected: "A customer registration already uses this email address.",
-  },
-};
-
 // ---------------------------------------------------------------------------
 // Shaping and small helpers
 
@@ -161,16 +147,14 @@ function toRow(actor: PolicyActor, user: StoredUser): SubUserRow {
  * Description: Turn taken identities into field errors.
  * Input: The conflicts found by the store.
  * Output: One message per taken field (empty when nothing is taken).
- * Use case: createSubUser and updateSubUser.
+ * Use case: createSubUser and updateSubUser. The texts are shared with the
+ *   tenant's customer creation (identityConflictErrors in src/lib/workspace/identity.ts).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-16
- * Last modified: 2026-10-16
+ * Last modified: 2026-10-17
  */
 function identityErrors(conflicts: IdentityConflicts): SubUserFieldErrors {
-  const errors: SubUserFieldErrors = {};
-  if (conflicts.username) errors.username = IDENTITY_MESSAGES.username[conflicts.username];
-  if (conflicts.email) errors.email = IDENTITY_MESSAGES.email[conflicts.email];
-  return errors;
+  return identityConflictErrors(conflicts);
 }
 
 /**

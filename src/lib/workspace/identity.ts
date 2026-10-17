@@ -27,6 +27,24 @@ export type IdentityClaim = "account" | "pending" | "rejected";
 export type IdentityConflicts = { email?: IdentityClaim; username?: IdentityClaim };
 
 /**
+ * What a taken identity says under its field, per kind of claim. One wording
+ * for every form that claims an identity (Sub-Tenants, Sub-Customers and the
+ * tenant's Customers module), so the same conflict always reads the same.
+ */
+export const IDENTITY_CONFLICT_MESSAGES: Record<"username" | "email", Record<IdentityClaim, string>> = {
+  username: {
+    account: "This username is already taken. Choose another one.",
+    pending: "A pending customer registration already uses this username. Choose another one.",
+    rejected: "A customer registration already uses this username. Choose another one.",
+  },
+  email: {
+    account: "Another account already uses this email address.",
+    pending: "A pending customer registration already uses this email address.",
+    rejected: "A customer registration already uses this email address.",
+  },
+};
+
+/**
  * Description: Take the tenant database's identity lock for the current transaction.
  * Input: The interactive transaction (tenant database).
  * Output: Nothing. Blocks until no other identity-claiming transaction holds the
@@ -87,4 +105,21 @@ export async function findIdentityConflicts(
     if (identity.username && request.username === identity.username) conflicts.username ??= claim;
   }
   return conflicts;
+}
+
+/**
+ * Description: Turn taken identities into the messages shown under their fields.
+ * Input: The conflicts found by findIdentityConflicts.
+ * Output: One message per taken field ({} when nothing is taken).
+ * Use case: The sub-user service (create / email change) and the tenant's
+ *   customer creation (src/lib/workspace/customers.ts).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-17
+ * Last modified: 2026-10-17
+ */
+export function identityConflictErrors(conflicts: IdentityConflicts): { username?: string; email?: string } {
+  const errors: { username?: string; email?: string } = {};
+  if (conflicts.username) errors.username = IDENTITY_CONFLICT_MESSAGES.username[conflicts.username];
+  if (conflicts.email) errors.email = IDENTITY_CONFLICT_MESSAGES.email[conflicts.email];
+  return errors;
 }
