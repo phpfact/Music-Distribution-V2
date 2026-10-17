@@ -579,7 +579,7 @@ describe("a provisioned tenant", () => {
     expect(await adminRows(before.database_name)).toStrictEqual(rowsBefore);
   });
 
-  it("reverts the tenant database when the control plane cannot be updated", SLOW, async () => {
+  it("keeps the tenant database unchanged when the control plane cannot be updated", SLOW, async () => {
     const { id } = requireProvisioned();
     const before = await tenantRow(id);
     const rowsBefore = await adminRows(before.database_name);

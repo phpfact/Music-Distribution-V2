@@ -5,9 +5,9 @@ import "server-only";
  *
  * Only what changed is written. The tenant admin's user name and email also
  * live in the tenant's own database once the admin account exists, and the
- * two databases cannot share a transaction, so the order is fixed: the tenant
- * database first (if that fails, nothing has changed), then the control plane
- * (if that fails, the tenant database change is reverted). Credentials are
+ * two databases cannot share a transaction: the control plane commits desired
+ * identity plus durable recovery state before the locked tenant commit.
+ * Interrupted edits are reconciled by immutable admin ID on the next write. Credentials are
  * never touched here; they have their own actions (credentials.ts).
  */
 import type { Prisma } from "@/generated/prisma/control/client";
@@ -29,6 +29,7 @@ import {
   validatePhone,
   validateTenantUsername,
 } from "@/lib/tenants/rules";
+import { identityConflictErrors } from "@/lib/workspace/identity";
 import type { TenantStatus } from "@/app/platform/(console)/tenants/labels";
 import { type NameKind, takenInControlPlane } from "./availability";
 import { isUuid, ownerAudit, type ServiceFailure, type TenantActor, UNAVAILABLE_MESSAGE } from "./common";
@@ -130,6 +131,8 @@ const EDITABLE_SELECT = {
   contactEmail: true,
   adminUsername: true,
   profileImageKey: true,
+  adminIdentityVersion: true,
+  adminIdentitySyncPending: true,
   domains: { select: { id: true, type: true, hostname: true } },
   provisioningSteps: { where: { step: "create_initial_admin" }, select: { step: true } },
 } satisfies Prisma.TenantSelect;
@@ -370,9 +373,15 @@ async function discardFile(key: string | null, why: string): Promise<void> {
  * Use case: updateTenantProfile.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-17
  */
-function adminSyncFailure(problem: Exclude<AdminRowOutcome, { ok: true }>["problem"]): UpdateTenantResult {
+function adminSyncFailure(outcome: Exclude<AdminRowOutcome, { ok: true }>): UpdateTenantResult {
+  const { problem, conflicts } = outcome;
+  // Preserve existing account wording; registration reservations use the shared policy.
+  if (conflicts?.username === "pending" || conflicts?.username === "rejected" ||
+      conflicts?.email === "pending" || conflicts?.email === "rejected") {
+    return { ok: false, reason: "validation", fieldErrors: identityConflictErrors(conflicts) };
+  }
   switch (problem) {
     case "username_taken":
       return {
@@ -431,12 +440,12 @@ function tenantData(
  * Input: The tenant id, the raw request values, the acting owner and test dependencies.
  * Output: ok with the changed fields and whether DNS is pending, field errors (like
  *   the create form), or a refusal (not found, setup running, unavailable).
- *   The admin row in the tenant database changes first and is reverted when the
- *   control plane refuses the edit.
+ *   Desired identity and recovery state commit before the locked tenant write.
+ *   An expected version rejects overlapping stale profile submissions.
  * Use case: updateTenantAction (the edit form).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-17
  */
 export async function updateTenantProfile(
   id: string,
@@ -460,6 +469,21 @@ export async function updateTenantProfile(
   if (!current) return NOT_FOUND;
   // The runner reads the admin's names and the domain while it works.
   if (current.status === "provisioning") return BUSY;
+
+  // Reconcile a previously interrupted edit even when the new request changes
+  // only non-identity fields or submits the already saved desired values.
+  if (current.adminIdentitySyncPending) {
+    try {
+      const recovered = await updateTenantAdminRow(id, current.adminUsername, {});
+      if (!recovered.ok) return adminSyncFailure(recovered);
+      current = await loadEditable(id);
+      if (!current) return NOT_FOUND;
+      if (current.status === "provisioning") return BUSY;
+    } catch (error) {
+      console.error(`[tenants] tenant ${id}: identity recovery could not finish: ${describeError(error)}`);
+      return UNAVAILABLE;
+    }
+  }
 
   const changedList = changedFields(current, next);
   if (changedList.length === 0) return { ok: true, tenantId: id, changed: [], dnsPending: false };
@@ -487,31 +511,39 @@ export async function updateTenantProfile(
     }
   }
 
-  // The tenant database first: if it refuses, nothing has changed anywhere.
   const adminChange: AdminRowChange = {
     ...(changed.has("username") ? { username: next.username } : {}),
     ...(changed.has("email") ? { email: next.email } : {}),
   };
   const syncAdmin =
     current.provisioningSteps.length > 0 && (changed.has("username") || changed.has("email"));
-  if (syncAdmin) {
-    const outcome = await updateTenantAdminRow(id, current.adminUsername, adminChange);
-    if (!outcome.ok) {
-      await discardFile(newImageKey, "an unused");
-      return adminSyncFailure(outcome.problem);
-    }
-  }
 
   const subdomainRow = domainOf(current, "subdomain");
   const customRow    = domainOf(current, "custom");
   let stage: InsertStage = "other";
-  try {
+  let controlCommitted   = false;
+  // Capture the narrowed row so the callback always checks this exact snapshot.
+  const snapshot = current;
+  /**
+   * Description: Save the profile and versioned desired admin identity atomically.
+   * Input: The immutable admin UUID when synchronizing a provisioned identity.
+   * Output: The desired revision; marks a durable commit for failure handling.
+   * Use case: Tenant identity lock callback, or a control-only profile edit.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-10-17
+   * Last modified: 2026-10-17
+   */
+  const commitProfile = async (adminId?: string): Promise<number> => {
     await getControlDb().$transaction(async (tx) => {
       stage = "tenant";
       // Conditional: setup may have started since the tenant was read.
       const { count } = await tx.tenant.updateMany({
-        where: { id, status: { not: "provisioning" } },
-        data: tenantData(changed, next, newImageKey),
+        where: { id, status: { not: "provisioning" }, adminIdentityVersion: snapshot.adminIdentityVersion },
+        data: {
+          ...tenantData(changed, next, newImageKey),
+          adminIdentityVersion: { increment: 1 },
+          ...(adminId ? { adminUserId: adminId, adminIdentitySyncPending: true } : {}),
+        },
       });
       if (count !== 1) throw new StateMismatch();
 
@@ -559,12 +591,29 @@ export async function updateTenantProfile(
         metadata: { fields: changedList },
       });
     });
+    controlCommitted = true;
+    return snapshot.adminIdentityVersion + 1;
+  };
+  try {
+    if (syncAdmin) {
+      const outcome = await updateTenantAdminRow(id, current.adminUsername, adminChange, commitProfile);
+      if (!outcome.ok) {
+        if (controlCommitted) {
+          // The new image is referenced by the committed profile: retain it.
+          if (changed.has("profileImage")) await discardFile(current.profileImageKey, "the previous");
+          return { ok: false, reason: "unavailable", message: "The profile was saved, but the administrator identity is waiting to synchronize. Retry the edit to finish synchronization." };
+        }
+        await discardFile(newImageKey, "an unused");
+        return adminSyncFailure(outcome);
+      }
+    } else {
+      await commitProfile();
+    }
   } catch (error) {
-    await discardFile(newImageKey, "an unused");
-    if (syncAdmin) await revertAdminRow(id, current, next, changed);
+    if (!controlCommitted) await discardFile(newImageKey, "an unused");
     if (error instanceof StateMismatch) {
       const exists = await getControlDb().tenant.count({ where: { id } }).catch(() => 1);
-      return exists === 0 ? NOT_FOUND : BUSY;
+      return exists === 0 ? NOT_FOUND : { ok: false, reason: "invalid_state", message: "This tenant changed while the form was being saved. Reload the form and try again." };
     }
     const kind  = uniqueViolationField(error, stage);
     const field = kind ? editField(kind) : null;
@@ -582,35 +631,4 @@ export async function updateTenantProfile(
     if (check.status !== "active") dnsPending = true;
   }
   return { ok: true, tenantId: id, changed: changedList, dnsPending };
-}
-
-/**
- * Description: Put the admin's old names back after the control plane refused the edit.
- * Input: The tenant id, the saved row, the new values and the changed fields
- *   (the admin row is renamed back from the new to the saved username/email).
- * Output: Nothing; best effort, failures are logged.
- * Use case: updateTenantProfile's failure path.
- * Author: Mr. Sachin Sharma
- * Created: 2026-10-14
- * Last modified: 2026-10-15
- */
-async function revertAdminRow(
-  id: string,
-  current: EditableRow,
-  next: EditValues,
-  changed: ReadonlySet<UpdateTenantField>,
-): Promise<void> {
-  const outcome = await updateTenantAdminRow(
-    id,
-    changed.has("username") ? next.username : current.adminUsername,
-    {
-      ...(changed.has("username") ? { username: current.adminUsername } : {}),
-      ...(changed.has("email") ? { email: current.contactEmail } : {}),
-    },
-  );
-  if (!outcome.ok) {
-    console.error(
-      `[tenants] tenant ${id}: the admin's user name/email in the tenant database could not be reverted (${outcome.problem}); it no longer matches the control plane`,
-    );
-  }
 }

@@ -159,3 +159,10 @@
   Registrations page shows the same Active / Suspended state.
 - The tenant dashboard's "Active customers" figure now comes from the
   Customers module (all active main customers), not from registrations.
+
+## Audit identity reservation alignment (2026-10-17)
+
+- AUD-20261017-005: Platform tenant-admin renames/email edits also take the
+  shared tenant identity advisory lock and inspect both users and open
+  (pending/rejected) registrations. The short-lived `pg` path shares the same
+  conflict classification and user-facing reservation messages as Prisma writes.
