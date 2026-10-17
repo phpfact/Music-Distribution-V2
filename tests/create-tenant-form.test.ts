@@ -588,9 +588,11 @@ describe("password generators", () => {
 describe("checkProfileImageFile", () => {
   const PNG_HEAD = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d];
 
-  it("accepts an image recognised from its first bytes, whatever its name", async () => {
-    expect(await checkProfileImageFile(new Blob([new Uint8Array(PNG_HEAD)]))).toBeNull();
-    expect(await checkProfileImageFile(new File([new Uint8Array(PNG_HEAD)], "logo.txt"))).toBeNull();
+  it("accepts a complete supported image whatever its name, and rejects headers alone", async () => {
+    const { VALID_PNG } = await import("./support/image-fixtures");
+    expect(await checkProfileImageFile(new Blob([Uint8Array.from(VALID_PNG)]))).toBeNull();
+    expect(await checkProfileImageFile(new File([Uint8Array.from(VALID_PNG)], "logo.txt"))).toBeNull();
+    expect(await checkProfileImageFile(new Blob([new Uint8Array(PNG_HEAD)]))).toContain("incomplete");
   });
 
   it("rejects other content, an empty file and a file over 2 MB", async () => {

@@ -54,8 +54,7 @@ import {
 const SLOW = { timeout: 120_000 };
 const BASE_DOMAIN = process.env.PLATFORM_BASE_DOMAIN?.trim() || "localhost";
 const LOCALHOST_BASE = BASE_DOMAIN === "localhost" || BASE_DOMAIN.endsWith(".localhost");
-const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 1, 2, 3]);
-const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0, 1]);
+import { VALID_PNG as PNG, VALID_JPEG as JPEG } from "./support/image-fixtures";
 const RATE_LIMIT_PREFIXES = [
   "tenant-create",
   "tenant-admin-password",

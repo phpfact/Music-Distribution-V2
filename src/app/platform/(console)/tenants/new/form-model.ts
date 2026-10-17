@@ -645,14 +645,12 @@ export function validateConnection(
 // ---------------------------------------------------------------------------
 // Profile image
 
-// Enough for every signature sniffImage knows (WebP needs 12 bytes).
-const IMAGE_HEAD_BYTES = 16;
-
 /**
  * Description: Run the server's image checks on a chosen file before it is uploaded.
  * Input: The chosen file.
  * Output: null when acceptable; otherwise the message: empty file, larger than 2 MB,
- *   or not PNG/JPEG/WebP judged from its first bytes (never its name or claimed type).
+ *   or an unsupported/incomplete PNG/JPEG/WebP container. The server additionally
+ *   decodes all pixels before storage; file names and claimed MIME are untrusted.
  * Use case: The profile image pickers of the create and edit forms (shown with an instant preview).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
@@ -663,8 +661,8 @@ export async function checkProfileImageFile(file: Blob): Promise<string | null> 
   if (file.size > MAX_PROFILE_IMAGE_BYTES) {
     return "The image is larger than 2 MB. Choose a smaller image.";
   }
-  const head   = new Uint8Array(await file.slice(0, IMAGE_HEAD_BYTES).arrayBuffer());
-  const result = validateProfileImage(head);
+  const bytes  = new Uint8Array(await file.arrayBuffer());
+  const result = validateProfileImage(bytes);
   return result.ok ? null : result.error;
 }
 

@@ -1,7 +1,8 @@
 import "server-only";
 /**
  * Tenant profile images (docs/tenant-management.md §8.6): checked by their
- * bytes, stored under a server-generated key, read back for the avatar route.
+ * bytes, decoded and normalized before storage under a server-generated key,
+ * then read back for the avatar route.
  */
 import { getControlDb } from "../db/control";
 import type { RuleResult } from "../tenants/rules";
@@ -12,7 +13,7 @@ import {
   readStoredFile,
   saveFile,
 } from "./files";
-import { validateProfileImage } from "./image";
+import { normalizeProfileImage } from "./normalize-image";
 import { UUID_PATTERN } from "@/lib/uuid";
 
 // The served type follows the stored key's extension, which the server chose
@@ -31,16 +32,16 @@ const CONTENT_TYPES: Record<ProfileImageExtension, string> = {
  * Use case: Tenant create and edit services.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-17
  */
 export async function storeProfileImage(
   tenantId: string,
   bytes: Uint8Array,
 ): Promise<RuleResult<string>> {
-  const image = validateProfileImage(bytes);
-  if (!image.ok) return image;
-  const key = profileImageKey(tenantId, image.value.extension);
-  await saveFile(key, bytes);
+  const normalized = await normalizeProfileImage(bytes);
+  if (!normalized.ok) return normalized;
+  const key = profileImageKey(tenantId, normalized.value.image.extension);
+  await saveFile(key, normalized.value.bytes);
   return { ok: true, value: key };
 }
 

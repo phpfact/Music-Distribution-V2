@@ -372,6 +372,29 @@ describe("customer sign-up and approval", () => {
     });
   });
 
+  it("AUD-006 refuses a suspended parent's child before issuing any session", async () => {
+    const suffix   = randomUUID();
+    const password = `Child-${randomBytes(18).toString("base64url")}`;
+    const parent   = await wsA.db.customer.create({ data: { name: "Parent fixture", type: "label" } });
+    const child    = await wsA.db.customer.create({ data: { name: "Child fixture", type: "artist", parentId: parent.id } });
+    const user     = await wsA.db.user.create({ data: {
+      name: "Child fixture", username: `child-${suffix}`, email: `child-${suffix}@example.com`,
+      customerId: child.id, passwordHash: await hashPassword(password),
+    } });
+    secrets.add(password);
+
+    // Legitimate control: the same child signs in while both customers are active.
+    const active = await authenticateWorkspaceUser(wsA, { identifier: user.username, password }, ip());
+    expect(active).toMatchObject({ ok: true, destination: "customer" });
+    await wsA.db.userSession.deleteMany({ where: { userId: user.id } });
+    await wsA.db.customer.update({ where: { id: parent.id }, data: { status: "disabled" } });
+
+    expect(await authenticateWorkspaceUser(wsA, { identifier: user.username, password }, ip())).toEqual({ ok: false, reason: "suspended" });
+    expect(await wsA.db.userSession.count({ where: { userId: user.id } })).toBe(0);
+    // An incorrect password still reveals neither parent nor child status.
+    expect(await authenticateWorkspaceUser(wsA, { identifier: user.username, password: "incorrect-password" }, ip())).toEqual({ ok: false, reason: "invalid_credentials" });
+  });
+
   it("counts and lists registrations at the database level", async () => {
     const summary = await getRegistrationSummary(wsA.db);
     expect(summary.total).toBe(summary.pending + summary.active + summary.suspended + summary.rejected);

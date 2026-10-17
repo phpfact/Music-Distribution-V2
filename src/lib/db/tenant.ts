@@ -2,6 +2,7 @@ import "server-only";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@/generated/prisma/tenant/client";
 import { getEnv } from "../env";
+import { sanitizeLogMessage } from "../log-sanitizer";
 
 export type TenantDb = PrismaClient;
 
@@ -28,7 +29,10 @@ const EVICTION_GRACE_MS = 30_000;
 
 // Kept on globalThis so dev hot reloads reuse the clients instead of leaking their pools.
 // Map order is least recently used first.
-const globalForTenantDb = globalThis as typeof globalThis & { __tenantDbs?: Map<string, Entry> };
+const globalForTenantDb = globalThis as typeof globalThis & {
+  __tenantDbs?: Map<string, Entry>;
+  __tenantDbTrimTimer?: ReturnType<typeof setTimeout>;
+};
 
 /**
  * Description: Create a Prisma client for one tenant's database.
@@ -56,7 +60,7 @@ function createTenantDb(target: TenantDatabase): TenantDb {
     {
       // The message names the tenant only; it never includes credentials.
       onPoolError: (error) => {
-        console.error(`[postgres] tenant ${target.tenantId} idle client error: ${error.message}`);
+        console.error(`[postgres] tenant ${target.tenantId} idle client error: ${sanitizeLogMessage(error.message)}`);
       },
     },
   );
@@ -75,7 +79,7 @@ function createTenantDb(target: TenantDatabase): TenantDb {
 function close(entry: Entry): void {
   entry.db.$disconnect().catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`[postgres] tenant ${entry.target.tenantId} disconnect failed: ${message}`);
+    console.error(`[postgres] tenant ${entry.target.tenantId} disconnect failed: ${sanitizeLogMessage(message)}`);
   });
 }
 
@@ -98,11 +102,47 @@ function sameTarget(a: TenantDatabase, b: TenantDatabase): boolean {
 }
 
 /**
+ * Description: Drain idle cache overflow and arrange cleanup after the safety grace.
+ * Input: The current timestamp, injectable for straightforward timer tests.
+ * Output: Nothing; idle clients close and any remaining overflow gets one timer.
+ * Use case: Cache hits, insertion, explicit eviction and scheduled idle cleanup.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-17
+ * Last modified: 2026-10-17
+ */
+function trimTenantClients(now = Date.now()): void {
+  // One shared timer survives development hot reloads without accumulating jobs.
+  if (globalForTenantDb.__tenantDbTrimTimer) {
+    clearTimeout(globalForTenantDb.__tenantDbTrimTimer);
+    globalForTenantDb.__tenantDbTrimTimer = undefined;
+  }
+  const entries = globalForTenantDb.__tenantDbs;
+  if (!entries) return;
+  const { tenantClientsMax } = getEnv().postgres;
+  let nextDelay = EVICTION_GRACE_MS;
+  for (const [tenantId, entry] of entries) {
+    if (entries.size <= tenantClientsMax) break;
+    const remaining = EVICTION_GRACE_MS - (now - entry.lastUsedAt);
+    if (remaining > 0) {
+      nextDelay = Math.min(nextDelay, remaining);
+      continue;
+    }
+    entries.delete(tenantId);
+    close(entry);
+  }
+  if (entries.size > tenantClientsMax) {
+    globalForTenantDb.__tenantDbTrimTimer = setTimeout(trimTenantClients, Math.max(1, nextDelay));
+    // A soft cache target must not keep an otherwise finished process alive.
+    globalForTenantDb.__tenantDbTrimTimer.unref();
+  }
+}
+
+/**
  * Description: Return the Prisma client for one tenant's database.
  * Input: The tenant's database target.
- * Output: A cached client (reused across requests; capped at
- *   POSTGRES_TENANT_CLIENTS_MAX, the least recently used is closed), so connections
- *   scale with the active tenants, not with the number of tenants.
+ * Output: A cached client. POSTGRES_TENANT_CLIENTS_MAX is a soft retention target:
+ *   idle LRU overflow closes after 30 seconds, including without new requests.
+ *   Individual pool limits bound connections; this is not hard admission control.
  * Use case: Tenant-facing data access.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-13
@@ -118,6 +158,7 @@ export function getTenantDb(target: TenantDatabase): TenantDb {
     if (sameTarget(existing.target, target)) {
       existing.lastUsedAt = now;
       entries.set(target.tenantId, existing);
+      trimTenantClients(now);
       return existing.db;
     }
     // The login was rotated or the database moved: drop the stale client.
@@ -127,13 +168,7 @@ export function getTenantDb(target: TenantDatabase): TenantDb {
   const entry: Entry = { db: createTenantDb(target), target, lastUsedAt: now };
   entries.set(target.tenantId, entry);
 
-  const { tenantClientsMax } = getEnv().postgres;
-  for (const [tenantId, candidate] of entries) {
-    if (entries.size <= tenantClientsMax) break;
-    if (now - candidate.lastUsedAt < EVICTION_GRACE_MS) break;
-    entries.delete(tenantId);
-    close(candidate);
-  }
+  trimTenantClients(now);
 
   return entry.db;
 }
@@ -154,4 +189,5 @@ export function evictTenantDb(tenantId: string): void {
   if (!entries || !entry) return;
   entries.delete(tenantId);
   close(entry);
+  trimTenantClients();
 }

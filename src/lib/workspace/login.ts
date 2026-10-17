@@ -122,7 +122,7 @@ export async function authenticateWorkspaceUser(
         passwordHash: true,
         status: true,
         customerId: true,
-        customer: { select: { status: true } },
+        customer: { select: { status: true, parentId: true, parent: { select: { status: true } } } },
       },
     });
 
@@ -137,7 +137,13 @@ export async function authenticateWorkspaceUser(
 
       // Step 4: the correct password — now the account's state decides.
       const isCustomer = user.customerId !== null;
-      const suspended  = user.status !== "active" || (isCustomer && user.customer?.status !== "active");
+      // Match session eligibility before issuing a cookie: children depend on
+      // their parent customer's status as well as their own account status.
+      const customer   = user.customer;
+      const suspended  = user.status !== "active" || (isCustomer && (
+        customer?.status !== "active" ||
+        (customer.parentId !== null && customer.parent?.status !== "active")
+      ));
       if (suspended) {
         console.warn(`[workspace-auth] tenant ${tenant.id}: login rejected (account suspended)`);
         return { ok: false, reason: "suspended" };

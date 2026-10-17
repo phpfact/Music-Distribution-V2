@@ -1,4 +1,5 @@
 import "server-only";
+import { redactLogCredentials, sanitizeLogMessage } from "@/lib/log-sanitizer";
 /**
  * Provisioning errors (docs/tenant-management.md §6.1).
  *
@@ -289,15 +290,6 @@ function capitalize(text: string): string {
 // ---------------------------------------------------------------------------
 // Log redaction
 
-// Anything that can carry a credential, whatever produced the text.
-const REDACTIONS: [RegExp, string][] = [
-  [/postgres(ql)?:\/\/\S+/gi, "<connection string>"],
-  [/SCRAM-SHA-256\$[^\s'"]+/g, "<scram verifier>"],
-  [/\$argon2(id|i|d)\$[^\s'"]+/g, "<password hash>"],
-  [/\bPASSWORD\s+'(?:[^']|'')*'/gi, "PASSWORD '<redacted>'"],
-  [/\b(password|passwd|pwd|secret|token)(\s*[=:]\s*)("[^"]*"|'[^']*'|\S+)/gi, "$1$2<redacted>"],
-];
-
 /**
  * Description: Remove credentials from a text meant for the log.
  * Input: The text and known secret values.
@@ -309,13 +301,7 @@ const REDACTIONS: [RegExp, string][] = [
  * Last modified: 2026-10-15
  */
 export function redact(text: string, secrets: readonly string[] = []): string {
-  let result = text;
-  // Longest first, so a secret that contains another is removed whole.
-  for (const secret of [...secrets].filter((s) => s.length > 0).sort((a, b) => b.length - a.length)) {
-    result = result.split(secret).join("<redacted>");
-  }
-  for (const [pattern, replacement] of REDACTIONS) result = result.replace(pattern, replacement);
-  return result;
+  return sanitizeLogMessage(text, secrets);
 }
 
 /**
@@ -332,7 +318,7 @@ export function describeForLog(error: unknown, secrets: readonly string[] = []):
   let current: unknown  = error;
   // A bounded walk: a cause chain could in theory be cyclic.
   for (let depth = 0; current !== undefined && current !== null && depth < 4; depth += 1) {
-    const message = current instanceof Error ? current.message : String(current);
+    const message = redactLogCredentials(current instanceof Error ? current.message : String(current), secrets);
     const lines = message
       .split("\n")
       .map((line) => line.trim())

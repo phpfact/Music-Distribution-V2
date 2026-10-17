@@ -1,4 +1,5 @@
 import "server-only";
+import { redactLogCredentials, sanitizeLogMessage } from "@/lib/log-sanitizer";
 import { createHash, randomBytes } from "node:crypto";
 import { getControlDb } from "../db/control";
 import { getEnv } from "../env";
@@ -202,18 +203,18 @@ export async function revokeSession(token: string): Promise<void> {
  * Description: Turn an error into one safe line for the server log.
  * Input: Any thrown value.
  * Output: The cause on one line (Prisma puts it on the last line of a multi-line
- *   message); anything that looks like a connection string is removed.
+ *   message), with credential forms redacted and bounded single-line output.
  * Use case: Every `[module] ...` error log line of the server.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-17
  */
 export function describeError(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = redactLogCredentials(error instanceof Error ? error.message : String(error));
   const lines = message
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
   const detail = (lines.length > 1 ? lines.at(-1) : lines[0]) ?? "unknown error";
-  return detail.replace(/postgres(ql)?:\/\/\S+/gi, "<connection string>");
+  return sanitizeLogMessage(detail);
 }

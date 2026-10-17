@@ -51,7 +51,7 @@ import {
 
 const SLOW = { timeout: 90_000 };
 const BASE_DOMAIN = process.env.PLATFORM_BASE_DOMAIN?.trim() || "localhost";
-const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 1, 2, 3]);
+import { VALID_PNG as PNG } from "./support/image-fixtures";
 
 let db: Client;
 let resources: TenantResources;
@@ -691,7 +691,10 @@ describe("profile images", () => {
     expect(row?.profile_image_key).toMatch(new RegExp(`^tenants/${id}/profile/[0-9a-f-]{36}\\.png$`));
     const image = await readProfileImage(id);
     expect(image?.contentType).toBe("image/png");
-    expect(Buffer.from(image?.bytes ?? new Uint8Array())).toStrictEqual(Buffer.from(PNG));
+    const sharp = (await import("sharp")).default;
+    const decoded = await sharp(image?.bytes).raw().toBuffer({ resolveWithObject: true });
+    expect(decoded.info).toMatchObject({ width: 2, height: 2, channels: 3 });
+    expect(decoded.data).toStrictEqual(await sharp(PNG).raw().toBuffer());
     expect((await getTenantDetails(id))?.hasProfileImage).toBe(true);
   });
 
