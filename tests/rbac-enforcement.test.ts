@@ -21,7 +21,8 @@ import { permissionKeysOfDomain } from "@/lib/authz/catalog";
 import { FORBIDDEN_MESSAGE, NO_ACTIVE_ROLE_MESSAGE } from "@/lib/authz/resolver";
 import { loadTenantDatabase } from "@/lib/tenants/database-target";
 import type { ReadyWorkspace } from "@/lib/workspace/context";
-import { createUserSession, hashWorkspaceToken } from "@/lib/workspace/sessions";
+import { hashWorkspaceToken } from "@/lib/workspace/sessions";
+import { createTestUserSession as createUserSession } from "./support/workspace-session";
 import { closeAppDatabase } from "./support/app-connections";
 import {
   clearPlatformTables,

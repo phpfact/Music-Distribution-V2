@@ -42,10 +42,12 @@ function constraintOf(error: unknown): string {
  * Output: ok, or the problem (missing row, username or email taken, unavailable).
  *   Never throws; runs as the tenant's runtime role on a short-lived connection;
  *   failure details go to the log only (pg keeps values in `detail`).
+ *   Password changes require the primary staff account and revoke all of its
+ *   sessions atomically; username/email edits preserve sessions.
  * Use case: Edit (username/email) and Reset master password.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-17
  */
 export async function updateTenantAdminRow(
   tenantId: string,
@@ -55,16 +57,37 @@ export async function updateTenantAdminRow(
   try {
     const target = await loadTenantDatabase(tenantId);
     const updated = await withLoginClient(target, async (client) => {
-      const result = await client.query(
-        `UPDATE users
-         SET username = COALESCE($2, username),
-             email = COALESCE($3, email),
-             password_hash = COALESCE($4, password_hash),
-             updated_at = now()
-         WHERE username = $1`,
-        [username, change.username ?? null, change.email ?? null, change.passwordHash ?? null],
-      );
-      return result.rowCount ?? 0;
+      await client.query("BEGIN");
+      try {
+        // Keep the edit/compensation username contract, then use only the
+        // locked immutable ID. Never reset an unrelated replacement account.
+        const admins = await client.query<{ id: string; is_primary: boolean; customer_id: string | null }>(
+          "SELECT id, is_primary, customer_id FROM users WHERE username = $1 FOR UPDATE", [username],
+        );
+        const admin = admins.rows[0];
+        const passwordChanged = change.passwordHash !== undefined;
+        if (!admin || (passwordChanged && (!admin.is_primary || admin.customer_id !== null))) {
+          await client.query("ROLLBACK");
+          return 0;
+        }
+        const result = await client.query(
+          `UPDATE users
+           SET username = COALESCE($2, username),
+               email = COALESCE($3, email),
+               password_hash = COALESCE($4, password_hash),
+               updated_at = now()
+           WHERE id = $1`,
+          [admin.id, change.username ?? null, change.email ?? null, change.passwordHash ?? null],
+        );
+        if (passwordChanged) {
+          await client.query("DELETE FROM user_sessions WHERE user_id = $1", [admin.id]);
+        }
+        await client.query("COMMIT");
+        return result.rowCount ?? 0;
+      } catch (error) {
+        await client.query("ROLLBACK").catch(() => undefined);
+        throw error;
+      }
     });
     return updated === 1 ? { ok: true } : { ok: false, problem: "missing" };
   } catch (error) {

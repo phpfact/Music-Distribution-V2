@@ -21,7 +21,7 @@ import { request } from "node:http";
 import type { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { permissionKeysOfDomain } from "@/lib/authz/catalog";
-import { createUserSession } from "@/lib/workspace/sessions";
+import { createTestUserSession as createUserSession } from "./support/workspace-session";
 import { closeAppDatabase } from "./support/app-connections";
 import { clearPlatformTables, clearTenantTables, connectTo, connectToTestDatabase } from "./support/postgres";
 import { approvedCustomer, assignRole, closeRbacTenant, insertCustomer, insertRole, insertUser, openRbacTenant, type RbacTenant } from "./support/rbac";

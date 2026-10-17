@@ -27,12 +27,12 @@ import {
   submitRegistration,
 } from "@/lib/workspace/registrations";
 import {
-  createUserSession,
   hashWorkspaceToken,
   revokeUserSession,
   validateRegistrationSession,
   validateUserSession,
 } from "@/lib/workspace/sessions";
+import { createTestUserSession as createUserSession } from "./support/workspace-session";
 import type { ReadyWorkspace } from "@/lib/workspace/context";
 import { closeAppDatabase, closeAppRedis } from "./support/app-connections";
 import { captureConsole } from "./support/console";

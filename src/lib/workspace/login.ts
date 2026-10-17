@@ -86,7 +86,7 @@ async function countAttempt(
  * Use case: workspaceLoginAction (src/app/(workspace)/login/actions.ts).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-15
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-17
  */
 export async function authenticateWorkspaceUser(
   workspace: ReadyWorkspace,
@@ -144,7 +144,8 @@ export async function authenticateWorkspaceUser(
       }
 
       const area  = isCustomer ? "customer" : "tenant";
-      const token = await createUserSession(db, tenant.id, user.id, area);
+      const token = await createUserSession(db, tenant.id, user.id, area, user.passwordHash);
+      if (!token) return invalidCredentials(tenant.id);
       await clearRateLimit(identifierKey(tenant.id, identifier));
       console.log(`[workspace-auth] tenant ${tenant.id}: ${area} login succeeded for user ${user.id}`);
       return { ok: true, destination: area, token };

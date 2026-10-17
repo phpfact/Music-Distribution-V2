@@ -41,7 +41,8 @@ import { loadDisabledTenantModules, resolveWorkspaceAccess } from "@/lib/authz/w
 import { getControlDb } from "@/lib/db/control";
 import type { TenantDb } from "@/lib/db/tenant";
 import { loadTenantDatabase } from "@/lib/tenants/database-target";
-import { createUserSession, validateUserSession } from "@/lib/workspace/sessions";
+import { validateUserSession } from "@/lib/workspace/sessions";
+import { createTestUserSession as createUserSession } from "./support/workspace-session";
 import { closeAppDatabase } from "./support/app-connections";
 import {
   clearPlatformTables,

@@ -158,6 +158,16 @@ The module depends on shared console wrappers (Field, FormSection, Notice, Avata
 
 ## Change history
 
+- 2026-10-17: Resolved AUD-20261017-001/002. A provisioned tenant's master
+  password reset locks the account selected by its stored admin username,
+  requires that account to be the primary staff user, then updates its hash and
+  deletes all of its sessions by immutable user ID in one tenant transaction.
+  A revocation failure rolls back the hash. Stale usernames that now identify a
+  nonprimary/customer account fail safely as a missing admin; profile edits and
+  their compensation keep their existing username contract and preserve
+  sessions. Workspace issuance uses a matching user lock and verified hash, so
+  an in-flight old-password login cannot survive reset. Pending setup continues
+  to replace only the pending hash; generated-password/audit behavior is retained.
 - 2026-10-15: Documented the existing module contracts and requested full shadcn/ui migration before implementation.
 - 2026-10-15: Migrated all existing tenant UI surfaces to shared shadcn primitives while preserving actions, models, payloads, permissions and stored data. Prisma client generation, TypeScript verification, ESLint with zero warnings and whitespace checks pass. Root owns final integrated tests and rendered verification.
 

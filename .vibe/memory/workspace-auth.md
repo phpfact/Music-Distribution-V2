@@ -95,6 +95,12 @@
   and area: a cookie copied to another tenant or area never matches.
 - Sessions live in the tenant's own database (`user_sessions`,
   `registration_sessions`), never in the control plane.
+- User-session issuance requires the password hash that was verified during
+  login. It re-reads the active user under `FOR SHARE` in the same transaction
+  as session insertion. A changed/missing hash or missing/disabled user returns
+  no token and login reports invalid credentials without clearing its limit.
+  Password resets lock/update that same user and delete their sessions before
+  committing: reset first prevents issuance; issuance first is revoked by reset.
 - Cookies: httpOnly, SameSite=Lax, Secure in production, host-only (no
   `Domain`), path-scoped per area, so a customer cookie is never even sent to
   `/tenant/**` and vice versa, and cookies never cross tenant domains.
@@ -136,6 +142,19 @@
 
 ## Change history
 
+- 2026-10-17: Resolved AUD-20261017-001/002 with transactional master-session
+  revocation and hash-checked, locked workspace-session issuance, following the
+  platform session pattern. Regression tests in
+  `tests/workspace-password-sessions.test.ts` exercise prior-session revocation,
+  both concurrent orderings, a full login paused after verification, staff and
+  customer stale hashes, rollback on revocation failure, unrelated sessions and
+  fresh credentials. Existing authorization fixtures now supply a current hash
+  through `tests/support/workspace-session.ts`; production has no bypass mode.
+  Validation: `npm run lint`, `npm run typecheck`, and `npm run build` passed;
+  the full Vitest run passed 61 files / 1,547 tests with one existing skip.
+  The 12 new regression tests passed again after independent read-only review.
+  Integration checks used dedicated PostgreSQL/Redis containers and a separate
+  app server, without changing the running development services.
 - 2026-10-15: Module created — requirements and owner decisions recorded
   before implementation (shared `/login`, username-or-email, area-separated
   sessions and cookies, no forgot-password/2FA yet).

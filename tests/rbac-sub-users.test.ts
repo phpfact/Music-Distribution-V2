@@ -24,7 +24,8 @@ import { getControlDb } from "@/lib/db/control";
 import { verifyPassword } from "@/lib/platform-auth/password";
 import { createSession } from "@/lib/platform-auth/session";
 import { setCustomerAccountStatus } from "@/lib/workspace/registrations";
-import { createUserSession, validateUserSession } from "@/lib/workspace/sessions";
+import { validateUserSession } from "@/lib/workspace/sessions";
+import { createTestUserSession as createUserSession } from "./support/workspace-session";
 import { closeAppDatabase } from "./support/app-connections";
 import {
   clearPlatformTables,

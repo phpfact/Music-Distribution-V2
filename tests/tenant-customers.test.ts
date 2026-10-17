@@ -24,7 +24,8 @@ import { permissionKeysOfDomain } from "@/lib/authz/catalog";
 import { FORBIDDEN_MESSAGE } from "@/lib/authz/resolver";
 import { authenticateWorkspaceUser } from "@/lib/workspace/login";
 import { listRegistrations } from "@/lib/workspace/registrations";
-import { createUserSession, validateUserSession } from "@/lib/workspace/sessions";
+import { validateUserSession } from "@/lib/workspace/sessions";
+import { createTestUserSession as createUserSession } from "./support/workspace-session";
 import { closeAppDatabase } from "./support/app-connections";
 import { clearPlatformTables, clearTenantTables, connectToTestDatabase } from "./support/postgres";
 import {

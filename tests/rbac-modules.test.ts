@@ -24,7 +24,8 @@ import { MODULE_INVALID_MESSAGE, MODULE_TENANT_NOT_FOUND_MESSAGE } from "@/lib/a
 import { FORBIDDEN_MESSAGE } from "@/lib/authz/resolver";
 import { getControlDb } from "@/lib/db/control";
 import type { ReadyWorkspace } from "@/lib/workspace/context";
-import { createUserSession, validateUserSession } from "@/lib/workspace/sessions";
+import { validateUserSession } from "@/lib/workspace/sessions";
+import { createTestUserSession as createUserSession } from "./support/workspace-session";
 import { closeAppDatabase } from "./support/app-connections";
 import {
   clearPlatformTables,

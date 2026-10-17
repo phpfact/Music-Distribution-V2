@@ -118,25 +118,37 @@ function idleCutoff(now: Date): Date {
 
 /**
  * Description: Start a signed-in session for a user whose password was just verified.
- * Input: The tenant database, the tenant id, the user id and the area.
- * Output: The token for the cookie. The user's expired or idle sessions are
- *   removed in the same transaction.
+ * Input: The tenant database, tenant id, user id, area and verified password hash.
+ * Output: The token, or null if the user is gone, disabled or has a different
+ *   password now. The user lock is held through cleanup and session insertion,
+ *   so a concurrent reset either prevents issuance or revokes the new session.
  * Use case: Workspace sign-in (tenant staff or customer).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-15
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-17
  */
 export async function createUserSession(
   db: TenantDb,
   tenantId: string,
   userId: string,
   area: SessionArea,
-): Promise<string> {
+  expectedPasswordHash: string,
+): Promise<string | null> {
   const token     = randomBytes(TOKEN_BYTES).toString("base64url");
   const tokenHash = hashWorkspaceToken(tenantId, area, token);
-  const now       = new Date();
+  const created = await db.$transaction(async (tx) => {
+    // Match the platform issuer: password updates conflict with this lock.
+    // A reset that commits first is visible here; one that waits behind us
+    // deletes this session after we commit. A key-share lock is insufficient.
+    const users = await tx.$queryRaw<{ passwordHash: string | null; status: string }[]>`
+      SELECT "password_hash" AS "passwordHash", "status"::text AS "status"
+      FROM "users" WHERE "id" = ${userId}::uuid FOR SHARE`;
+    const user = users[0];
+    if (!user || user.status !== "active" || !user.passwordHash || user.passwordHash !== expectedPasswordHash) {
+      return false;
+    }
 
-  await db.$transaction(async (tx) => {
+    const now = new Date();
     // Step 1: housekeeping — this user's sessions that can no longer be used.
     await tx.userSession.deleteMany({
       where: {
@@ -155,8 +167,9 @@ export async function createUserSession(
         expiresAt: new Date(now.getTime() + WORKSPACE_SESSION_ABSOLUTE_LIFETIME_MS),
       },
     });
+    return true;
   });
-  return token;
+  return created ? token : null;
 }
 
 /**

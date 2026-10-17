@@ -13,7 +13,8 @@ import { getControlDb } from "@/lib/db/control";
 import { loadTenantDatabase } from "@/lib/tenants/database-target";
 import type { ReadyWorkspace } from "@/lib/workspace/context";
 import { approveRegistration } from "@/lib/workspace/registrations";
-import { createUserSession, validateUserSession } from "@/lib/workspace/sessions";
+import { validateUserSession } from "@/lib/workspace/sessions";
+import { createTestUserSession as createUserSession } from "./workspace-session";
 import { connectAs } from "./tenant-resources";
 import { createProvisionedTenant, readyWorkspace, type ProvisionedTenant } from "./workspace";
 

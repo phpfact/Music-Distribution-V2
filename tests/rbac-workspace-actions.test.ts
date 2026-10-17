@@ -17,7 +17,7 @@ import type { Client } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { permissionKeysOfDomain } from "@/lib/authz/catalog";
 import { FORBIDDEN_MESSAGE } from "@/lib/authz/resolver";
-import { createUserSession } from "@/lib/workspace/sessions";
+import { createTestUserSession as createUserSession } from "./support/workspace-session";
 import { closeAppDatabase } from "./support/app-connections";
 import { clearPlatformTables, clearTenantTables, connectToTestDatabase } from "./support/postgres";
 import {
