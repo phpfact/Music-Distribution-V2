@@ -470,9 +470,11 @@ export async function updateTenantProfile(
   // The runner reads the admin's names and the domain while it works.
   if (current.status === "provisioning") return BUSY;
 
-  // Reconcile a previously interrupted edit even when the new request changes
-  // only non-identity fields or submits the already saved desired values.
-  if (current.adminIdentitySyncPending) {
+  // Non-identity/no-change submissions first finish the saved desired identity.
+  // An explicit name correction may replace a pending desired name instead: an
+  // applicant could have reserved it after the interrupted tenant rollback.
+  const correctsPendingIdentity = next.username !== current.adminUsername || next.email !== current.contactEmail;
+  if (current.adminIdentitySyncPending && !correctsPendingIdentity) {
     try {
       const recovered = await updateTenantAdminRow(id, current.adminUsername, {});
       if (!recovered.ok) return adminSyncFailure(recovered);

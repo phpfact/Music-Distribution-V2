@@ -260,7 +260,9 @@ and `admin_identity_sync_pending` marker in the control-plane transaction, then
 commit the tenant identity change by that immutable ID. A stale profile version
 is refused. Interrupted tenant commits retain durable desired state; the next
 edit (including a no-change submission) or master-password reset reconciles it
-under the same lock. Only the matching revision may clear the recovery marker.
+under the same lock. An owner can replace a pending desired name with an
+available alternative if a registration reserved it after interruption. Only
+the matching revision may clear the recovery marker.
 Control-plane refusals happen before the tenant write; after a durable profile
 commit, a tenant failure reports pending synchronization and preserves any new
 referenced image.

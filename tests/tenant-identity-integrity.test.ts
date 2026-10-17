@@ -159,4 +159,23 @@ describe("tenant administrator identity integrity", () => {
     expect(await verifyPassword(admin.passwordHash!, password)).toBe(true);
     expect((await getControlDb().tenant.findUniqueOrThrow({ where: { id: tenant.tenant.id } })).adminIdentitySyncPending).toBe(false);
   });
+
+  it("lets an owner correct a pending desired identity that became reserved after interruption", async () => {
+    const registration = await tenant.ws.db.customerRegistration.create({ data: {
+      fullName: "Test Applicant", username: `reserved-${randomUUID().slice(0, 8)}`,
+      email: `reserved-${randomUUID()}@example.com`, passwordHash: "fixture-hash", accountType: "artist",
+    } });
+    await getControlDb().tenant.update({ where: { id: tenant.tenant.id }, data: {
+      adminUserId: tenant.adminId, contactEmail: registration.email, adminIdentitySyncPending: true,
+      adminIdentityVersion: { increment: 1 },
+    } });
+    expect(await edit(await editInput())).toMatchObject({ ok: false, reason: "validation",
+      fieldErrors: { email: expect.stringContaining("registration") } });
+    const correctedEmail = `corrected-${randomUUID()}@example.com`;
+    expect(await edit(await editInput({ email: correctedEmail }))).toMatchObject({ ok: true, changed: ["email"] });
+    expect((await tenant.ws.db.user.findUniqueOrThrow({ where: { id: tenant.adminId } })).email).toBe(correctedEmail);
+    expect((await getControlDb().tenant.findUniqueOrThrow({ where: { id: tenant.tenant.id } })).adminIdentitySyncPending).toBe(false);
+    expect((await tenant.ws.db.customerRegistration.findUniqueOrThrow({ where: { id: registration.id } })).email).toBe(registration.email);
+  });
+
 });

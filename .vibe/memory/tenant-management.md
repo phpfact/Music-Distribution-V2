@@ -423,3 +423,8 @@ CLAUDE.md, and explicitly asked for a secondary menu in Tenant Management.
   The earlier username-based profile compensation contract in the AUD-001/002
   historical entry is superseded by the durable immutable-ID flow above; its
   password/session guarantees remain intact.
+- Recovery conflict handling: if a pending desired name is later claimed by an
+  applicant after an interruption, the owner can submit a different available
+  username/email. That edit replaces the pending desired identity under the
+  same lock/version guard; no-change/non-identity requests still reconcile the
+  saved desired identity first. This keeps recovery available through the UI.
