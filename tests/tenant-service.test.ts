@@ -26,6 +26,7 @@ import {
   getTenantDetails,
   getTenantSummary,
   listTenants,
+  listTenantCountRecords,
   previewGeneratedValues,
   reactivateTenant,
   retryProvisioning,
@@ -746,6 +747,7 @@ describe("listTenants", () => {
     await make("underscoreX", `Test Underscorex ${token}`, { email: `us-axb-${token}@example.com` });
     await setStatus(ids.alpha as string, "active");
     await setStatus(ids.percent as string, "suspended");
+    await db.query("UPDATE tenants SET schema_status = 'current' WHERE id = ANY($1::uuid[])", [[ids.alpha, ids.percent]]);
     await setStatus(ids.percentX as string, "failed");
     await setStatus(ids.underscore as string, "provisioning");
   });
@@ -803,6 +805,20 @@ describe("listTenants", () => {
     expect(byId.get(ids.percentX as string)).toBe("failed");
     expect(byId.get(ids.underscore as string)).toBe("provisioning");
     expect(byId.get(ids.underscoreX as string)).toBe("pending");
+  });
+
+  it("shows failed/pending schema readiness in directory and count records", async () => {
+    try {
+      await db.query("UPDATE tenants SET schema_status = 'failed' WHERE id = $1", [ids.alpha]);
+      await db.query("UPDATE tenants SET schema_status = 'pending' WHERE id = $1", [ids.percent]);
+      const directory = await listTenants({ q: token, status: "all", page: 1 });
+      expect(directory.rows.find((row) => row.id === ids.alpha)?.databaseState).toBe("failed");
+      expect(directory.rows.find((row) => row.id === ids.percent)?.databaseState).toBe("pending");
+      const counted = await listTenantCountRecords({ kind: "summary", category: "active" }, 1);
+      expect(counted.rows.find((row) => row.id === ids.alpha)?.databaseState).toBe("failed");
+    } finally {
+      await db.query("UPDATE tenants SET schema_status = 'current' WHERE id = ANY($1::uuid[])", [[ids.alpha, ids.percent]]);
+    }
   });
 
   it("pages 20 rows at a time, newest first, and falls back to page 1 for invalid pages", async () => {

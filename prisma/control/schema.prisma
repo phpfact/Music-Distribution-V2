@@ -129,6 +129,12 @@ model Tenant {
   /// The tenant admin's login name, in the same format as platform owner user
   /// names (checked in the database).
   adminUsername   String       @unique @map("admin_username") @db.VarChar(64)
+  /// Immutable primary staff user in the tenant database; captured on first identity edit.
+  adminUserId String? @map("admin_user_id") @db.Uuid
+  /// Durable desired-identity revision; only the matching revision may clear recovery.
+  adminIdentityVersion Int @default(0) @map("admin_identity_version")
+  /// Desired adminUsername/contactEmail still need confirmation in the tenant database.
+  adminIdentitySyncPending Boolean @default(false) @map("admin_identity_sync_pending")
   /// Digits with an optional leading "+" (checked in the database).
   phone           String?      @db.VarChar(16)
   /// Storage key of the profile image (see src/lib/storage). Never a URL.

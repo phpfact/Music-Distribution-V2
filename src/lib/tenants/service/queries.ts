@@ -121,6 +121,7 @@ type ListRow = {
   phone: string | null;
   status: TenantStatus;
   status_reason: string | null;
+  schema_status: "pending" | "current" | "failed";
   database_mode: DatabaseModeName;
   has_profile_image: boolean;
   created_at: Date;
@@ -130,17 +131,19 @@ type ListRow = {
 };
 
 /**
- * Description: Derive the directory's database column from the tenant status.
- * Input: The tenant status.
- * Output: "pending" / "provisioning" / "failed" while setup is not done, otherwise "ready".
+ * Description: Derive directory readiness from lifecycle and schema state.
+ * Input: The tenant lifecycle and schema status.
+ * Output: Failed/pending schema states stay visible; current provisioned databases are ready.
  * Use case: The Database column of the tenant directory.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-17
  */
-function databaseState(status: TenantStatus): DatabaseState {
+function databaseState(status: TenantStatus, schemaStatus: ListRow["schema_status"]): DatabaseState {
+  if (schemaStatus === "failed") return "failed";
   if (status === "pending" || status === "provisioning" || status === "failed") return status;
-  // Active, suspended and deprovisioning tenants were fully provisioned.
+  if (schemaStatus !== "current") return "pending";
+  // Provisioned lifecycle states are ready only with a current schema.
   return "ready";
 }
 
@@ -283,7 +286,8 @@ async function queryTenantPage(
     db.$queryRaw<{ total: number }[]>`SELECT count(*)::int AS total ${from}`,
     db.$queryRaw<ListRow[]>`
       SELECT t.id::text AS id, t.name, t.admin_username, t.contact_email, t.phone,
-             t.status::text AS status, t.status_reason, t.database_mode::text AS database_mode,
+             t.status::text AS status, t.status_reason, t.schema_status::text AS schema_status,
+             t.database_mode::text AS database_mode,
              (t.profile_image_key IS NOT NULL) AS has_profile_image, t.created_at,
              sd.hostname AS subdomain, cd.hostname AS custom_host, cd.status::text AS custom_status
       ${from}
@@ -308,7 +312,7 @@ async function queryTenantPage(
           ? { host: row.custom_host, status: row.custom_status }
           : null,
       databaseMode: row.database_mode,
-      databaseState: databaseState(row.status),
+      databaseState: databaseState(row.status, row.schema_status),
       hasProfileImage: row.has_profile_image,
       createdAt: row.created_at.toISOString(),
     })),

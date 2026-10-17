@@ -8,7 +8,7 @@ The directory searches and filters at the database level; pagination, query and 
 
 Creation supports generated credentials and manual entry, including attaching an existing database. Client form models use the shared domain, image, password and tenant rules, build the existing Server Action payload and preserve input after errors. Preview, connection checks and image selection use sequence guards to ignore stale results. Submit refs prevent immediate duplicate submissions. Edit preserves saved values, protects provisioning tenants and returns to the detail view after a successful save.
 
-Lifecycle changes, password changes and retries require confirmation. Confirmation failures remain visible and drafts stay available. DNS failures update only their result and recorded check information. Tenant avatars use the protected avatar route. No schema, API or permissions changes are requested.
+Lifecycle changes, password changes and retries require confirmation. Confirmation failures remain visible and drafts stay available. DNS failures update only their result and recorded check information. Tenant avatars use the protected avatar route. The UI migration did not change schema, APIs or permissions. The later audit adds the narrow identity-recovery columns documented below.
 
 ## Shared UI migration (2026-10-15)
 
@@ -380,3 +380,51 @@ CLAUDE.md, and explicitly asked for a secondary menu in Tenant Management.
   control plane (`tenant_module_settings`, absent row = enabled) and apply to
   that tenant's users on their next request.
 - Change history: 2026-10-16 — section added.
+
+## Audit integrity fixes (2026-10-17)
+
+- AUD-20261017-003: every provisioning attempt must run the idempotent
+  `apply_migrations` reconciliation against the deployed migration set, even
+  when an earlier attempt completed that step. Other completed steps retain
+  their resume behavior.
+- AUD-20261017-004: identity edits must hold the tenant's shared identity lock,
+  target a validated primary staff user's immutable UUID, and reject a stale
+  control-plane snapshot. The control-plane tenant stores that UUID, a
+  monotonically increasing identity version and a durable synchronization flag.
+  The profile/audit transaction commits the desired identity and recovery flag
+  before the tenant transaction commits. A failed or interrupted tenant commit
+  therefore leaves explicit recoverable work, rather than an untraceable split.
+  Subsequent edits and master-password resets reconcile the saved desired
+  identity under the same tenant lock before proceeding. Clearing the flag is
+  version-conditional, so an older request cannot clear newer work. Failures
+  after the control-plane commit must preserve the referenced profile image.
+- AUD-20261017-005: administrator identity writes also respect pending and
+  rejected customer-registration reservations. The runtime SQL path will share
+  the identity lock and conflict policy with registration/account creation;
+  field errors explain the particular reservation before either identity changes.
+- AUD-20261017-021: directory and count-record readiness must inspect schema
+  state as well as tenant lifecycle. A failed schema is failed, a pending schema
+  is pending, and only an otherwise provisioned current schema is ready.
+- Existing AUD-20261017-001/002 behavior remains: password reset validates the
+  primary staff account and revokes its sessions in the same tenant transaction.
+
+### Audit verification and related storage fix
+
+- TypeScript and targeted ESLint pass. Five real-database regression files
+  pass: 130 tests, with one existing localhost-only DNS skip. Coverage includes
+  a migration appended between failed setup/retry, actual overlapping identity
+  edits, a tenant-write failure after the durable profile commit, recovery via
+  a no-change edit/password reset, open-registration reservations, schema
+  readiness in directory/count records, and prior session-reset containment.
+- AUD-20261017-020 image decoding/re-encoding belongs to the storage module; see
+  `profile-images.md` for the coordinated audit change.
+- Follow-up reservation/account regressions also pass: four files, 50 tests
+  (identity integrity, RBAC sub-users, tenant customers and workspace portal).
+  The earlier username-based profile compensation contract in the AUD-001/002
+  historical entry is superseded by the durable immutable-ID flow above; its
+  password/session guarantees remain intact.
+- Recovery conflict handling: if a pending desired name is later claimed by an
+  applicant after an interruption, the owner can submit a different available
+  username/email. That edit replaces the pending desired identity under the
+  same lock/version guard; no-change/non-identity requests still reconcile the
+  saved desired identity first. This keeps recovery available through the UI.
