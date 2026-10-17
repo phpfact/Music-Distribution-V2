@@ -67,22 +67,29 @@ type RegistrationListProps = {
   /** The list page's path (filters and paging links are built from it). */
   basePath: string;
   actions: RegistrationActions;
+  /** Approve/Reject are offered only with the panel's review privilege (the server checks again). */
+  canReview: boolean;
+  /** Suspend/Reactivate are offered only with the panel's suspend privilege (the server checks again). */
+  canSuspend: boolean;
 };
 
 /**
  * Description: Render one page of registrations with their review actions.
- * Input: The page of rows, the current query, the list path and the area's actions.
+ * Input: The page of rows, the current query, the list path, the area's actions
+ *   and the capability flags (canReview, canSuspend) from the viewer's privileges.
  * Output: A table on wide screens (xl) and cards below (masked email and
  *   username with eye buttons, status, submitted date, reason/message), the
  *   actions allowed for each status behind confirmation dialogs (Reject asks
  *   for a reason), success/error feedback, an empty state and paging links.
- *   After a change only the server data is refreshed (no full reload).
+ *   After a change only the server data is refreshed (no full reload). Buttons
+ *   the viewer may not use are not rendered (hiding is a convenience: every
+ *   action re-checks its privilege on the server).
  * Use case: Tenant and Platform Owner registrations pages.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-16
  * Last modified: 2026-10-16
  */
-export function RegistrationList({ page, query, basePath, actions }: RegistrationListProps) {
+export function RegistrationList({ page, query, basePath, actions, canReview, canSuspend }: RegistrationListProps) {
   const router                = useRouter();
   const [, startTransition]   = useTransition();
   const [open, setOpen]       = useState<{ kind: ActionKind; row: RegistrationRow } | null>(null);
@@ -213,7 +220,7 @@ export function RegistrationList({ page, query, basePath, actions }: Registratio
                       <RowNotes row={row} />
                     </TableCell>
                     <TableCell>
-                      <RowActions row={row} onAsk={ask} />
+                      <RowActions row={row} onAsk={ask} canReview={canReview} canSuspend={canSuspend} />
                     </TableCell>
                   </TableRow>
                 ))}
@@ -245,7 +252,7 @@ export function RegistrationList({ page, query, basePath, actions }: Registratio
                   </div>
                 </dl>
                 <RowNotes row={row} />
-                <RowActions row={row} onAsk={ask} />
+                <RowActions row={row} onAsk={ask} canReview={canReview} canSuspend={canSuspend} />
               </li>
             ))}
           </ul>
@@ -336,17 +343,32 @@ function RowNotes({ row }: { row: RegistrationRow }) {
 }
 
 /**
- * Description: Render the actions a registration's status allows.
- * Input: The row and the callback that opens a confirmation.
- * Output: Approve + Reject (pending / review requested), Suspend (active),
- *   Reactivate (suspended), nothing for rejected (waiting for the applicant).
- * Use case: Table and card rows. The server re-checks every transition.
+ * Description: Render the actions a registration's status allows and the viewer may use.
+ * Input: The row, the callback that opens a confirmation and the capability flags.
+ * Output: Approve + Reject (pending / review requested, with canReview), Suspend
+ *   (active) / Reactivate (suspended) with canSuspend, the "Waiting for the
+ *   applicant" note for rejected rows, and nothing when the viewer may not act.
+ * Use case: Table and card rows. The server re-checks every transition and privilege.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-16
  * Last modified: 2026-10-16
  */
-function RowActions({ row, onAsk }: { row: RegistrationRow; onAsk: (kind: ActionKind, row: RegistrationRow) => void }) {
-  if (row.status === "pending" || row.status === "review_requested") {
+function RowActions({
+  row,
+  onAsk,
+  canReview,
+  canSuspend,
+}: {
+  row: RegistrationRow;
+  onAsk: (kind: ActionKind, row: RegistrationRow) => void;
+  canReview: boolean;
+  canSuspend: boolean;
+}) {
+  // Without the matching privilege the row offers no button at all.
+  const reviewable = row.status === "pending" || row.status === "review_requested";
+  if (reviewable && !canReview) return null;
+  if ((row.status === "active" || row.status === "suspended") && !canSuspend) return null;
+  if (reviewable) {
     return (
       <div className="flex flex-wrap justify-end gap-2">
         <Button type="button" size="sm" onClick={() => onAsk("approve", row)} aria-label={`Approve ${row.fullName}`}>

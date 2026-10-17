@@ -161,7 +161,7 @@ describe("sessions", () => {
     const token  = await createUserSession(wsA.db, tenantA.id, userId, "tenant");
 
     const user = await validateUserSession(wsA.db, tenantA.id, "tenant", token);
-    expect(user).toMatchObject({ id: userId, isOwner: true, customer: null });
+    expect(user).toMatchObject({ id: userId, role: { systemKey: "master_tenant" }, customer: null });
     // The same token is worthless in the other area and on another tenant.
     expect(await validateUserSession(wsA.db, tenantA.id, "customer", token)).toBeNull();
     expect(await validateUserSession(wsB.db, tenantB.id, "tenant", token)).toBeNull();
@@ -297,7 +297,7 @@ describe("customer sign-up and approval", () => {
     if (!login.ok) return;
     expect(await validateUserSession(wsA.db, tenantA.id, "customer", login.token)).toMatchObject({
       id: user.id,
-      isOwner: false,
+      role: { systemKey: "master_customer" },
       customer: { type: "label" },
     });
     // A customer session never opens the tenant staff area.
@@ -390,14 +390,14 @@ describe("customer sign-up and approval", () => {
 describe("appearance", () => {
   it("resolves personal → workspace → default, and only the owner changes the workspace default", async () => {
     const admin = await adminId(wsA, tenantA);
-    const owner = { userId: admin, tenantId: tenantA.id, isOwner: true };
+    const owner = { userId: admin, tenantId: tenantA.id, canManageWorkspace: true };
     expect(await getPublicAppearance(wsA.db)).toStrictEqual({ theme: "light", accent: "neutral", width: "default" });
 
     // A customer (never an owner) cannot change the workspace default.
     const { id, form } = await submitted(wsA);
     await approveRegistration(wsA.db, tenantA.id, id, ownerActor(admin), null);
     const customer = await wsA.db.user.findUniqueOrThrow({ where: { email: form.email }, select: { id: true } });
-    const viewer   = { userId: customer.id, tenantId: tenantA.id, isOwner: false };
+    const viewer   = { userId: customer.id, tenantId: tenantA.id, canManageWorkspace: false };
     const denied   = await saveViewerAppearance(wsA.db, viewer, { operation: "apply", scope: "workspace", appearance: { theme: "dark", accent: "rose", width: "full" } }, null);
     expect(denied).toMatchObject({ ok: false });
     expect(await saveViewerAppearance(wsA.db, viewer, { operation: "apply", scope: "personal", appearance: { theme: "x" } }, null)).toMatchObject({ ok: false });

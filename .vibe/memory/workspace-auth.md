@@ -64,10 +64,17 @@
   within the 8-hour absolute lifetime, used within 30 minutes, matching area,
   user `active`; area `tenant` additionally requires a user without
   `customer_id`; area `customer` requires a linked customer whose status is
-  `active`. A suspension therefore ends access on the very next request
-  (sessions of a suspended user are also deleted).
-- Owner-only features (registrations, workspace-wide appearance) also require
-  the system role `owner` (the tenant admin created by provisioning).
+  `active` AND, for a sub-customer, an active main customer (parent). A
+  suspension therefore ends access on the very next request (sessions of a
+  suspended user are also deleted).
+- The session check also reads the user's single role and its privilege keys
+  in the same query; the guards attach the effective privileges as
+  `area.authz` (role-privilege-management.md). A missing/disabled role keeps
+  the session valid with an EMPTY privilege set.
+- Owner-only features (registrations, workspace-wide appearance) still use
+  `user.isOwner`, now computed as "holds the Master Tenant role" (system key
+  `master_tenant`, role key `owner`); later RBAC tasks replace these checks
+  with privileges.
 - The tenant admin's initial account is never subject to approval: it is a
   staff user created `active` by provisioning; approvals only exist for
   customer registrations.
@@ -134,3 +141,24 @@
   sessions and cookies, no forgot-password/2FA yet).
 
 - 2026-10-16: Implemented as recorded above. Verified: TypeScript, ESLint (0 warnings), full Vitest suite 40 files / 1174 tests passed (new: workspace-rules, workspace-portal with two real provisioned tenants, workspace-http). Browser-verified on a test tenant created in the Platform Owner panel: welcome, login (errors, wrong password, admin by username/email), tenant dashboard, dark theme switch persisting after reload, customer sign-up (validation, pending login blocked), tenant-admin approval, logout + Back, customer dashboard, customer blocked from /tenant, Platform Owner registrations page (count popup, reject with reason), rejected login -> status page -> review request, Platform Owner suspension ending the active session. Not browser-verified yet: "Apply to everyone" appearance, phone/tablet layouts.
+- 2026-10-16: RBAC foundation (role-privilege-management.md):
+  `validateUserSession` reads the role + privilege keys in its query, refuses
+  a sub-customer whose main customer is suspended, and takes
+  `{ touch?: boolean }` (default true; background polls pass false so they do
+  not extend the idle timeout). `WorkspaceUser` gained `isPrimary`, `role`
+  and `customer.parentId`; `isOwner` = holds `master_tenant`. Tenant and
+  customer areas carry `authz`; `src/lib/authz/workspace.ts` adds
+  `requireTenantAccess`, `requireCustomerAccess`, `authorizeTenantAction`,
+  `authorizeCustomerAction` (refusals audited as `authz.denied`).
+
+## RBAC (2026-10-16)
+
+- `WorkspaceUser.isOwner` was removed (and its computation in
+  `validateUserSession`); `WorkspaceRole` gained the display-only `name`
+  (read in the same session query).
+- `readAreaFingerprint(area)` (guards.ts) validates the area's session with
+  `touch: false` and returns only `{ signedIn, fingerprint }`; used by
+  `tenantFingerprintAction` / `customerFingerprintAction` for PermissionSync.
+- Pages/actions needing a privilege use `requireTenantAccess` /
+  `authorizeTenantAction` (src/lib/authz/workspace.ts).
+- Change history: 2026-10-16 — owner flag removed, role name, fingerprint reader.

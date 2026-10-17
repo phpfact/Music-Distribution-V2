@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   save: vi.fn<(...args: unknown[]) => Promise<AppearanceActionResult>>(),
   load: vi.fn<(...args: unknown[]) => Promise<AppearanceState>>(),
   revalidate: vi.fn(),
+  authorize: vi.fn<(...args: unknown[]) => Promise<{ ok: true } | { ok: false; error: string }>>(),
 }));
 vi.mock("@/lib/platform-auth/dal", () => ({ getPlatformSession: mocks.getSession }));
 vi.mock("next/headers", () => ({ headers: mocks.headers, cookies: mocks.cookies }));
@@ -18,6 +19,7 @@ vi.mock("@/lib/platform-auth/session", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/platform-auth/session")>(),
   validateSession: mocks.validateSession,
 }));
+vi.mock("@/lib/authz/platform", () => ({ authorizePlatformAction: mocks.authorize }));
 vi.mock("@/lib/appearance/service", () => ({ getAppearanceState: mocks.load, saveAppearance: mocks.save }));
 import { refreshAppearanceAction, updateAppearanceAction } from "@/app/platform/(console)/settings/appearance/actions";
 
@@ -40,6 +42,7 @@ beforeEach(() => {
   mocks.headers.mockResolvedValue(new Headers({ origin: "https://platform.example.com", host: "platform.example.com", "sec-fetch-site": "same-origin" }));
   mocks.save.mockResolvedValue({ ok: true, state });
   mocks.load.mockResolvedValue(state);
+  mocks.authorize.mockResolvedValue({ ok: true });
 });
 
 describe("appearance Server Actions", () => {
@@ -110,6 +113,19 @@ describe("appearance Server Actions", () => {
     const update = operation === "apply" ? { operation: "apply" as const, scope: "global" as const, appearance } : { operation: "reset" as const, scope: "global" as const };
     expect(await updateAppearanceAction(update)).toMatchObject({ ok: false, error: expect.stringContaining("permission") });
     expect(mocks.revalidate).not.toHaveBeenCalled();
+  });
+
+  it("authorizes (and audits) the global scope by privilege before the service runs; personal needs no privilege", async () => {
+    mocks.authorize.mockResolvedValue({ ok: false, error: "You do not have permission to perform this action." });
+    const update = { operation: "apply" as const, scope: "global" as const, appearance };
+    expect(await updateAppearanceAction(update)).toStrictEqual({ ok: false, error: "You do not have permission to perform this action." });
+    expect(mocks.authorize).toHaveBeenCalledWith("platform.appearance.manage_global", { ipAddress: "unknown" });
+    expect(mocks.save).not.toHaveBeenCalled();
+    expect(mocks.revalidate).not.toHaveBeenCalled();
+
+    mocks.authorize.mockClear();
+    expect(await updateAppearanceAction(input)).toMatchObject({ ok: true });
+    expect(mocks.authorize).not.toHaveBeenCalled();
   });
 
   it("reports write failure without a success result or cache invalidation", async () => {

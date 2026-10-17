@@ -6,13 +6,17 @@ import type { Ref } from "react";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { findActiveNavItem, getNavItem } from "../navigation";
+import { findActiveNavItem, getNavItem, type PlatformNavSection } from "../navigation";
 import { Icon } from "./icons";
 import { ProfileMenu } from "./profile-menu";
 import { ThemeToggle } from "./theme-toggle";
 
 type TopbarProps = {
   username: string;
+  /** The owner's role name (or "No active role") for the account menu. */
+  roleLabel: string;
+  /** The navigation the owner may see; the breadcrumb only names visible items. */
+  sections: readonly PlatformNavSection[];
   drawerId: string;
   drawerOpen: boolean;
   onOpenDrawer: () => void;
@@ -20,17 +24,18 @@ type TopbarProps = {
 };
 
 /**
- * Render route breadcrumbs, mobile navigation access, and account controls.
- * Input: current account name and controlled mobile drawer state/focus ref.
+ * Description: Render route breadcrumbs, mobile navigation access, and account controls.
+ * Input: current account name, role label, the privilege-filtered sections and
+ *   controlled mobile drawer state/focus ref.
  * Output: the common responsive shadcn-based console header.
  * Use case: retain route context and accessible controls on every console page.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-15
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
-export function Topbar({ username, drawerId, drawerOpen, onOpenDrawer, menuToggleRef }: TopbarProps) {
+export function Topbar({ username, roleLabel, sections, drawerId, drawerOpen, onOpenDrawer, menuToggleRef }: TopbarProps) {
   const pathname = usePathname();
-  const current  = findActiveNavItem(pathname);
+  const current  = findActiveNavItem(pathname, sections.flatMap((section) => section.items));
   const child    = current?.children?.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
 
   return (
@@ -54,7 +59,7 @@ export function Topbar({ username, drawerId, drawerOpen, onOpenDrawer, menuToggl
       <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
         <ThemeToggle />
         <Separator orientation="vertical" className="h-6" />
-        <ProfileMenu username={username} />
+        <ProfileMenu username={username} roleLabel={roleLabel} />
       </div>
     </header>
   );

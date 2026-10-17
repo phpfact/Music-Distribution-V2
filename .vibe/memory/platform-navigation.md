@@ -75,3 +75,34 @@ The isolated navigation branch passes `npm run typecheck`, `npm run lint`, and `
 - 2026-10-15: Verification of the compliance pass: TypeScript (including tests)
   and ESLint (zero warnings) pass; the full Vitest suite passes in the app
   container: 37 files, 1136 tests, 1 pre-existing localhost-only skip.
+
+## RBAC: privilege-filtered navigation (2026-10-16)
+
+- Every item/child in `navigation.ts` may carry `permission`
+  (`PlatformPermissionKey`); `filterNavSections(permissions)` keeps only what
+  the owner's CURRENT effective privileges allow (sections without items are
+  dropped). The console layout calls `requirePlatformAccess()` and passes the
+  granted keys (plain strings) and the role label to `ConsoleShell`, which
+  feeds the Sidebar and the Topbar breadcrumb (`findActiveNavItem(path, visibleItems)`).
+- Entries: Tenant Management (`platform.tenants.view`), Roles & Privileges
+  (`platform.roles.view`, now "available"), NEW Sub-Platform Owners
+  (`/platform/users`, `platform.users.view`, icon `user`), Subscriptions and
+  Support stay planned and ungated; Settings → Appearance (everyone) and NEW
+  Modules (`/platform/settings/modules`, `platform.modules.manage`). The
+  Modules page exists since 2026-10-16 (platform module switches,
+  role-privilege-management.md "Module switches"); switching a platform
+  module off removes its links from every owner's sidebar on the next
+  request. The Roles & Privileges pages (`/platform/roles/**`) and the
+  Sub-Platform Owners pages (`/platform/users/**`) exist since 2026-10-16
+  (role-privilege-management.md, "Platform role + Sub-Platform Owner pages").
+- The account menu shows the role name (`PlatformAccess.roleName`) or
+  "No active role" instead of the fixed "Platform Owner" label (initials from
+  the role label; the username stays masked).
+- The layout renders `PermissionSync` with `platformFingerprintAction`
+  (30 s / focus / route change, `touch: false`); a changed fingerprint
+  refreshes the tree so revoked links disappear without a reload.
+- Hiding is a convenience; every page/action checks its privilege
+  (role-privilege-management.md, "Enforcement map").
+- Change history: 2026-10-16 — navigation filtered by privilege, new entries,
+  role name in the account menu, PermissionSync. 2026-10-16 — the Roles &
+  Privileges and Sub-Platform Owners entries now open real pages.

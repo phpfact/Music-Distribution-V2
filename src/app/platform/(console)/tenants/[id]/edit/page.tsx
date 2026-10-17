@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
-import { requirePlatformOwner } from "@/lib/platform-auth/dal";
+import { AccessDenied } from "@/components/shared";
+import { requirePlatformAccess } from "@/lib/authz/platform";
 import { getTenantForEdit } from "@/lib/tenants/service";
 import type { IconName } from "../../../_components/icons";
 import { PageHeader } from "../../../_components/page-header";
@@ -40,17 +41,19 @@ const loadTenant = cache(async (id: string) => getTenantForEdit(id));
 /**
  * Description: Build the edit page's title without exposing data to signed-out visitors.
  * Input: The route parameters (tenant id).
- * Output: "Edit <name>", or "Tenant not found"; a signed-out visitor is redirected first.
+ * Output: "Edit <name>", or "Tenant not found"; "Access denied" without
+ *   platform.tenants.edit; a signed-out visitor is redirected first.
  * Use case: The browser tab title of /platform/tenants/<id>/edit.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  // No tenant data in the title without a session.
-  await requirePlatformOwner();
+  // No tenant data in the title without a session and the edit privilege.
+  const { access } = await requirePlatformAccess();
+  if (!access.can("platform.tenants.edit")) return { title: "Access denied" };
   const tenant = await loadTenant((await params).id);
   return { title: tenant ? `Edit ${tenant.fullName}` : "Tenant not found" };
 }
@@ -60,15 +63,17 @@ export async function generateMetadata({
  * Input: The route parameters (tenant id).
  * Output: The page header, the secondary menu (Personal, Login and Domain
  *   Information) and the edit form prefilled with the saved values; 404 when
- *   the tenant does not exist.
+ *   the tenant does not exist. Needs platform.tenants.edit (otherwise the
+ *   inline access-denied state, HTTP 200, before the tenant is read).
  * Use case: /platform/tenants/<id>/edit — the owner changes a tenant's details.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 export default async function EditTenantPage({ params }: PageProps) {
-  // Checked on the server on every request; nothing below renders without it.
-  await requirePlatformOwner();
+  // Checked on the server on every request: session and CURRENT privileges.
+  const { access } = await requirePlatformAccess();
+  if (!access.can("platform.tenants.edit")) return <AccessDenied homeHref="/platform/dashboard" />;
   const tenant = await loadTenant((await params).id);
   if (!tenant) notFound();
 

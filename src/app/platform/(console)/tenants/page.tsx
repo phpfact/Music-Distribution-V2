@@ -18,7 +18,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { requirePlatformOwner } from "@/lib/platform-auth/dal";
+import { AccessDenied } from "@/components/shared";
+import { requirePlatformAccess } from "@/lib/authz/platform";
 import {
   parseTenantListQuery,
   type TenantListQuery,
@@ -50,7 +51,7 @@ import {
   TenantListResults,
   TenantListTransition,
 } from "./_components/list-transition";
-import { TenantRowActions } from "./_components/row-actions";
+import { TenantRowActions, type TenantRowPermissions } from "./_components/row-actions";
 import {
   TenantFlashNotice,
   TenantFlashProvider,
@@ -84,18 +85,28 @@ type PageProps = {
  * Description: Render the tenant directory: summary figures, search/filter and the paged list.
  * Input: The URL search parameters (q, status, page, notice), read on the server.
  * Output: The protected page: header, notices, secondary menu, clickable
- *   summary cards and the database-paged tenant table/cards.
+ *   summary cards and the database-paged tenant table/cards. Needs
+ *   platform.tenants.view (otherwise the inline access-denied state, HTTP 200);
+ *   "Create tenant" only with platform.tenants.create and each row's menu only
+ *   with the matching privileges.
  * Use case: /platform/tenants — the owner reviews and manages all tenants.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 export default async function PlatformTenantsPage({ searchParams }: PageProps) {
-  // Checked on the server on every request; nothing below renders without it.
-  await requirePlatformOwner();
-  const params = await searchParams;
-  const query  = parseTenantListQuery(params);
-  const notice = tenantNoticeMessage(params.notice);
+  // Checked on the server on every request: session and CURRENT privileges.
+  const { access } = await requirePlatformAccess();
+  if (!access.can("platform.tenants.view")) return <AccessDenied homeHref={getNavItem("dashboard").href} />;
+  // What this owner may do from the directory (the actions check again).
+  const can: TenantRowPermissions = {
+    edit: access.can("platform.tenants.edit"),
+    suspend: access.can("platform.tenants.suspend"),
+  };
+  const canCreate = access.can("platform.tenants.create");
+  const params    = await searchParams;
+  const query     = parseTenantListQuery(params);
+  const notice    = tenantNoticeMessage(params.notice);
   const [summary, list] = await Promise.all([
     loadTenantSummary(),
     listTenants(query),
@@ -109,12 +120,14 @@ export default async function PlatformTenantsPage({ searchParams }: PageProps) {
           title="Tenant Management"
           description="Create, review and manage the tenants registered on the platform."
           actions={
-            <Button asChild variant="default">
-              <Link href={NEW_TENANT_PATH}>
-                <Icon name="plus" className="size-4" />
-                Create tenant
-              </Link>
-            </Button>
+            canCreate ? (
+              <Button asChild variant="default">
+                <Link href={NEW_TENANT_PATH}>
+                  <Icon name="plus" className="size-4" />
+                  Create tenant
+                </Link>
+              </Button>
+            ) : undefined
           }
         />
 
@@ -202,7 +215,7 @@ export default async function PlatformTenantsPage({ searchParams }: PageProps) {
             <TenantListTransition>
               <TenantToolbar q={query.q} status={query.status} />
               <TenantListResults>
-                <TenantResults list={list} query={query} />
+                <TenantResults list={list} query={query} can={can} canCreate={canCreate} />
               </TenantListResults>
             </TenantListTransition>
           </Card>
@@ -273,20 +286,26 @@ function FailedNote({
 
 /**
  * Description: Render the directory's results for the current query.
- * Input: The loaded page and the query.
+ * Input: The loaded page, the query, the row permissions and whether the owner
+ *   may create tenants.
  * Output: The table (xl) and cards (smaller screens) with pagination, or the
- *   matching empty state (no tenants, no matches, page past the end).
+ *   matching empty state (no tenants, no matches, page past the end); the
+ *   "Create tenant" empty-state action only with platform.tenants.create.
  * Use case: The tenant directory card.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 function TenantResults({
   list,
   query,
+  can,
+  canCreate,
 }: {
   list: TenantListPage;
   query: TenantListQuery;
+  can: TenantRowPermissions;
+  canCreate: boolean;
 }) {
   const filtered = query.q !== "" || query.status !== "all";
 
@@ -306,14 +325,20 @@ function TenantResults({
       <DirectoryEmptyState
         icon="building-2"
         title="No tenants yet"
-        text="Create the first tenant to give it its own database and subdomain."
+        text={
+          canCreate
+            ? "Create the first tenant to give it its own database and subdomain."
+            : "Tenants appear here once someone with permission to create them adds the first one."
+        }
         action={
-          <Button asChild variant="default">
-            <Link href={NEW_TENANT_PATH}>
-              <Icon name="plus" className="size-4" />
-              Create tenant
-            </Link>
-          </Button>
+          canCreate ? (
+            <Button asChild variant="default">
+              <Link href={NEW_TENANT_PATH}>
+                <Icon name="plus" className="size-4" />
+                Create tenant
+              </Link>
+            </Button>
+          ) : null
         }
       />
     );
@@ -339,11 +364,11 @@ function TenantResults({
 
   return (
     <>
-      <TenantTable rows={list.rows} />
+      <TenantTable rows={list.rows} can={can} />
       <ul className="grid gap-4 px-5 pt-5 md:grid-cols-2 xl:hidden">
         {list.rows.map((row) => (
           <li key={row.id}>
-            <TenantCard row={row} />
+            <TenantCard row={row} can={can} />
           </li>
         ))}
       </ul>
@@ -477,15 +502,15 @@ const TD = "px-5 py-4 align-middle whitespace-normal";
 
 /**
  * Description: Render the directory as a table (xl and up).
- * Input: The rows of the page.
+ * Input: The rows of the page and the owner's row permissions (edit, suspend).
  * Output: Tenant, Contact (masked), Domain, Database, Status and Actions columns.
  *   Below xl the six columns would only fit by scrolling sideways, so cards are used.
  * Use case: TenantResults.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
-function TenantTable({ rows }: { rows: TenantListRow[] }) {
+function TenantTable({ rows, can }: { rows: TenantListRow[]; can: TenantRowPermissions }) {
   return (
     <div className="hidden overflow-x-auto xl:block">
       <Table className="w-full min-w-[58rem] text-left text-xs">
@@ -553,6 +578,7 @@ function TenantTable({ rows }: { rows: TenantListRow[] }) {
                   tenantId={row.id}
                   tenantName={row.name}
                   status={row.status}
+                  can={can}
                 />
               </TableCell>
             </TableRow>
@@ -565,14 +591,14 @@ function TenantTable({ rows }: { rows: TenantListRow[] }) {
 
 /**
  * Description: Render one tenant as a card (below xl).
- * Input: The row.
+ * Input: The row and the owner's row permissions.
  * Output: The same data as a table row (contact details masked), two per row from md.
  * Use case: TenantResults.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
-function TenantCard({ row }: { row: TenantListRow }) {
+function TenantCard({ row, can }: { row: TenantListRow; can: TenantRowPermissions }) {
   return (
     <Card
       role="article"
@@ -624,6 +650,7 @@ function TenantCard({ row }: { row: TenantListRow }) {
             tenantId={row.id}
             tenantName={row.name}
             status={row.status}
+            can={can}
           />
         </div>
       </CardContent>

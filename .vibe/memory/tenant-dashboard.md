@@ -63,3 +63,28 @@
 
 - 2026-10-16: Implemented as recorded above. Verified: TypeScript, ESLint (0 warnings), full Vitest suite 40 files / 1174 tests passed (new: workspace-rules, workspace-portal with two real provisioned tenants, workspace-http). Browser-verified on a test tenant created in the Platform Owner panel: welcome, login (errors, wrong password, admin by username/email), tenant dashboard, dark theme switch persisting after reload, customer sign-up (validation, pending login blocked), tenant-admin approval, logout + Back, customer dashboard, customer blocked from /tenant, Platform Owner registrations page (count popup, reject with reason), rejected login -> status page -> review request, Platform Owner suspension ending the active session. Not browser-verified yet: "Apply to everyone" appearance, phone/tablet layouts.
 - 2026-10-16: Browser follow-up checks. "Apply selection to everyone" saved the workspace default (Dark + Emerald) and the public /login page of that tenant switched to it at once, while another tenant (mr-arun) stayed Light / Neutral. Phone (375x812) and tablet (768x1024): welcome, sign-up, login, tenant dashboard, mobile sidebar Sheet (closes on navigation), registrations and appearance pages show no horizontal page overflow. Fixes from these checks: the registrations list shows cards below xl (the table hid Status/Actions behind horizontal scroll next to the sidebar on tablets); the reviewer note reads "Approved by …" so a later suspension is not attributed to the approver.
+
+## RBAC (2026-10-16)
+
+- Navigation from `area.authz`: Registrations + "Review registrations" quick
+  action with `tenant.registrations.view`; NEW group "Access control" with
+  Sub-Tenants (`/tenant/users`, `tenant.users.view`) and Roles & Privileges
+  (`/tenant/roles`, `tenant.roles.view`) — pages built by later tasks; the
+  planned Catalog/Business modules stay ungated. Account-menu role label =
+  role name or "No active role" (`WorkspaceRole.name`).
+- Dashboard: the registration cards and the recent-registrations table are
+  shown (and read) only with `tenant.registrations.view` — hidden, not "—";
+  `NoActiveRoleNotice` when the role is not active.
+- The layout renders `PermissionSync` with `tenantFingerprintAction`.
+- `WorkspaceUser.isOwner` no longer exists; nothing depends on the master
+  role's identity for UI decisions.
+- Change history: 2026-10-16 — owner flag replaced by privileges, new nav
+  group, role name, no-role notice, PermissionSync.
+
+- 2026-10-16: The "Access control" pages exist now: `/tenant/users`
+  (Sub-Tenants: list, `/new`, `/[id]/edit`) and `/tenant/roles` (list,
+  `/new`, `/[id]`, `/[id]/edit`), each gated by its `tenant.users.*` /
+  `tenant.roles.*` privilege (inline AccessDenied otherwise). They replace the
+  `/tenant/[module]` placeholder for these two segments (static routes win;
+  the placeholder still serves the planned modules). Details:
+  `role-privilege-management.md` → "Workspace RBAC pages".

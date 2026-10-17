@@ -4,7 +4,8 @@ import { RegistrationList } from "@/components/registrations/registration-list";
 import { RegistrationSummaryCards } from "@/components/registrations/registration-summary";
 import { RegistrationToolbar } from "@/components/registrations/registration-toolbar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { requirePlatformOwner } from "@/lib/platform-auth/dal";
+import { AccessDenied } from "@/components/shared";
+import { requirePlatformAccess } from "@/lib/authz/platform";
 import { openTenantForPlatformOwner } from "@/lib/workspace/platform-access";
 import { getRegistrationSummary, listRegistrations } from "@/lib/workspace/registrations";
 import { parseRegistrationListQuery } from "@/lib/workspace/rules";
@@ -41,7 +42,10 @@ const MENU_ITEMS: readonly SecondaryMenuItem[] = Object.values(SECTIONS);
  * Output: Summary counts (each opens its records), the search/status toolbar
  *   and one page of registrations with Approve / Reject / Suspend / Reactivate.
  *   Unknown tenant → the tenant not-found page; unfinished setup or an
- *   unreachable database → an explanatory notice.
+ *   unreachable database → an explanatory notice. Needs
+ *   platform.tenant_registrations.view (otherwise the inline access-denied
+ *   state, HTTP 200, before the tenant is opened); Approve/Reject only with
+ *   ...review, Suspend/Reactivate only with ...suspend (the actions check again).
  * Use case: /platform/tenants/<id>/registrations (entry point: the tenant
  *   detail page's "Registrations" button).
  * Author: Mr. Sachin Sharma
@@ -49,8 +53,9 @@ const MENU_ITEMS: readonly SecondaryMenuItem[] = Object.values(SECTIONS);
  * Last modified: 2026-10-16
  */
 export default async function TenantRegistrationsPage({ params, searchParams }: PageProps) {
-  // Step 1: only a signed-in Platform Owner (checked on every request).
-  await requirePlatformOwner();
+  // Step 1: a signed-in owner whose CURRENT privileges include the registrations (every request).
+  const { access: privileges } = await requirePlatformAccess();
+  if (!privileges.can("platform.tenant_registrations.view")) return <AccessDenied homeHref="/platform/dashboard" />;
 
   // Step 2: the tenant chosen by id, if its database is set up and reachable.
   const { id } = await params;
@@ -132,6 +137,8 @@ export default async function TenantRegistrationsPage({ params, searchParams }: 
                     page={page}
                     query={query}
                     basePath={basePath}
+                    canReview={privileges.can("platform.tenant_registrations.review")}
+                    canSuspend={privileges.can("platform.tenant_registrations.suspend")}
                     actions={{
                       approve: approvePlatformRegistrationAction.bind(null, tenantId),
                       reject: rejectPlatformRegistrationAction.bind(null, tenantId),

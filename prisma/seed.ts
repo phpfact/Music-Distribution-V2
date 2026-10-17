@@ -6,6 +6,8 @@
  *
  * Safe to run again: it only bootstraps an empty `platform_owners` table. Once
  * any platform owner exists it changes nothing, whatever the two variables say.
+ * The bootstrapped owner is the primary account and holds the Master Platform
+ * role (.vibe/memory/role-privilege-management.md).
  *
  *   npm run db:seed:rotate-password
  *
@@ -126,6 +128,18 @@ function reportExisting(username: string, matches: boolean): void {
   }
 }
 
+/**
+ * Description: Bootstrap the first platform owner when the table is empty.
+ * Input: The control-plane client, the normalized username and the password hash.
+ * Output: Exit code 0 (created, or an owner already exists and nothing changed).
+ *   The new owner is the primary account and holds the Master Platform role
+ *   (.vibe/memory/role-privilege-management.md); the role is found by its
+ *   protected system key, never by its name.
+ * Use case: `npm run db:seed`.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-13
+ * Last modified: 2026-10-16
+ */
 async function seed(
   control: PrismaClient,
   username: string,
@@ -133,7 +147,10 @@ async function seed(
 ): Promise<number> {
   try {
     const outcome = await control.$transaction(async (tx) => {
+      // Step 1: serialize concurrent seed runs.
       await lockSeed(tx);
+
+      // Step 2: only an empty table is bootstrapped.
       if ((await tx.platformOwner.count()) > 0) {
         const match = await tx.platformOwner.findUnique({
           where: { username },
@@ -141,7 +158,20 @@ async function seed(
         });
         return { created: false, matches: match !== null };
       }
-      await tx.platformOwner.create({ data: { username, passwordHash } });
+
+      // Step 3: the master role written by the rbac migration.
+      const master = await tx.platformRole.findUnique({
+        where: { systemKey: "master_platform" },
+        select: { id: true },
+      });
+      if (!master) {
+        throw new Error("the Master Platform role is missing: apply the control-plane migrations first");
+      }
+
+      // Step 4: the first owner — primary account, Master Platform.
+      await tx.platformOwner.create({
+        data: { username, passwordHash, isPrimary: true, roleId: master.id },
+      });
       return { created: true, matches: true };
     });
 

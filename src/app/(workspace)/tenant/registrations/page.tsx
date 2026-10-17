@@ -3,12 +3,12 @@ import { PageHeading } from "@/components/dashboard/page-heading";
 import { RegistrationList } from "@/components/registrations/registration-list";
 import { RegistrationSummaryCards } from "@/components/registrations/registration-summary";
 import { RegistrationToolbar } from "@/components/registrations/registration-toolbar";
-import { EmptyState, SectionedLayout, type SecondaryMenuItem } from "@/components/shared";
+import { AccessDenied, SectionedLayout, type SecondaryMenuItem } from "@/components/shared";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { requireTenantUser } from "@/lib/workspace/guards";
+import { requireTenantAccess } from "@/lib/authz/workspace";
 import { getRegistrationSummary, listRegistrations } from "@/lib/workspace/registrations";
 import { parseRegistrationListQuery } from "@/lib/workspace/rules";
-import { TENANT_REGISTRATIONS_PATH } from "../navigation";
+import { TENANT_DASHBOARD_PATH, TENANT_REGISTRATIONS_PATH } from "../navigation";
 import {
   approveTenantRegistrationAction,
   loadTenantRegistrationRecordsAction,
@@ -29,27 +29,25 @@ const SECTIONS = {
 const MENU_ITEMS: readonly SecondaryMenuItem[] = Object.values(SECTIONS);
 
 /**
- * Description: Let the tenant administrator review customer registrations.
+ * Description: Let tenant staff with the registrations privileges review customer registrations.
  * Input: The URL's search, status and page (anyone can edit them).
  * Output: Summary counts (each opens its records), the search/status toolbar
- *   and one page of registrations with their review actions. Staff without
- *   the owner role see an explanation instead (checked on the server).
+ *   and one page of registrations. Approve/Reject appear only with
+ *   tenant.registrations.review, Suspend/Reactivate only with
+ *   tenant.registrations.suspend (the actions check again). Without
+ *   tenant.registrations.view the inline access-denied state is shown (HTTP 200).
  * Use case: /tenant/registrations — only this tenant's database is ever read.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-16
  * Last modified: 2026-10-16
  */
 export default async function TenantRegistrationsPage({ searchParams }: PageProps) {
-  // Step 1: a signed-in staff user of this host; the owner role decides access.
-  const area = await requireTenantUser();
-  if (!area.user.isOwner) {
+  // Step 1: a signed-in staff user of this host; the CURRENT privileges decide access.
+  const area = await requireTenantAccess();
+  if (!area.authz.can("tenant.registrations.view")) {
     return (
       <div className="px-4 lg:px-6">
-        <EmptyState
-          icon="shield-check"
-          title="Only the administrator can review registrations"
-          description="Ask your workspace administrator if you need access."
-        />
+        <AccessDenied homeHref={TENANT_DASHBOARD_PATH} />
       </div>
     );
   }
@@ -90,6 +88,8 @@ export default async function TenantRegistrationsPage({ searchParams }: PageProp
                   page={page}
                   query={query}
                   basePath={TENANT_REGISTRATIONS_PATH}
+                  canReview={area.authz.can("tenant.registrations.review")}
+                  canSuspend={area.authz.can("tenant.registrations.suspend")}
                   actions={{
                     approve: approveTenantRegistrationAction,
                     reject: rejectTenantRegistrationAction,

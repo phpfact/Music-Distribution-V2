@@ -29,8 +29,24 @@ const SESSION_TOUCH_INTERVAL_MS = 60 * 1000;
 const TOKEN_BYTES   = 32;
 // 32 random bytes in base64url: always 43 characters, no padding.
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
-// The system role of the tenant administrator (written by provisioning).
-const OWNER_ROLE_KEY = "owner";
+
+/**
+ * The user's single role as read with the session (role-privilege-management.md).
+ * Only data: the authorization decision is made by src/lib/authz.
+ */
+export type WorkspaceRole = {
+  id: string;
+  /** The role's display name (account menu); never used for a decision. */
+  name: string;
+  domain: "tenant" | "customer";
+  status: "active" | "disabled";
+  /** "master_tenant" / "master_customer" for the master roles; null for custom roles. */
+  systemKey: string | null;
+  /** The main customer owning a custom customer role; null otherwise. */
+  ownerCustomerId: string | null;
+  /** The privilege keys stored on the role (ignored for a master role). */
+  permissionKeys: string[];
+};
 
 /** The signed-in person as the portal pages see them. Never a password hash. */
 export type WorkspaceUser = {
@@ -40,10 +56,12 @@ export type WorkspaceUser = {
   username: string | null;
   email: string;
   createdAt: Date;
-  /** Tenant area only: holds the system role "owner" (the tenant administrator). */
-  isOwner: boolean;
-  /** Customer area only: the customer account this user belongs to. */
-  customer: { id: string; type: AccountType; name: string } | null;
+  /** The primary account (tenant administrator / main customer's user). */
+  isPrimary: boolean;
+  /** The user's role, or null when none is assigned (the session stays valid). */
+  role: WorkspaceRole | null;
+  /** Customer area only: the customer account this user belongs to (parentId set for a sub-customer). */
+  customer: { id: string; type: AccountType; name: string; parentId: string | null } | null;
 };
 
 /** A rejected (or review-requested) applicant in their limited session. */
@@ -143,26 +161,36 @@ export async function createUserSession(
 
 /**
  * Description: Find the valid session (and its user) a cookie value belongs to.
- * Input: The tenant database, the tenant id, the area and the cookie's token.
- * Output: The signed-in user, or null. Valid means: within the absolute lifetime,
- *   used within the idle timeout, same area, user `active`; area "tenant" also
- *   needs a staff user (no customer link); area "customer" needs an active
- *   customer. Checked on every request, so a suspension takes effect at once.
- * Use case: requireTenantUser / requireCustomer (src/lib/workspace/guards.ts).
+ * Input: The tenant database, the tenant id, the area, the cookie's token and
+ *   `touch` (default true; false for background polls, so they do not extend
+ *   the idle timeout).
+ * Output: The signed-in user with their role (or null role), or null. Valid
+ *   means: within the absolute lifetime, used within the idle timeout, same
+ *   area, user `active`; area "tenant" also needs a staff user (no customer
+ *   link); area "customer" needs an active customer AND, for a sub-customer, an
+ *   active main customer. The role and its privilege keys come from the same
+ *   query (no extra round trip). Checked on every request, so a suspension or
+ *   a role change takes effect at once. A missing or disabled role does not
+ *   end the session: the authorization layer then grants nothing. The role's
+ *   name is read for display only (the old owner flag is gone: every check
+ *   uses privileges, .vibe/memory/role-privilege-management.md).
+ * Use case: requireTenantUser / requireCustomer (src/lib/workspace/guards.ts)
+ *   and the areas' privilege fingerprint (touch: false).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-15
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 export async function validateUserSession(
   db: TenantDb,
   tenantId: string,
   area: SessionArea,
   token: string,
+  options: { touch?: boolean } = {},
 ): Promise<WorkspaceUser | null> {
   if (!isTokenShaped(token)) return null;
   const now = new Date();
 
-  // Step 1: the session with every condition in one query.
+  // Step 1: the session, its user and the user's role with every condition in one query.
   const session = await db.userSession.findFirst({
     where: {
       tokenHash: hashWorkspaceToken(tenantId, area, token),
@@ -172,7 +200,16 @@ export async function validateUserSession(
       user:
         area === "tenant"
           ? { status: "active", customerId: null }
-          : { status: "active", customer: { is: { status: "active" } } },
+          : {
+              status: "active",
+              customer: {
+                is: {
+                  status: "active",
+                  // A sub-customer is refused while its main customer is suspended.
+                  OR: [{ parentId: null }, { parent: { is: { status: "active" } } }],
+                },
+              },
+            },
     },
     select: {
       id: true,
@@ -184,8 +221,23 @@ export async function validateUserSession(
           username: true,
           email: true,
           createdAt: true,
-          customer: { select: { id: true, type: true, name: true } },
-          roles: { where: { role: { key: OWNER_ROLE_KEY } }, select: { roleId: true } },
+          isPrimary: true,
+          customer: { select: { id: true, type: true, name: true, parentId: true } },
+          roleAssignment: {
+            select: {
+              role: {
+                select: {
+                  id: true,
+                  name: true,
+                  domain: true,
+                  status: true,
+                  systemKey: true,
+                  ownerCustomerId: true,
+                  permissions: { select: { permission: { select: { key: true } } } },
+                },
+              },
+            },
+          },
         },
       },
     },
@@ -193,8 +245,9 @@ export async function validateUserSession(
   if (!session) return null;
 
   // Step 2: record use at most once a minute (keeps the idle timer honest).
+  // Background polls pass touch: false, so they never keep an idle session alive.
   const touchBefore = new Date(now.getTime() - SESSION_TOUCH_INTERVAL_MS);
-  if (session.lastUsedAt < touchBefore) {
+  if (options.touch !== false && session.lastUsedAt < touchBefore) {
     try {
       await db.userSession.updateMany({
         where: { id: session.id, lastUsedAt: { lt: touchBefore } },
@@ -206,8 +259,22 @@ export async function validateUserSession(
     }
   }
 
-  // Step 3: only what the pages need.
+  // Step 3: the role as plain data (the decision itself is src/lib/authz).
   const { user } = session;
+  const assigned = user.roleAssignment?.role ?? null;
+  const role: WorkspaceRole | null = assigned
+    ? {
+        id: assigned.id,
+        name: assigned.name,
+        domain: assigned.domain,
+        status: assigned.status,
+        systemKey: assigned.systemKey,
+        ownerCustomerId: assigned.ownerCustomerId,
+        permissionKeys: assigned.permissions.map((link) => link.permission.key),
+      }
+    : null;
+
+  // Step 4: only what the pages need.
   return {
     sessionId: session.id,
     id: user.id,
@@ -215,7 +282,8 @@ export async function validateUserSession(
     username: user.username,
     email: user.email,
     createdAt: user.createdAt,
-    isOwner: area === "tenant" && user.roles.length > 0,
+    isPrimary: user.isPrimary,
+    role,
     customer: area === "customer" && user.customer ? user.customer : null,
   };
 }

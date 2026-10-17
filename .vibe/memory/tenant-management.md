@@ -305,3 +305,68 @@ CLAUDE.md, and explicitly asked for a secondary menu in Tenant Management.
 - 2026-10-15: Recorded the Registrations entry point on the tenant detail page.
 
 - 2026-10-16: Implemented as recorded above. Verified: TypeScript, ESLint (0 warnings), full Vitest suite 40 files / 1174 tests passed (new: workspace-rules, workspace-portal with two real provisioned tenants, workspace-http). Browser-verified on a test tenant created in the Platform Owner panel: welcome, login (errors, wrong password, admin by username/email), tenant dashboard, dark theme switch persisting after reload, customer sign-up (validation, pending login blocked), tenant-admin approval, logout + Back, customer dashboard, customer blocked from /tenant, Platform Owner registrations page (count popup, reject with reason), rejected login -> status page -> review request, Platform Owner suspension ending the active session. Not browser-verified yet: "Apply to everyone" appearance, phone/tablet layouts.
+
+## RBAC foundation (2026-10-16)
+
+- Provisioning (`create_initial_admin`) upserts the role with key `owner` as
+  **Master Tenant** (name "Master Tenant", domain `tenant`, system key
+  `master_tenant`, status active, never back to "Owner"), marks the admin the
+  primary staff account (unless another one already is) and assigns exactly
+  that role (`user_roles` is keyed by user_id; upsert). `verify` checks the
+  admin holds the active role with `system_key = 'master_tenant'`.
+- New tenant databases get both master roles and the catalog mirror from the
+  rbac tenant migration (role-privilege-management.md). Per-tenant module
+  switches live in the control plane (`tenant_module_settings`, cascades with
+  the tenant row).
+
+### Change history
+
+- 2026-10-16: Provisioning writes Master Tenant + primary admin; verify by
+  system key; verify failure message now says the admin "does not hold the
+  Master Tenant role".
+
+## RBAC enforcement (2026-10-16)
+
+- Pages: directory + details (+ metadata) `platform.tenants.view`; `/new`
+  `platform.tenants.create`; `/[id]/edit` `platform.tenants.edit`;
+  `/[id]/registrations` `platform.tenant_registrations.view`. Without the
+  privilege the page renders the shared `AccessDenied` state (HTTP 200)
+  before reading any tenant data; the avatar route answers 404.
+- Buttons follow the privileges: Create tenant (create), Edit + DNS checks
+  (edit), Suspend/Reactivate (suspend), Retry setup (provision), Reset master
+  password + database password (credentials), Registrations link
+  (tenant_registrations.view). The row menu (`TenantRowActions`, new `can`
+  prop) is omitted when it would be empty.
+- Server Actions authorize with `authorizePlatformAction(key, { ipAddress })`
+  before anything else: create/preview/test-connection → create;
+  suspend/reactivate → suspend; retry → provision; count records → view;
+  update/verify custom domain/recheck subdomain → edit; reset master
+  password/rotate/update DB password → credentials; registrations load →
+  tenant_registrations.view, approve/reject → review, suspend/reactivate
+  customer → suspend. Refusals (audited `authz.denied`) use the action's
+  normal shape: `ForbiddenFailure` `{ ok: false, reason: "forbidden", message }`,
+  connection test `{ kind: "error", reason: "forbidden" }`, forms a
+  form-level error, count/registration loaders their `message`/`error`.
+- Change history: 2026-10-16 — every page, action and route of the module is
+  privilege-checked (tests: rbac-enforcement*.test.ts).
+
+## Module access section (2026-10-16)
+
+- The details page has a new **"Module access"** section (secondary menu item
+  `tenant-module-access`, between Domain Information and Status History),
+  visible to everyone who can open the page (`platform.tenants.view`).
+- Two groups, "Tenant panel" (`tenant.*` modules) and "Customer panel"
+  (`customer.*` modules), each row: module label, description and its
+  privileges (small muted list). With `platform.tenant_modules.manage` a
+  non-core row has a Switch; otherwise a read-only "On"/"Off" badge. Core
+  modules (roles, sub-users / sub-customers) show a locked "Core · always on"
+  badge and can never be switched.
+- Turning a module off asks for confirmation ("Every tenant role, including
+  Master Tenant, loses these privileges immediately" / the customer wording
+  with Master Customer); turning it on applies directly. Server Action
+  `setTenantModuleAction(tenantId, moduleKey, enabled)` in
+  `tenants/[id]/module-actions.ts` → `setTenantModuleEnabled` (module service,
+  role-privilege-management.md "Module switches"); settings live in the
+  control plane (`tenant_module_settings`, absent row = enabled) and apply to
+  that tenant's users on their next request.
+- Change history: 2026-10-16 — section added.

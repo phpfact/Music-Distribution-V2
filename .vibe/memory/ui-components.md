@@ -174,3 +174,104 @@ illustrates multiple draft palettes rather than inheriting the active mode.
   dashboard block components and the shared-wrapper barrel before implementation.
 
 - 2026-10-16: Implemented as recorded above. Verified: TypeScript, ESLint (0 warnings), full Vitest suite 40 files / 1174 tests passed (new: workspace-rules, workspace-portal with two real provisioned tenants, workspace-http). Browser-verified on a test tenant created in the Platform Owner panel: welcome, login (errors, wrong password, admin by username/email), tenant dashboard, dark theme switch persisting after reload, customer sign-up (validation, pending login blocked), tenant-admin approval, logout + Back, customer dashboard, customer blocked from /tenant, Platform Owner registrations page (count popup, reject with reason), rejected login -> status page -> review request, Platform Owner suspension ending the active session. Not browser-verified yet: "Apply to everyone" appearance, phone/tablet layouts.
+
+## RBAC shared UI (requested 2026-10-16)
+
+Purely presentational building blocks for the role/sub-user screens of all
+three panels (`role-privilege-management.md`, "UI specs (approved
+2026-10-16)"). Pages pass serializable data and bound Server Actions as props;
+nothing here reads a session, a database or `server-only` code.
+
+- **Primitives** (`src/components/ui/`, official new-york sources adapted):
+  `checkbox.tsx` (Radix Checkbox, `checked="indeterminate"` shows a minus),
+  `collapsible.tsx` (Radix Collapsible root/trigger/content), `popover.tsx`
+  (Radix Popover; the portal renders inside the theme ancestor from
+  `useThemePortal()`, like dialog/dropdown, so accents and dark mode apply).
+- **`SearchableSelect`** (`src/components/shared/searchable-select.tsx`,
+  exported from `@/components/shared`): single-value combobox. A button
+  trigger (`role="combobox"`, `aria-expanded`, `aria-controls`) opens a Popover
+  with a search input and a `role="listbox"` of `role="option"` rows
+  (`aria-selected`, `aria-disabled`, active row via `aria-activedescendant`).
+  Keyboard: ArrowUp/Down, Home/End, Enter, Escape, typing filters; focus goes
+  back to the trigger on close. A hidden input (`name`) submits exactly ONE
+  value. `loading` shows "Loading…" and keeps it disabled; `invalid` and
+  `aria-describedby` wire it to `Field` errors. Options carry `label`,
+  `description`, `meta` (right-aligned text) and `badge`.
+- **Client-safe rules**: `src/lib/authz/role-rules.ts` (role name,
+  description and status rules, `isReservedRoleName` over the catalog's
+  `MASTER_ROLE_NAMES`, `dependentsOf`, `clearDependents`, `toggleSelection`
+  which adds the catalog's `dependencyClosure` limited to assignable keys —
+  nothing of the catalog is duplicated) and
+  `src/lib/authz/sub-user-rules.ts` (sub-user fields composed from the
+  existing tenant/workspace rules). Server code reuses both.
+- **`src/components/rbac/`** (one implementation for Platform, Tenant and
+  Customer): `types.ts` (view + form-state types), `role-badges.tsx`
+  (RoleStatusBadge, SystemRoleBadge, MasterBadge, AboveAuthorityBadge,
+  UserStatusBadge, PrimaryBadge, SelfBadge), `privilege-list.tsx` (read-only,
+  grouped; marks module-disabled privileges), `role-picker.tsx` (exactly one
+  role, `name="roleId"`), `role-editor.tsx` (create/edit), `role-dialogs.tsx`
+  (disable/enable with affected users; delete with required replacement),
+  `rbac-toolbar.tsx` (search + status + optional role filter in the URL),
+  `list-href.ts` (`parseRbacListQuery`, `rbacListHref`, `hasRbacFilters`,
+  page size 20), `roles-directory.tsx`, `sub-users-directory.tsx` (table
+  from xl, cards below, masked username/email, clickable counts, built-in row
+  actions with a per-row override slot `rowActions`, paging, empty states),
+  `row-actions.tsx` (RoleRowActions, SubUserRowActions; status buttons call
+  `toggleStatusAction(id, next)` with the INTENDED change computed from the
+  row's shown status — roles `"disabled"` / `"active"` (via
+  `RoleStatusDialog`, whose `onConfirm(roleId, next)` computes it), users
+  `"suspend"` / `"reactivate"` (`UserStatusChange` in `types.ts`); the
+  services refuse a stale change, so no client wrappers or bound intent maps
+  are needed),
+  `assigned-users.tsx` (AssignedUsersTable, AffectedUsersPreview),
+  `rbac-records.tsx` (paged count-popup records loaded through bound Server
+  Actions), `directory-parts.tsx` (paging), `rbac-summary.tsx` (RolesSummary,
+  SubUsersSummary: StatCards with CountDetails) and `sub-user-form.tsx`
+  (variants platform/tenant/customer, modes create/edit).
+- **`src/components/rbac/screens/`** (the page layer shared by all three
+  panels; server components except `role-details-actions.tsx`):
+  `roles-screens.tsx` (RolesListScreen, RoleDetailsScreen, RoleEditorScreen),
+  `sub-users-screens.tsx` (SubUsersListScreen, SubUserFormScreen),
+  `screen-parts.tsx` (ScreenFrame, DeniedScreen, ActorFallback, LoadFailed,
+  DetailRow), `role-details-actions.tsx`, `notices.ts` (fixed `?notice=`
+  codes), `skeletons.tsx` (RbacListSkeleton, RbacFormSkeleton; take the
+  panel's `gutterClassName`) and `types.ts` (panel bindings: paths, texts,
+  gutters, the server page guard `pageActor`, bound Server Actions). They
+  never import a panel guard, session or action; each panel's
+  `rbac-bindings.ts` supplies them (details: `role-privilege-management.md`,
+  "RBAC pages (all panels)").
+- Panels pass only serializable data and bound Server Actions; record popups
+  take `(filter, page)` / `(roleId, page)` loaders (never closures built on
+  the server). Success messages of row actions show above the list and only
+  `router.refresh()` runs (no full reload).
+- `@/components/shared` now also re-exports FormSection, FormActions,
+  RequiredLegend, Icon, PageHeader, StatCard (+ StatCardDetails), ToneBadge
+  and Spinner (already reviewed presentational console wrappers).
+
+### Change history
+
+- 2026-10-16: Recorded the RBAC shared UI before implementation.
+- 2026-10-16: Implemented as recorded. Verified in the rbac container:
+  TypeScript (no errors in these files), ESLint 0 warnings on every new file,
+  `tests/role-rules.test.ts` (16) and `tests/rbac-ui.test.ts` (12) pass;
+  console-ui, workspace-rules and tenant-rules suites still pass. Not
+  browser-verified yet (pages are built by later tasks).
+- 2026-10-16: Shared screen layer `src/components/rbac/screens/` added (moved
+  from the workspace `_rbac/` folder, now used by the Platform panel too);
+  row actions / RoleStatusDialog / directories pass the intended status
+  (`toggleStatusAction(id, next)`) instead of a bare id.
+
+## RBAC shared components (2026-10-16)
+
+- `AccessDenied` (`src/components/shared/access-denied.tsx`): the shared
+  EmptyState with "You don't have access to this page", a short explanation
+  and "Go to dashboard" (`homeHref`; optional `title` / `description`).
+  Rendered inline by protected pages (HTTP 200). Same file:
+  `NoActiveRoleNotice`, `NO_ACTIVE_ROLE_LABEL`, `NO_ACTIVE_ROLE_NOTICE`.
+- `PermissionSync` (`src/components/shared/permission-sync.tsx`, client):
+  `{ initialFingerprint, check }`; checks every 30 s while visible, on focus /
+  visibilitychange and route change, never overlapping, silent on errors;
+  `router.refresh()` when signed out or the fingerprint changed.
+- Both exported from `src/components/shared/index.ts`; dashboard icon
+  `shield-check` added to `src/components/dashboard/icons.tsx`.
+- Change history: 2026-10-16 — added for RBAC enforcement.

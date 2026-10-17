@@ -3,19 +3,17 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { requirePlatformOwner } from "@/lib/platform-auth/dal";
+import { NoActiveRoleNotice } from "@/components/shared";
+import { requirePlatformAccess } from "@/lib/authz/platform";
 import { EmptyState } from "../_components/empty-state";
 import { Icon } from "../_components/icons";
 import { SectionedLayout, type SecondaryMenuItem } from "../_components/secondary-menu";
 import { StatCard } from "../_components/stat-card";
-import { getNavItem, PLATFORM_NAV_ITEMS } from "../navigation";
+import { filterNavSections, getNavItem } from "../navigation";
 import { tenantSummaryDetails } from "../tenants/_components/count-details-content";
 import { loadTenantSummary, SUMMARY_UNAVAILABLE } from "../tenants/summary";
 
 export const metadata: Metadata = { title: getNavItem("dashboard").label };
-
-// Every module except the page this list is on.
-const QUICK_ACCESS = PLATFORM_NAV_ITEMS.filter((item) => item.id !== "dashboard");
 
 // The page's sections, in page order, for the secondary menu (top bar).
 const SECTION_IDS = {
@@ -31,20 +29,31 @@ const MENU_ITEMS: readonly SecondaryMenuItem[] = [
 
 /**
  * Description: Show the platform dashboard: summary figures, quick access and activity.
- * Input: None (the signed-in owner is checked on the server; the tenant summary
- *   is read from the database).
- * Output: The protected dashboard with a secondary menu, clickable tenant
- *   figures (each opens its exact records), module shortcuts and the activity card.
- * Use case: /platform/dashboard — the owner's starting page after sign-in.
+ * Input: None (the signed-in owner and their CURRENT privileges are checked on
+ *   the server; the tenant summary is read from the database only with
+ *   platform.tenants.view).
+ * Output: The protected dashboard with a secondary menu, a warning notice when
+ *   the owner has no active role, clickable tenant figures and the "Manage
+ *   tenants" button (platform.tenants.view only), module shortcuts filtered
+ *   like the sidebar, and the activity card.
+ * Use case: /platform/dashboard — the owner's starting page after sign-in
+ *   (available to every signed-in owner; widgets follow the privileges).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 export default async function PlatformDashboardPage() {
-  // Checked on the server on every request; nothing below renders without it.
-  await requirePlatformOwner();
-  // The tenant figures are real; null when they could not be read.
-  const summary = await loadTenantSummary();
+  // Checked on the server on every request: session and CURRENT privileges.
+  const { access } = await requirePlatformAccess();
+  const canSeeTenants = access.can("platform.tenants.view");
+  // The tenant figures are real; null when they could not be read (never read without the privilege).
+  const summary = canSeeTenants ? await loadTenantSummary() : null;
+  // Every module the owner may open, except the page this list is on (same rules as the sidebar).
+  const quickAccess = filterNavSections(access.permissions)
+    .flatMap((section) => section.items)
+    .filter((item) => item.id !== "dashboard");
+  // The menu follows the sections that are actually shown.
+  const menuItems = canSeeTenants ? MENU_ITEMS : MENU_ITEMS.filter((item) => item.id !== SECTION_IDS.summary);
 
   return (
     <div className="flex flex-col gap-9">
@@ -57,42 +66,49 @@ export default async function PlatformDashboardPage() {
             Here&apos;s an overview of your platform. Manage your tenants and keep everything moving from one workspace.
           </p>
         </div>
-        <Button asChild variant="outline" className="self-start lg:self-auto">
-          <Link href={getNavItem("tenants").href}>
-            <Icon name="building-2" className="size-4" />
-            Manage tenants
-            <Icon name="arrow-right" className="size-4" />
-          </Link>
-        </Button>
+        {canSeeTenants ? (
+          <Button asChild variant="outline" className="self-start lg:self-auto">
+            <Link href={getNavItem("tenants").href}>
+              <Icon name="building-2" className="size-4" />
+              Manage tenants
+              <Icon name="arrow-right" className="size-4" />
+            </Link>
+          </Button>
+        ) : null}
       </header>
 
-      <SectionedLayout items={MENU_ITEMS} variant="top" contentClassName="flex flex-col gap-9">
-        <section id={SECTION_IDS.summary} aria-labelledby="platform-summary">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 id="platform-summary" className="text-sm font-semibold">Platform at a glance</h2>
-            <span className="text-xs text-fg-subtle">Tenant overview</span>
-          </div>
-          <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {/* Each tenant figure opens the exact tenants it counts. */}
-            <StatCard
-              label="Total Tenants"
-              icon="building-2"
-              value={summary?.total ?? null}
-              note={summary ? "Registered on your platform" : SUMMARY_UNAVAILABLE}
-              details={summary ? tenantSummaryDetails("all", summary) : undefined}
-            />
-            <StatCard
-              label="Active Tenants"
-              icon="activity"
-              value={summary?.active ?? null}
-              note={summary ? "Accounts marked active" : SUMMARY_UNAVAILABLE}
-              details={summary ? tenantSummaryDetails("active", summary) : undefined}
-            />
-            {/* Not collected yet, so no figure (and nothing to open) is shown. */}
-            <StatCard label="Subscription Plans" icon="credit-card" value={null} note="Not configured yet" />
-            <StatCard label="Open Support Requests" icon="life-buoy" value={null} note="Not configured yet" />
-          </dl>
-        </section>
+      {access.roleState !== "active" ? <NoActiveRoleNotice /> : null}
+
+      <SectionedLayout items={menuItems} variant="top" contentClassName="flex flex-col gap-9">
+        {/* Gated widgets: the tenant figures need platform.tenants.view. */}
+        {canSeeTenants ? (
+          <section id={SECTION_IDS.summary} aria-labelledby="platform-summary">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 id="platform-summary" className="text-sm font-semibold">Platform at a glance</h2>
+              <span className="text-xs text-fg-subtle">Tenant overview</span>
+            </div>
+            <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {/* Each tenant figure opens the exact tenants it counts. */}
+              <StatCard
+                label="Total Tenants"
+                icon="building-2"
+                value={summary?.total ?? null}
+                note={summary ? "Registered on your platform" : SUMMARY_UNAVAILABLE}
+                details={summary ? tenantSummaryDetails("all", summary) : undefined}
+              />
+              <StatCard
+                label="Active Tenants"
+                icon="activity"
+                value={summary?.active ?? null}
+                note={summary ? "Accounts marked active" : SUMMARY_UNAVAILABLE}
+                details={summary ? tenantSummaryDetails("active", summary) : undefined}
+              />
+              {/* Not collected yet, so no figure (and nothing to open) is shown. */}
+              <StatCard label="Subscription Plans" icon="credit-card" value={null} note="Not configured yet" />
+              <StatCard label="Open Support Requests" icon="life-buoy" value={null} note="Not configured yet" />
+            </dl>
+          </section>
+        ) : null}
 
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1.9fr)_minmax(0,1fr)]">
           <Card id={SECTION_IDS.quick} role="region" aria-labelledby="quick-access" className="min-w-0">
@@ -104,7 +120,7 @@ export default async function PlatformDashboardPage() {
             </CardHeader>
             <CardContent>
               <ul className="grid gap-3 sm:grid-cols-2">
-                {QUICK_ACCESS.map((item) => (
+                {quickAccess.map((item) => (
                   <li key={item.id} className="min-w-0">
                     <Button
                       asChild

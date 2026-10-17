@@ -4,14 +4,16 @@
  * credentials and checking its domains (docs/tenant-management.md §8.4,
  * §8.5, §7.2, §8.7).
  *
- * Same rules as actions.ts: each is a public HTTP endpoint, so the session is
- * checked first, every argument is re-validated (types included), the service
+ * Same rules as actions.ts: each is a public HTTP endpoint, so the session and
+ * the action's privilege are checked first (authorizePlatformAction; refusals
+ * are audited as authz.denied), every argument is re-validated (types included), the service
  * does the work, and the result is a plain object with safe messages. No
  * result carries a password, except a generated master password, once.
  */
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { requirePlatformOwner } from "@/lib/platform-auth/dal";
+import type { PlatformPermissionKey } from "@/lib/authz/catalog";
+import { authorizePlatformAction } from "@/lib/authz/platform";
 import { clientIpFromForwardedFor } from "@/lib/platform-auth/rate-limit";
 import { MAX_PROFILE_IMAGE_BYTES } from "@/lib/storage/image";
 import {
@@ -27,6 +29,7 @@ import {
 import type {
   DatabasePasswordActionResult,
   DomainCheckActionResult,
+  ForbiddenFailure,
   ResetMasterPasswordActionResult,
   ResetMasterPasswordInput,
   UpdateTenantActionState,
@@ -35,18 +38,36 @@ import type {
 const TENANTS_PATH = "/platform/tenants";
 
 /**
- * Description: Identify the signed-in owner and the client address for a tenant action.
- * Input: None (reads the session cookie and X-Forwarded-For).
- * Output: The actor; a signed-out caller is redirected to the login page.
- * Use case: Every manage Server Action.
+ * Description: Authorize a manage action by privilege and identify its actor.
+ * Input: The platform privilege the action needs.
+ * Output: { ok: true, actor } (owner id from the session and the client IP), or
+ *   { ok: false, error } with the friendly refusal (audited as authz.denied);
+ *   a signed-out caller is redirected to the login page.
+ * Use case: Every manage Server Action, before it reads or changes anything.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
-async function currentActor(): Promise<TenantActor> {
-  const { owner } = await requirePlatformOwner();
-  const ipAddress = clientIpFromForwardedFor((await headers()).get("x-forwarded-for"));
-  return { ownerId: owner.id, ipAddress };
+async function authorizeActor(
+  permission: PlatformPermissionKey,
+): Promise<{ ok: true; actor: TenantActor } | { ok: false; error: string }> {
+  const ipAddress     = clientIpFromForwardedFor((await headers()).get("x-forwarded-for"));
+  const authorization = await authorizePlatformAction(permission, { ipAddress });
+  if (!authorization.ok) return { ok: false, error: authorization.error };
+  return { ok: true, actor: { ownerId: authorization.session.owner.id, ipAddress } };
+}
+
+/**
+ * Description: Build the refusal of an action whose privilege is missing.
+ * Input: The friendly message from authorizePlatformAction.
+ * Output: The shared ForbiddenFailure shape ({ ok: false, reason: "forbidden", message }).
+ * Use case: Credential and domain actions of this file.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-16
+ * Last modified: 2026-10-16
+ */
+function forbidden(message: string): ForbiddenFailure {
+  return { ok: false, reason: "forbidden", message };
 }
 
 /**
@@ -114,15 +135,17 @@ async function profileImageChange(
  * Use case: The edit form (useActionState).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 export async function updateTenantAction(
   tenantId: string,
   _previousState: UpdateTenantActionState,
   formData: FormData,
 ): Promise<UpdateTenantActionState> {
-  const actor = await currentActor();
-  const id    = text(tenantId);
+  const authorization = await authorizeActor("platform.tenants.edit");
+  if (!authorization.ok) return { status: "error", formError: authorization.error, fieldErrors: {} };
+  const { actor } = authorization;
+  const id        = text(tenantId);
   if (!(formData instanceof FormData)) {
     return { status: "error", formError: "The form could not be read. Reload the page and try again.", fieldErrors: {} };
   }
@@ -170,13 +193,16 @@ export async function updateTenantAction(
  * Use case: Reset master password dialog.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 export async function resetMasterPasswordAction(
   tenantId: string,
   input: ResetMasterPasswordInput,
 ): Promise<ResetMasterPasswordActionResult> {
-  const actor  = await currentActor();
+  const authorization = await authorizeActor("platform.tenants.credentials");
+  if (!authorization.ok) return forbidden(authorization.error);
+  const { actor } = authorization;
+
   const id     = text(tenantId);
   const values = (typeof input === "object" && input !== null ? input : {}) as Record<string, unknown>;
   // Only the two documented shapes reach the service; anything else is refused there.
@@ -197,10 +223,13 @@ export async function resetMasterPasswordAction(
  * Use case: Rotate password confirmation.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 export async function rotateDatabasePasswordAction(tenantId: string): Promise<DatabasePasswordActionResult> {
-  const actor  = await currentActor();
+  const authorization = await authorizeActor("platform.tenants.credentials");
+  if (!authorization.ok) return forbidden(authorization.error);
+  const { actor } = authorization;
+
   const id     = text(tenantId);
   const result = await rotateDatabasePassword(id, actor);
   if (result.ok) revalidateTenant(id);
@@ -214,13 +243,16 @@ export async function rotateDatabasePasswordAction(tenantId: string): Promise<Da
  * Use case: Update password confirmation.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 export async function updateDatabasePasswordAction(
   tenantId: string,
   password: string,
 ): Promise<DatabasePasswordActionResult> {
-  const actor  = await currentActor();
+  const authorization = await authorizeActor("platform.tenants.credentials");
+  if (!authorization.ok) return forbidden(authorization.error);
+  const { actor } = authorization;
+
   const id     = text(tenantId);
   const result = await updateExistingDatabasePassword(id, text(password), actor);
   if (result.ok) revalidateTenant(id);
@@ -235,10 +267,13 @@ export async function updateDatabasePasswordAction(
  * Use case: Check DNS on the details page.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 export async function verifyCustomDomainAction(tenantId: string): Promise<DomainCheckActionResult> {
-  const actor  = await currentActor();
+  const authorization = await authorizeActor("platform.tenants.edit");
+  if (!authorization.ok) return forbidden(authorization.error);
+  const { actor } = authorization;
+
   const id     = text(tenantId);
   const result = await verifyCustomDomain(id, actor);
   // A failed check records its time and reason on the row too.
@@ -253,10 +288,13 @@ export async function verifyCustomDomainAction(tenantId: string): Promise<Domain
  * Use case: Check again on the details page.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 export async function recheckSubdomainAction(tenantId: string): Promise<DomainCheckActionResult> {
-  const actor  = await currentActor();
+  const authorization = await authorizeActor("platform.tenants.edit");
+  if (!authorization.ok) return forbidden(authorization.error);
+  const { actor } = authorization;
+
   const id     = text(tenantId);
   const result = await recheckSubdomain(id, actor);
   if (result.ok || result.reason === "dns") revalidateTenant(id);

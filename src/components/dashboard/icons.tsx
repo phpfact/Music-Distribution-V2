@@ -10,6 +10,7 @@ import {
   MicVocal,
   Palette,
   Send,
+  ShieldCheck,
   Tag,
   UsersRound,
   type LucideIcon,
@@ -31,6 +32,7 @@ const DASHBOARD_ICONS = {
   "mic-vocal":        MicVocal,
   palette:            Palette,
   send:               Send,
+  "shield-check":     ShieldCheck,
   tag:                Tag,
   users:              UsersRound,
 } as const satisfies Record<string, LucideIcon>;

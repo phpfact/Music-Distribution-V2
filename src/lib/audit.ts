@@ -27,7 +27,27 @@ export type AuditAction =
   | "customer_account.suspended"
   | "customer_account.reactivated"
   | "workspace_appearance.applied"
-  | "workspace_appearance.reset";
+  | "workspace_appearance.reset"
+  // Role and privilege management (.vibe/memory/role-privilege-management.md).
+  // Metadata holds privilege KEYS and field names only, never secrets.
+  | "role.created"
+  | "role.updated"
+  | "role.disabled"
+  | "role.enabled"
+  | "role.deleted"
+  | "user.created"
+  | "user.updated"
+  | "user.role_changed"
+  | "user.password_reset"
+  | "user.suspended"
+  | "user.reactivated"
+  | "master_role.assigned"
+  | "platform_module.enabled"
+  | "platform_module.disabled"
+  | "tenant_module.enabled"
+  | "tenant_module.disabled"
+  | "authz.denied"
+  | "authz.escalation_blocked";
 
 type AuditMetadataValue = string | number | boolean | null | string[];
 
@@ -39,6 +59,7 @@ type AuditMetadataValue = string | number | boolean | null | string[];
 export type AuditMetadata = Record<string, AuditMetadataValue>;
 
 export type AuditEntry = {
+  /** system, super_admin (platform owner), tenant_user (staff) or customer_user. */
   actorType: AuditActorType;
   /** E.g. the platform owner's id; null for the system. */
   actorId: string | null;

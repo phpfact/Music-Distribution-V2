@@ -5,13 +5,18 @@ import { notFound } from "next/navigation";
 import { cache, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { requirePlatformOwner } from "@/lib/platform-auth/dal";
+import { AccessDenied } from "@/components/shared";
+import type { TenantModuleGroups } from "@/lib/authz/module-model";
+import { listTenantModules } from "@/lib/authz/module-service";
+import { requirePlatformAccess } from "@/lib/authz/platform";
+import { getControlDb } from "@/lib/db/control";
 import { getTenantDetails, type TenantDetails } from "@/lib/tenants/service";
 import { Avatar } from "../../_components/avatar";
 import { CopyButton } from "../../_components/copy-button";
 import { CountDetails } from "../../_components/count-details";
 import { EmptyState } from "../../_components/empty-state";
 import { Icon, type IconName } from "../../_components/icons";
+import { ModuleToggleList } from "../../_components/module-toggle-list";
 import { Notice } from "../../_components/notice";
 import { SectionedLayout, type SecondaryMenuItem } from "../../_components/secondary-menu";
 import { SensitiveValue } from "../../_components/sensitive-value";
@@ -51,8 +56,28 @@ const SECTIONS = {
   login:    { id: "tenant-login-information", title: "Login Information", icon: "key-round" },
   database: { id: "tenant-database-information", title: "Database Information", icon: "database" },
   domains:  { id: "tenant-domain-information", title: "Domain Information", icon: "globe" },
+  modules:  { id: "tenant-module-access", title: "Module Access", icon: "layout-grid" },
   history:  { id: "tenant-status-history", title: "Status History", icon: "clock" },
 } as const satisfies Record<string, { id: string; title: string; icon: IconName }>;
+
+/** What the signed-in owner may do on this page (decided on the server per request). */
+type TenantPagePermissions = {
+  /** platform.tenants.edit: Edit button and the domain DNS checks. */
+  edit: boolean;
+  /** platform.tenants.suspend: Suspend / Reactivate. */
+  suspend: boolean;
+  /** platform.tenants.provision: Retry setup. */
+  provision: boolean;
+  /** platform.tenants.credentials: Reset master password, rotate/update the database password. */
+  credentials: boolean;
+  /** platform.tenant_registrations.view: the Registrations link. */
+  registrations: boolean;
+  /** platform.tenant_modules.manage: the switches of the Module access section. */
+  modules: boolean;
+};
+
+// The page shown instead of the details when platform.tenants.view is missing.
+const DASHBOARD_PATH = "/platform/dashboard";
 
 // The secondary menu lists every section; the Setup Progress item disappears
 // by itself while that card is not shown (the menu follows the page's DOM).
@@ -76,17 +101,19 @@ const loadTenant = cache(async (id: string) => getTenantDetails(id));
 /**
  * Description: Build the details page's title without exposing data to signed-out visitors.
  * Input: The route parameters (tenant id).
- * Output: The tenant's name, or "Tenant not found"; a signed-out visitor is redirected first.
+ * Output: The tenant's name, or "Tenant not found"; "Access denied" without
+ *   platform.tenants.view; a signed-out visitor is redirected first.
  * Use case: The browser tab title of /platform/tenants/<id>.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 export async function generateMetadata({
   params,
 }: PageProps): Promise<Metadata> {
-  // No tenant data in the title without a session.
-  await requirePlatformOwner();
+  // No tenant data in the title without a session and the view privilege.
+  const { access } = await requirePlatformAccess();
+  if (!access.can("platform.tenants.view")) return { title: "Access denied" };
   const tenant = await loadTenant((await params).id);
   return { title: tenant ? tenant.name : "Tenant not found" };
 }
@@ -95,8 +122,10 @@ export async function generateMetadata({
  * Description: Render the protected tenant details page.
  * Input: The route parameters (tenant id) and search parameters (notice).
  * Output: The header with the permitted actions, notices, the secondary menu and the
- *   Setup, Personal, Login, Database, Domain and Status History sections;
- *   sensitive values are masked; 404 when the tenant does not exist.
+ *   Setup, Personal, Login, Database, Domain, Module access and Status History sections;
+ *   sensitive values are masked; 404 when the tenant does not exist. Needs
+ *   platform.tenants.view (otherwise the inline access-denied state, HTTP 200,
+ *   before anything is read); every button appears only with its privilege.
  * Use case: /platform/tenants/<id> — the owner reviews and manages one tenant
  *   (and opens its customer registrations).
  * Author: Mr. Sachin Sharma
@@ -107,11 +136,23 @@ export default async function TenantDetailsPage({
   params,
   searchParams,
 }: PageProps) {
-  // Checked on the server on every request; nothing below renders without it.
-  await requirePlatformOwner();
+  // Checked on the server on every request: session and CURRENT privileges.
+  const { access } = await requirePlatformAccess();
+  if (!access.can("platform.tenants.view")) return <AccessDenied homeHref={DASHBOARD_PATH} />;
+  // The page's buttons follow the privileges (each action checks again).
+  const can: TenantPagePermissions = {
+    edit: access.can("platform.tenants.edit"),
+    suspend: access.can("platform.tenants.suspend"),
+    provision: access.can("platform.tenants.provision"),
+    credentials: access.can("platform.tenants.credentials"),
+    registrations: access.can("platform.tenant_registrations.view"),
+    modules: access.can("platform.tenant_modules.manage"),
+  };
   const { id } = await params;
   const tenant = await loadTenant(id);
   if (!tenant) notFound();
+  // The tenant's panel modules and their switches (control plane, read fresh).
+  const modules = await listTenantModules(getControlDb(), tenant.id);
 
   const notice         = tenantNoticeMessage((await searchParams).notice);
   const requestHeaders = await headers();
@@ -160,7 +201,7 @@ export default async function TenantDetailsPage({
           </div>
           <div className="flex flex-wrap gap-2">
             {/* Customer sign-ups exist only once the tenant's database is set up. */}
-            {tenant.status === "active" || tenant.status === "suspended" ? (
+            {can.registrations && (tenant.status === "active" || tenant.status === "suspended") ? (
               <Button asChild variant="outline">
                 <Link href={`${TENANTS_PATH}/${tenant.id}/registrations`}>
                   <Icon name="user" className="size-4" />
@@ -168,27 +209,29 @@ export default async function TenantDetailsPage({
                 </Link>
               </Button>
             ) : null}
-            <Button asChild variant="outline">
-              <Link href={`${TENANTS_PATH}/${tenant.id}/edit`}>
-                <Icon name="pencil" className="size-4" />
-                Edit
-              </Link>
-            </Button>
-            {tenant.provisioning.canRetry ? (
+            {can.edit ? (
+              <Button asChild variant="outline">
+                <Link href={`${TENANTS_PATH}/${tenant.id}/edit`}>
+                  <Icon name="pencil" className="size-4" />
+                  Edit
+                </Link>
+              </Button>
+            ) : null}
+            {can.provision && tenant.provisioning.canRetry ? (
               <LifecycleButton
                 action="retry"
                 tenantId={tenant.id}
                 tenantName={tenant.name}
               />
             ) : null}
-            {tenant.status === "suspended" ? (
+            {can.suspend && tenant.status === "suspended" ? (
               <LifecycleButton
                 action="reactivate"
                 tenantId={tenant.id}
                 tenantName={tenant.name}
               />
             ) : null}
-            {tenant.status === "active" ? (
+            {can.suspend && tenant.status === "active" ? (
               <LifecycleButton
                 action="suspend"
                 tenantId={tenant.id}
@@ -204,15 +247,17 @@ export default async function TenantDetailsPage({
 
         <SectionedLayout items={MENU_ITEMS} contentClassName="flex flex-col gap-6">
           {showsSetupCard(tenant.status, tenant.provisioning.canRetry) ? (
-            <SetupCard tenant={tenant} />
+            <SetupCard tenant={tenant} canRetry={can.provision} />
           ) : null}
 
           <div className="grid gap-6 2xl:grid-cols-2">
             <ProfileCard tenant={tenant} />
-            <LoginCard tenant={tenant} />
-            <DatabaseCard tenant={tenant} />
-            <DomainsCard tenant={tenant} siteRequest={siteRequest} />
+            <LoginCard tenant={tenant} canManageCredentials={can.credentials} />
+            <DatabaseCard tenant={tenant} canManageCredentials={can.credentials} />
+            <DomainsCard tenant={tenant} siteRequest={siteRequest} canCheck={can.edit} />
           </div>
+
+          <ModulesCard tenantId={tenant.id} modules={modules} canManage={can.modules} />
 
           <HistoryCard tenant={tenant} />
         </SectionedLayout>
@@ -436,18 +481,20 @@ function setupSummary(tenant: TenantDetails): string {
 
 /**
  * Description: Render the Setup Progress section.
- * Input: The tenant.
+ * Input: The tenant and whether the owner holds platform.tenants.provision.
  * Output: The progress sentence (opens the steps dialog), the attempt, the last error
  *   with retry advice, every step with its state and the Retry setup button
  *   when allowed.
  * Use case: The details page while setup is unfinished or retryable.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
-function SetupCard({ tenant }: { tenant: TenantDetails }) {
-  const { steps, attempt, lastError, canRetry } = tenant.provisioning;
-  const running = isSetupInProgress(tenant.status);
+function SetupCard({ tenant, canRetry: mayRetry }: { tenant: TenantDetails; canRetry: boolean }) {
+  const { steps, attempt, lastError } = tenant.provisioning;
+  // Retry needs both a retryable state and platform.tenants.provision.
+  const canRetry = tenant.provisioning.canRetry && mayRetry;
+  const running  = isSetupInProgress(tenant.status);
 
   return (
     <DetailCard id={SECTIONS.setup.id} title={SECTIONS.setup.title} icon={SECTIONS.setup.icon}>
@@ -581,23 +628,23 @@ function ProfileCard({ tenant }: { tenant: TenantDetails }) {
 
 /**
  * Description: Render the Login Information section.
- * Input: The tenant.
+ * Input: The tenant and whether the owner holds platform.tenants.credentials.
  * Output: The username and email masked behind eye buttons, the 2FA note and the
  *   Reset master password action (not while setup runs).
  * Use case: The details page.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
-function LoginCard({ tenant }: { tenant: TenantDetails }) {
+function LoginCard({ tenant, canManageCredentials }: { tenant: TenantDetails; canManageCredentials: boolean }) {
   return (
     <DetailCard
       id={SECTIONS.login.id}
       title={SECTIONS.login.title}
       icon={SECTIONS.login.icon}
       actions={
-        // Setup writes the same login: nothing to offer while it runs.
-        tenant.status === "provisioning" ? undefined : (
+        // Setup writes the same login: nothing to offer while it runs (or without the privilege).
+        tenant.status === "provisioning" || !canManageCredentials ? undefined : (
           <ResetMasterPassword
             tenantId={tenant.id}
             tenantName={tenant.name}
@@ -632,16 +679,16 @@ const SCHEMA_TONES = {
 
 /**
  * Description: Render the Database Information section.
- * Input: The tenant.
+ * Input: The tenant and whether the owner holds platform.tenants.credentials.
  * Output: Mode, name and user and server (masked), port, password status (never the
  *   password), schema status and the Rotate/Update password action (not while
  *   setup runs).
  * Use case: The details page.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
-function DatabaseCard({ tenant }: { tenant: TenantDetails }) {
+function DatabaseCard({ tenant, canManageCredentials }: { tenant: TenantDetails; canManageCredentials: boolean }) {
   const { database } = tenant;
   return (
     <DetailCard
@@ -649,7 +696,7 @@ function DatabaseCard({ tenant }: { tenant: TenantDetails }) {
       title={SECTIONS.database.title}
       icon={SECTIONS.database.icon}
       actions={
-        tenant.status === "provisioning" ? undefined : (
+        tenant.status === "provisioning" || !canManageCredentials ? undefined : (
           <DatabasePassword
             tenantId={tenant.id}
             tenantName={tenant.name}
@@ -723,24 +770,28 @@ function CheckError({ children }: { children: ReactNode }) {
 
 /**
  * Description: Render the Domain Information section.
- * Input: The tenant and the console request's host/scheme (for the site link).
+ * Input: The tenant, the console request's host/scheme (for the site link) and
+ *   whether the owner holds platform.tenants.edit (DNS checks).
  * Output: The subdomain (link when active) and custom domain with their status, the
  *   TXT record to add (with copy buttons), last check details and the DNS check
  *   actions (not while setup runs).
  * Use case: The details page.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 function DomainsCard({
   tenant,
   siteRequest,
+  canCheck: mayCheck,
 }: {
   tenant: TenantDetails;
   siteRequest: { host: string | null; forwardedProto: string | null };
+  canCheck: boolean;
 }) {
   const { subdomain, custom } = tenant.domains;
-  const canCheck = tenant.status !== "provisioning";
+  // DNS checks need platform.tenants.edit and are not offered while setup runs.
+  const canCheck = mayCheck && tenant.status !== "provisioning";
 
   return (
     <DetailCard id={SECTIONS.domains.id} title={SECTIONS.domains.title} icon={SECTIONS.domains.icon}>
@@ -933,6 +984,46 @@ function HistoryCard({ tenant }: { tenant: TenantDetails }) {
           ))}
         </ol>
       )}
+    </DetailCard>
+  );
+}
+
+/**
+ * Description: Render the Module access section: the tenant's Tenant panel and
+ *   Customer panel modules with their per-tenant state.
+ * Input: The tenant id, its module groups and whether the viewer holds
+ *   platform.tenant_modules.manage.
+ * Output: The section card with two groups; switches with the privilege,
+ *   read-only On/Off badges without it, core modules locked ("Core · always on").
+ * Use case: The details page (.vibe/memory/tenant-management.md, "Module access section").
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-16
+ * Last modified: 2026-10-16
+ */
+function ModulesCard({
+  tenantId,
+  modules,
+  canManage,
+}: {
+  tenantId: string;
+  modules: TenantModuleGroups;
+  canManage: boolean;
+}) {
+  return (
+    <DetailCard id={SECTIONS.modules.id} title={SECTIONS.modules.title} icon={SECTIONS.modules.icon}>
+      <Note>
+        {canManage
+          ? "Switch this tenant's panel modules on or off. A module that is off removes its privileges from every role of that panel on the next request."
+          : "The panel modules available to this tenant. Only Platform Owners with the Manage tenant modules privilege can change them."}
+      </Note>
+      <ModuleToggleList
+        target={{ scope: "tenant", tenantId }}
+        groups={[
+          { id: "tenant-panel", title: "Tenant panel", modules: modules.tenant },
+          { id: "customer-panel", title: "Customer panel", modules: modules.customer },
+        ]}
+        canManage={canManage}
+      />
     </DetailCard>
   );
 }

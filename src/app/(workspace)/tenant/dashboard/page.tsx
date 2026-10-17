@@ -6,12 +6,12 @@ import { SectionCard, SectionCards } from "@/components/dashboard/section-cards"
 import { formatRegistrationDate } from "@/components/registrations/format";
 import { RegistrationRecords } from "@/components/registrations/registration-records";
 import { RegistrationStatusBadge } from "@/components/registrations/registration-status-badge";
-import { CountDetails, EmptyState, SectionedLayout, type SecondaryMenuItem } from "@/components/shared";
+import { CountDetails, EmptyState, NoActiveRoleNotice, SectionedLayout, type SecondaryMenuItem } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { requireTenantUser } from "@/lib/workspace/guards";
+import { requireTenantAccess } from "@/lib/authz/workspace";
 import { getRegistrationSummary, listRecentRegistrations } from "@/lib/workspace/registrations";
 import { accountTypeLabel, type RegistrationRow, type RegistrationSummary } from "@/lib/workspace/rules";
 import { TENANT_REGISTRATIONS_PATH } from "../navigation";
@@ -27,28 +27,32 @@ const SECTIONS = {
 } as const;
 
 /**
- * Description: Render the tenant administrator's dashboard (shadcn dashboard-01 layout).
- * Input: None (tenant from the Host header, user from the tenant area session).
- * Output: Welcome heading; four summary cards (real registration counts with
- *   details popups for the owner, honest "coming soon" cards for unbuilt
- *   modules); the activity card (empty until analytics exist); the recent
- *   registrations table (owner only). No invented figures.
- * Use case: /tenant/dashboard — the landing page after a tenant staff sign-in.
+ * Description: Render the tenant staff dashboard (shadcn dashboard-01 layout).
+ * Input: None (tenant from the Host header, user and privileges from the tenant
+ *   area session).
+ * Output: Welcome heading; a warning notice when the user has no active role;
+ *   summary cards (real registration counts with details popups only with
+ *   tenant.registrations.view, honest "coming soon" cards for unbuilt modules);
+ *   the activity card (empty until analytics exist); the recent registrations
+ *   table (tenant.registrations.view only). No invented figures.
+ * Use case: /tenant/dashboard — the landing page after a tenant staff sign-in
+ *   (available to every active staff user; widgets are filtered by privilege).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-16
  * Last modified: 2026-10-16
  */
 export default async function TenantDashboardPage() {
   // Step 1: the signed-in staff user of this host (redirects to /login otherwise).
-  const area = await requireTenantUser();
+  const area = await requireTenantAccess();
 
-  // Step 2: real registration data, only for the administrator.
-  const summary = area.user.isOwner ? await getRegistrationSummary(area.db) : null;
-  const recent  = area.user.isOwner ? await listRecentRegistrations(area.db, 5) : [];
+  // Step 2: real registration data, only with the registrations privilege.
+  const canSeeRegistrations = area.authz.can("tenant.registrations.view");
+  const summary             = canSeeRegistrations ? await getRegistrationSummary(area.db) : null;
+  const recent              = canSeeRegistrations ? await listRecentRegistrations(area.db, 5) : [];
 
   // The menu follows the sections that are actually shown.
   const menuItems: SecondaryMenuItem[] = [SECTIONS.overview, SECTIONS.activity];
-  if (area.user.isOwner) menuItems.push(SECTIONS.recent);
+  if (canSeeRegistrations) menuItems.push(SECTIONS.recent);
 
   return (
     <>
@@ -56,6 +60,11 @@ export default async function TenantDashboardPage() {
         title={`Welcome back, ${area.user.name}`}
         description={`Here is what is happening at ${area.tenant.name}.`}
       />
+      {area.authz.roleState !== "active" ? (
+        <div className="px-4 lg:px-6">
+          <NoActiveRoleNotice />
+        </div>
+      ) : null}
       <div className="px-4 lg:px-6">
         <SectionedLayout items={menuItems} variant="top" contentClassName="flex flex-col gap-4 md:gap-6">
           <section id={SECTIONS.overview.id} aria-label="Overview">
@@ -80,7 +89,7 @@ export default async function TenantDashboardPage() {
             </Card>
           </section>
 
-          {area.user.isOwner ? (
+          {canSeeRegistrations ? (
             <section id={SECTIONS.recent.id} aria-labelledby={`${SECTIONS.recent.id}-title`}>
               <RecentRegistrations rows={recent} />
             </section>
@@ -92,11 +101,12 @@ export default async function TenantDashboardPage() {
 }
 
 /**
- * Description: Render the four summary cards of the dashboard.
- * Input: The registration counts (null for staff without the owner role).
- * Output: Pending approvals and Active customers (clickable real counts for the
- *   owner) and the Releases and Royalties cards, which say the modules are not
- *   available yet instead of showing numbers.
+ * Description: Render the summary cards of the dashboard.
+ * Input: The registration counts (null without tenant.registrations.view).
+ * Output: Pending approvals and Active customers (clickable real counts, only
+ *   when the counts were loaded, i.e. with the privilege) and the Releases and
+ *   Royalties cards, which say the modules are not available yet instead of
+ *   showing numbers.
  * Use case: TenantDashboardPage.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-16
@@ -105,26 +115,31 @@ export default async function TenantDashboardPage() {
 function OverviewCards({ summary }: { summary: RegistrationSummary | null }) {
   return (
     <SectionCards className="px-0 lg:px-0">
-      <SectionCard
-        label="Pending approvals"
-        value={summary ? <FigureDetails summary={summary} kind="pending" /> : "—"}
-        badge={
-          summary && summary.pending > 0 ? (
-            <Badge variant="outline" className="gap-1">
-              <Clock aria-hidden="true" />
-              Needs review
-            </Badge>
-          ) : undefined
-        }
-        footerTitle={summary ? "Sign-ups waiting for your decision" : "Visible to the administrator"}
-        footerDescription={summary ? "Approve or reject them on the Registrations page" : "Registrations are reviewed by the owner"}
-      />
-      <SectionCard
-        label="Active customers"
-        value={summary ? <FigureDetails summary={summary} kind="active" /> : "—"}
-        footerTitle={summary ? "Approved accounts that can log in" : "Visible to the administrator"}
-        footerDescription="Artists, labels and white-label partners"
-      />
+      {/* Gated widgets: hidden entirely without the registrations privilege. */}
+      {summary ? (
+        <>
+          <SectionCard
+            label="Pending approvals"
+            value={<FigureDetails summary={summary} kind="pending" />}
+            badge={
+              summary.pending > 0 ? (
+                <Badge variant="outline" className="gap-1">
+                  <Clock aria-hidden="true" />
+                  Needs review
+                </Badge>
+              ) : undefined
+            }
+            footerTitle="Sign-ups waiting for your decision"
+            footerDescription="Approve or reject them on the Registrations page"
+          />
+          <SectionCard
+            label="Active customers"
+            value={<FigureDetails summary={summary} kind="active" />}
+            footerTitle="Approved accounts that can log in"
+            footerDescription="Artists, labels and white-label partners"
+          />
+        </>
+      ) : null}
       <SectionCard
         label="Releases"
         value="—"
@@ -178,7 +193,7 @@ function FigureDetails({ summary, kind }: { summary: RegistrationSummary; kind: 
  * Input: Up to five newest registrations.
  * Output: A table (applicant, type, submitted, status) with "View all", or an
  *   empty state when nobody has signed up yet.
- * Use case: TenantDashboardPage (owner only).
+ * Use case: TenantDashboardPage (tenant.registrations.view only).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-16
  * Last modified: 2026-10-16

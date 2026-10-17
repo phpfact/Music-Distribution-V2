@@ -68,8 +68,10 @@ export async function connectToTestDatabase(): Promise<Client> {
 }
 
 /**
- * Empties the two platform owner tables. Only ever in a scratch database: the
- * server is asked which database this connection is on before anything is deleted.
+ * Empties the two platform owner tables, the custom platform roles (the
+ * Master Platform role written by the migration stays) and the platform
+ * module switches. Only ever in a scratch database: the server is asked which
+ * database this connection is on before anything is deleted.
  */
 export async function clearPlatformTables(db: Client): Promise<void> {
   const current = await db.query<{ name: string }>("SELECT current_database() AS name");
@@ -79,6 +81,8 @@ export async function clearPlatformTables(db: Client): Promise<void> {
   }
   await db.query("DELETE FROM platform_owner_sessions");
   await db.query("DELETE FROM platform_owners");
+  await db.query("DELETE FROM platform_roles WHERE system_key IS NULL");
+  await db.query("DELETE FROM platform_module_settings");
 }
 
 /**
@@ -159,16 +163,48 @@ export function sha256Hex(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
+/** The id of the Master Platform role (found by its system key, as the app does). */
+export async function masterPlatformRoleId(db: Client): Promise<string> {
+  const result = await db.query<{ id: string }>("SELECT id FROM platform_roles WHERE system_key = 'master_platform'");
+  const id = result.rows[0]?.id;
+  if (!id) throw new Error("the Master Platform role is missing: are the migrations applied?");
+  return id;
+}
+
+/**
+ * Inserts a platform owner. Every owner holds exactly one role: the Master
+ * Platform role unless `roleId` names another (custom) platform role.
+ */
 export async function insertOwner(
   db: Client,
-  owner: { username: string; passwordHash: string; status?: "active" | "disabled" },
+  owner: { username: string; passwordHash: string; status?: "active" | "disabled"; roleId?: string },
 ): Promise<string> {
   const id = randomUUID();
   await db.query(
-    `INSERT INTO platform_owners (id, username, password_hash, status)
-     VALUES ($1, $2, $3, $4::platform_owner_status)`,
-    [id, owner.username, owner.passwordHash, owner.status ?? "active"],
+    `INSERT INTO platform_owners (id, username, password_hash, status, role_id)
+     VALUES ($1, $2, $3, $4::platform_owner_status,
+             COALESCE($5::uuid, (SELECT id FROM platform_roles WHERE system_key = 'master_platform')))`,
+    [id, owner.username, owner.passwordHash, owner.status ?? "active", owner.roleId ?? null],
   );
+  return id;
+}
+
+/**
+ * Inserts a custom platform role holding exactly the given privilege keys
+ * (they must exist in platform_permissions). Returns its id.
+ */
+export async function insertPlatformRole(
+  db: Client,
+  role: { name: string; permissionKeys: readonly string[]; status?: "active" | "disabled" },
+): Promise<string> {
+  const id = randomUUID();
+  await db.query(
+    `INSERT INTO platform_roles (id, name, status, updated_at) VALUES ($1, $2, $3::role_status, now())`,
+    [id, role.name, role.status ?? "active"],
+  );
+  for (const key of role.permissionKeys) {
+    await db.query("INSERT INTO platform_role_permissions (role_id, permission_key) VALUES ($1, $2)", [id, key]);
+  }
   return id;
 }
 

@@ -28,3 +28,21 @@ export { PasswordChecklist } from "@/app/platform/(console)/tenants/new/password
 export { SectionedLayout, type SecondaryMenuItem } from "@/app/platform/(console)/_components/secondary-menu";
 export { SensitiveInput } from "@/app/platform/(console)/_components/sensitive-input";
 export { SensitiveValue } from "@/app/platform/(console)/_components/sensitive-value";
+// Added for the shared RBAC screens (2026-10-16): already-reviewed presentational
+// console wrappers, plus the searchable single-value select.
+export { FormActions, RequiredLegend } from "@/app/platform/(console)/_components/form-actions";
+export { FormSection } from "@/app/platform/(console)/_components/form-section";
+export { Icon } from "@/app/platform/(console)/_components/icons";
+export { PageHeader } from "@/app/platform/(console)/_components/page-header";
+export { Spinner } from "@/app/platform/(console)/_components/spinner";
+export { StatCard, type StatCardDetails } from "@/app/platform/(console)/_components/stat-card";
+export { ToneBadge, type BadgeTone } from "@/app/platform/(console)/_components/status-badge";
+export {
+  SearchableSelect,
+  type SearchableSelectOption,
+  type SearchableSelectProps,
+} from "./searchable-select";
+// RBAC (.vibe/memory/role-privilege-management.md): the inline access-denied
+// state of protected pages and the background privilege refresh of the shells.
+export { AccessDenied, NO_ACTIVE_ROLE_LABEL, NO_ACTIVE_ROLE_NOTICE, NoActiveRoleNotice } from "./access-denied";
+export { PermissionSync, type PermissionCheckResult } from "./permission-sync";

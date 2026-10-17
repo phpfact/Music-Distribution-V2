@@ -1,18 +1,34 @@
+import type { PlatformPermissionKey } from "@/lib/authz/catalog";
 import type { IconName } from "./_components/icons";
 
 /**
  * The single description of the platform console's navigation. The sidebar,
  * the top bar title, the dashboard's quick access, the placeholder pages and
  * their metadata all read from here. No "use client": imported on both sides.
+ *
+ * An item (or child) with a `permission` is shown only to owners whose
+ * CURRENT effective privileges include it (.vibe/memory/role-privilege-management.md,
+ * "Navigation"); items without one are shown to every signed-in owner. Hiding
+ * is a convenience only: every page and action checks its privilege itself.
  */
 
 export type PlatformNavId =
   | "dashboard"
   | "tenants"
   | "roles"
+  | "users"
   | "subscriptions"
   | "settings"
   | "support";
+
+/** A link below a navigation item (e.g. Settings → Appearance). */
+export type PlatformNavChild = {
+  label: string;
+  href: string;
+  icon: IconName;
+  /** The privilege needed to see the link; absent = every signed-in owner. */
+  permission?: PlatformPermissionKey;
+};
 
 export type PlatformNavItem = {
   id: PlatformNavId;
@@ -22,7 +38,9 @@ export type PlatformNavItem = {
   description: string;
   /** "planned": the route exists but only shows a coming-soon notice. */
   status: "available" | "planned";
-  children?: readonly { label: string; href: string; icon: IconName }[];
+  /** The privilege needed to see the item; absent = every signed-in owner. */
+  permission?: PlatformPermissionKey;
+  children?: readonly PlatformNavChild[];
 };
 
 export type PlatformNavSection = {
@@ -57,14 +75,25 @@ export const PLATFORM_NAV_SECTIONS: readonly PlatformNavSection[] = [
         icon: "building-2",
         description: "Manage the tenants registered on the platform.",
         status: "available",
+        permission: "platform.tenants.view",
       },
       {
         id: "roles",
-        label: "Roles Management",
+        label: "Roles & Privileges",
         href: "/platform/roles",
         icon: "shield-check",
-        description: "Manage platform-level roles and permissions.",
-        status: "planned",
+        description: "Manage platform roles and the privileges they grant.",
+        status: "available",
+        permission: "platform.roles.view",
+      },
+      {
+        id: "users",
+        label: "Sub-Platform Owners",
+        href: "/platform/users",
+        icon: "user",
+        description: "Manage the owners who help run the platform and their roles.",
+        status: "available",
+        permission: "platform.users.view",
       },
       {
         id: "subscriptions",
@@ -87,7 +116,10 @@ export const PLATFORM_NAV_SECTIONS: readonly PlatformNavSection[] = [
         icon: "settings",
         description: "Personalize your workspace and manage platform appearance.",
         status: "available",
-        children: [{ label: "Appearance", href: "/platform/settings/appearance", icon: "sun" }],
+        children: [
+          { label: "Appearance", href: "/platform/settings/appearance", icon: "sun" },
+          { label: "Modules", href: "/platform/settings/modules", icon: "layout-grid", permission: "platform.modules.manage" },
+        ],
       },
       {
         id: "support",
@@ -105,6 +137,41 @@ export const PLATFORM_NAV_SECTIONS: readonly PlatformNavSection[] = [
 export const PLATFORM_NAV_ITEMS: readonly PlatformNavItem[] = PLATFORM_NAV_SECTIONS.flatMap(
   (section) => section.items,
 );
+
+/**
+ * Description: Tell whether an item or child may be shown to an owner.
+ * Input: The entry (its optional permission) and the owner's granted privilege keys.
+ * Output: True when the entry needs no privilege or the keys include it.
+ * Use case: filterNavSections (sidebar, top bar, dashboard quick access).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-16
+ * Last modified: 2026-10-16
+ */
+export function canSeeNavEntry(entry: { permission?: PlatformPermissionKey }, permissions: readonly string[]): boolean {
+  return entry.permission === undefined || permissions.includes(entry.permission);
+}
+
+/**
+ * Description: Keep only the navigation an owner may see.
+ * Input: The owner's granted privilege keys (serializable list from the server).
+ * Output: The sections with the visible items and visible children only;
+ *   sections left without items are dropped.
+ * Use case: The console shell (sidebar and top bar) and the dashboard's quick
+ *   access (.vibe/memory/role-privilege-management.md, "Navigation").
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-16
+ * Last modified: 2026-10-16
+ */
+export function filterNavSections(permissions: readonly string[]): PlatformNavSection[] {
+  return PLATFORM_NAV_SECTIONS.map((section) => ({
+    ...section,
+    items: section.items
+      .filter((item) => canSeeNavEntry(item, permissions))
+      .map((item) =>
+        item.children ? { ...item, children: item.children.filter((child) => canSeeNavEntry(child, permissions)) } : item,
+      ),
+  })).filter((section) => section.items.length > 0);
+}
 
 /**
  * Description: Look up one navigation item by id.
@@ -154,16 +221,20 @@ export function isNavItemActive(item: PlatformNavItem, pathname: string): boolea
 
 /**
  * Description: Find the navigation item the current page belongs to.
- * Input: The current pathname.
+ * Input: The current pathname and, optionally, the items to search (default:
+ *   every item; the top bar passes only the owner's visible items).
  * Output: The most specific matching item, or undefined.
  * Use case: Top bar breadcrumb.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
-export function findActiveNavItem(pathname: string): PlatformNavItem | undefined {
+export function findActiveNavItem(
+  pathname: string,
+  items: readonly PlatformNavItem[] = PLATFORM_NAV_ITEMS,
+): PlatformNavItem | undefined {
   let active: PlatformNavItem | undefined;
-  for (const item of PLATFORM_NAV_ITEMS) {
+  for (const item of items) {
     if (!isNavItemActive(item, pathname)) continue;
     if (!active || item.href.length > active.href.length) active = item;
   }

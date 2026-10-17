@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getEnv } from "@/lib/env";
-import { requirePlatformOwner } from "@/lib/platform-auth/dal";
+import { AccessDenied } from "@/components/shared";
+import { requirePlatformAccess } from "@/lib/authz/platform";
 import type { IconName } from "../../_components/icons";
 import { PageHeader } from "../../_components/page-header";
 import { SectionedLayout, type SecondaryMenuItem } from "../../_components/secondary-menu";
@@ -29,15 +30,17 @@ const MENU_ITEMS: readonly SecondaryMenuItem[] = FORM_SECTIONS.map((section) => 
  * Input: None (the session is checked and safe configuration is read on the server).
  * Output: The page header, the secondary menu (Personal, Login, Database and
  *   Domain Information) and the create form with the base domain, default
- *   port and database server it displays.
+ *   port and database server it displays. Needs platform.tenants.create
+ *   (otherwise the inline access-denied state, HTTP 200).
  * Use case: /platform/tenants/new — the owner creates a tenant.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 export default async function CreateTenantPage() {
-  // Checked on the server on every request; nothing below renders without it.
-  await requirePlatformOwner();
+  // Checked on the server on every request: session and CURRENT privileges.
+  const { access } = await requirePlatformAccess();
+  if (!access.can("platform.tenants.create")) return <AccessDenied homeHref="/platform/dashboard" />;
   // Only what the form displays reaches the browser: never the control-plane
   // database name or the admin login (the server rejects those names itself).
   const { postgres, platformBaseDomain } = getEnv();

@@ -41,6 +41,24 @@ enum CustomerStatus {
   @@map("customer_status")
 }
 
+/// Custom roles can be disabled; the master roles are always active (CHECK).
+/// (.vibe/memory/role-privilege-management.md)
+enum RoleStatus {
+  active
+  disabled
+
+  @@map("role_status")
+}
+
+/// The two authorization domains of a tenant database: the tenant's staff
+/// (Tenant and Sub-Tenants) and its customers (Customer and Sub-Customers).
+enum AuthzDomain {
+  tenant
+  customer
+
+  @@map("authz_domain")
+}
+
 model User {
   id           String     @id @default(uuid(7)) @db.Uuid
   /// Lower-case (checked in the database, see the init migration).
@@ -56,44 +74,75 @@ model User {
   /// Set for a customer's users; empty for the tenant's own staff.
   customerId   String?    @map("customer_id") @db.Uuid
   customer     Customer?  @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  /// The tenant administrator written by provisioning, or the user of an
+  /// approved main customer: always holds its master role (one primary staff
+  /// user; one primary user per customer: partial unique indexes).
+  isPrimary    Boolean    @default(false) @map("is_primary")
   createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt    DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  roles        UserRole[]
-  sessions     UserSession[]
-  appearance   UserAppearance?
+  /// Exactly one role per user (user_id is the key of user_roles).
+  roleAssignment UserRole?
+  createdRoles   Role[]                @relation("RoleCreatedBy")
+  sessions       UserSession[]
+  appearance     UserAppearance?
   /// The approved sign-up request this customer user was created from.
-  registration CustomerRegistration?
+  registration   CustomerRegistration?
 
   @@index([customerId])
   @@map("users")
 }
 
+/// A tenant or customer role. A master role is recognised by `systemKey`
+/// only and grants every privilege of its domain; a custom role grants its
+/// stored privileges. Domain, system key and owner never change (trigger).
 model Role {
-  id          String   @id @default(uuid(7)) @db.Uuid
-  key         String   @unique @db.VarChar(100)
-  name        String   @db.VarChar(200)
-  description String?  @db.VarChar(500)
-  /// Predefined by the platform; tenants cannot edit or delete it.
-  isSystem    Boolean  @default(false) @map("is_system")
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id              String      @id @default(uuid(7)) @db.Uuid
+  /// "owner" (Master Tenant), "master_customer", or generated for custom roles.
+  key             String      @unique @default(dbgenerated("('custom_'::text || replace((gen_random_uuid())::text, '-'::text, ''::text))")) @db.VarChar(100)
+  /// Unique per scope (domain + owning main customer), case-insensitively.
+  name            String      @db.VarChar(200)
+  description     String?     @db.VarChar(500)
+  /// Predefined by the platform; tenants cannot edit or delete it. Always
+  /// equal to "has a system key" (CHECK).
+  isSystem        Boolean     @default(false) @map("is_system")
+  domain          AuthzDomain
+  /// 'master_tenant' / 'master_customer' for the master roles (CHECK).
+  systemKey       String?     @unique @map("system_key") @db.VarChar(50)
+  status          RoleStatus  @default(active)
+  /// The main customer that owns a custom customer role (required for those, empty otherwise).
+  ownerCustomerId String?     @map("owner_customer_id") @db.Uuid
+  ownerCustomer   Customer?   @relation("CustomerRoles", fields: [ownerCustomerId], references: [id], onDelete: Restrict)
+  createdById     String?     @map("created_by_id") @db.Uuid
+  createdBy       User?       @relation("RoleCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   permissions RolePermission[]
   users       UserRole[]
 
+  @@index([ownerCustomerId])
   @@map("roles")
 }
 
+/// Mirror of the tenant and customer domains of src/lib/authz/catalog.ts,
+/// written by migrations only.
 model Permission {
-  id          String   @id @default(uuid(7)) @db.Uuid
-  /// Stable identifier checked by the authorization service, e.g. "customers.create".
-  key         String   @unique @db.VarChar(100)
-  description String?  @db.VarChar(500)
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  id          String      @id @default(uuid(7)) @db.Uuid
+  /// Stable identifier checked by the authorization service, e.g. "tenant.roles.view".
+  key         String      @unique @db.VarChar(100)
+  domain      AuthzDomain
+  moduleKey   String      @map("module_key") @db.VarChar(100)
+  action      String      @db.VarChar(50)
+  /// Display text only.
+  label       String      @db.VarChar(200)
+  description String?     @db.VarChar(500)
+  sortOrder   Int         @default(0) @map("sort_order")
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
 
   roles RolePermission[]
 
+  @@index([domain, moduleKey])
   @@map("permissions")
 }
 
@@ -109,14 +158,17 @@ model RolePermission {
   @@map("role_permissions")
 }
 
+/// A user's single role. user_id is the key, so an assignment is an upsert
+/// on user_id and two roles can never coexist. A trigger checks the domain
+/// (staff ↔ tenant role, customer user ↔ customer role) and the customer scope.
 model UserRole {
-  userId    String   @map("user_id") @db.Uuid
+  userId    String   @id @map("user_id") @db.Uuid
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// A role in use cannot be deleted (RESTRICT).
   roleId    String   @map("role_id") @db.Uuid
-  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Restrict)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  @@id([userId, roleId])
   @@index([roleId])
   @@map("user_roles")
 }
@@ -126,7 +178,8 @@ model Customer {
   type      CustomerType
   name      String         @db.VarChar(200)
   status    CustomerStatus @default(active)
-  /// Set for a sub-customer. A customer cannot be its own parent (checked in the database).
+  /// Set for a sub-customer. A customer cannot be its own parent, and the
+  /// hierarchy is one level deep (both checked in the database).
   parentId  String?        @map("parent_id") @db.Uuid
   parent    Customer?      @relation("CustomerHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
   children  Customer[]     @relation("CustomerHierarchy")
@@ -134,6 +187,8 @@ model Customer {
   updatedAt DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   users         User[]
+  /// Custom customer roles owned by this (main) customer.
+  roles         Role[]         @relation("CustomerRoles")
   artists       Artist[]
   labels        Label[]
   audioReleases AudioRelease[]

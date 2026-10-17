@@ -7,7 +7,7 @@ import { getAppearanceState, saveAppearance } from "@/lib/appearance/service";
 import { DEFAULT_APPEARANCE, type Appearance } from "@/lib/appearance/preferences";
 import { createSession, revokeSession, validateSession, type PlatformSession } from "@/lib/platform-auth/session";
 import { closeAppDatabase } from "./support/app-connections";
-import { clearPlatformTables, connectToTestDatabase, insertOwner } from "./support/postgres";
+import { clearPlatformTables, connectToTestDatabase, insertOwner, insertPlatformRole } from "./support/postgres";
 
 const HASH = "$argon2id$v=19$m=19456,t=2,p=1$c2FsdHNhbHQ$aGFzaGhhc2hoYXNo";
 const DARK: Appearance = { theme: "dark", accent: "violet", width: "focused" };
@@ -18,17 +18,35 @@ let b: PlatformSession;
 let tokenA: string;
 
 /**
+ * Description: Create a custom platform role WITHOUT the global appearance privilege.
+ * Input: None.
+ * Output: The new role's id (it holds platform.tenants.view only).
+ * Use case: Owners limited to their personal appearance (the privilege replaced
+ *   the old can_manage_appearance column).
+ * Author: Mr. Sachin Sharma
+ * Created date: 2026-10-16
+ * Last modified date: 2026-10-16
+ */
+async function personalOnlyRole(): Promise<string> {
+  return insertPlatformRole(db, {
+    name: `VT personal appearance ${randomBytes(4).toString("hex")}`,
+    permissionKeys: ["platform.tenants.view"],
+  });
+}
+
+/**
  * Description: Create an isolated scratch-database owner and authenticated session.
- * Input: Whether this test owner can change the global appearance.
+ * Input: Whether this test owner can change the global appearance (Master
+ *   Platform when true; a custom role without platform.appearance.manage_global when false).
  * Output: The verified session and its cookie token for auth regression tests.
  * Use case: Test each permission scope without relying on seeded platform users.
  * Author: Mr. Sachin Sharma
  * Created date: 2026-10-14
- * Last modified date: 2026-10-14
+ * Last modified date: 2026-10-16
  */
 async function account(canManageAppearance = true) {
-  const id = await insertOwner(db, { username: `vt-appearance-${randomBytes(4).toString("hex")}`, passwordHash: HASH });
-  if (!canManageAppearance) await db.query("UPDATE platform_owners SET can_manage_appearance = false WHERE id = $1", [id]);
+  const roleId = canManageAppearance ? undefined : await personalOnlyRole();
+  const id = await insertOwner(db, { username: `vt-appearance-${randomBytes(4).toString("hex")}`, passwordHash: HASH, roleId });
   const token = await createSession(id, HASH);
   if (!token) throw new Error("no session");
   const session = await validateSession(token);
@@ -207,7 +225,7 @@ describe("global defaults and safe resets", () => {
   });
 
   it("checks the persisted permission again after the authenticated page was rendered", async () => {
-    await db.query("UPDATE platform_owners SET can_manage_appearance = false WHERE id = $1", [a.owner.id]);
+    await db.query("UPDATE platform_owners SET role_id = $2 WHERE id = $1", [a.owner.id, await personalOnlyRole()]);
     expect(await apply(a, DARK, "global")).toMatchObject({ ok: false });
     expect(await reset(a, "global")).toMatchObject({ ok: false });
     expect(await apply(a, DARK)).toMatchObject({ ok: true });

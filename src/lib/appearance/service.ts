@@ -1,6 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { recordAudit } from "@/lib/audit";
+import { loadPlatformAccess } from "@/lib/authz/platform-access";
 import { getControlDb, type ControlDb } from "@/lib/db/control";
 import { SESSION_IDLE_TIMEOUT_MS, type PlatformSession } from "@/lib/platform-auth/session";
 import {
@@ -16,18 +17,24 @@ import { UUID_PATTERN } from "@/lib/uuid";
 export type { AppearanceState } from "./preferences";
 
 const GLOBAL_ID = "platform";
-type AppearanceDb = Pick<ControlDb, "platformOwner" | "platformAppearance">;
+// The privilege that replaced the old platform_owners.can_manage_appearance
+// column (.vibe/memory/role-privilege-management.md).
+const GLOBAL_APPEARANCE_PRIVILEGE = "platform.appearance.manage_global";
+type AppearanceDb = Pick<ControlDb, "platformOwner" | "platformAppearance" | "platformModuleSetting">;
 
 /**
  * Description: Read the current account and global appearance without private peers.
  * Input: A control database/transaction and an optional server-authenticated owner ID.
- * Output: The complete resolved appearance, its source, and global permission.
+ * Output: The complete resolved appearance, its source, and whether the owner
+ *   currently holds the platform.appearance.manage_global privilege (resolved
+ *   from the owner's role and the module switches, read fresh).
  * Use case: First render, background refresh, and uncached post-transaction results.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-14
+ * Last modified: 2026-10-16
  */
 async function readState(db: AppearanceDb, ownerId?: string): Promise<AppearanceState> {
+  // Step 1: the global default and the (active) owner's personal override.
   const [globalRow, owner] = await Promise.all([
     db.platformAppearance.findUnique({ where: { id: GLOBAL_ID }, select: { theme: true, accent: true, width: true } }),
     ownerId && UUID_PATTERN.test(ownerId)
@@ -35,12 +42,17 @@ async function readState(db: AppearanceDb, ownerId?: string): Promise<Appearance
           where: { id: ownerId, status: "active" },
           select: {
             id: true,
-            canManageAppearance: true,
             personalAppearance: { select: { theme: true, accent: true, width: true } },
           },
         })
       : null,
   ]);
+
+  // Step 2: the global permission comes from the owner's role (deny by default).
+  const access          = owner ? await loadPlatformAccess(db, owner.id) : null;
+  const canManageGlobal = access?.can(GLOBAL_APPEARANCE_PRIVILEGE) === true;
+
+  // Step 3: personal → global → application default.
   const personal = parseAppearance(owner?.personalAppearance);
   const global   = parseAppearance(globalRow);
   return {
@@ -48,7 +60,7 @@ async function readState(db: AppearanceDb, ownerId?: string): Promise<Appearance
     personal,
     global,
     ...resolveAppearance(personal, global),
-    canManageGlobal: owner?.canManageAppearance === true,
+    canManageGlobal,
   };
 }
 
@@ -74,9 +86,11 @@ export const getAppearanceState = cache(async (ownerId?: string): Promise<Appear
  * global reset leaves every personal override intact. An exclusive owner row lock
  * serializes that owner's writes before checking override existence; a shared
  * session lock still protects against revocation after a page was rendered.
+ * Global changes need the platform.appearance.manage_global privilege, resolved
+ * from the owner's role inside the same transaction, after the lock.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-14
+ * Last modified: 2026-10-16
  */
 export async function saveAppearance(
   session: PlatformSession,
@@ -97,8 +111,8 @@ export async function saveAppearance(
     // serializes personal creates/resets with global apply, so updateMany cannot
     // miss a concurrently created override and return an unexpected old setting.
     // Keep only a shared session lock: revocation still waits until this commits.
-    const owners = await tx.$queryRaw<{ canManageAppearance: boolean }[]>`
-      SELECT o."can_manage_appearance" AS "canManageAppearance"
+    const owners = await tx.$queryRaw<{ id: string }[]>`
+      SELECT o."id"::text AS "id"
       FROM "platform_owners" o
       JOIN "platform_owner_sessions" s ON s."owner_id" = o."id"
       WHERE o."id" = ${session.owner.id}::uuid
@@ -111,8 +125,13 @@ export async function saveAppearance(
     if (!owner) {
       return { ok: false, error: "Your session has expired. Sign in again to save appearance settings." };
     }
-    if (update.scope === "global" && !owner.canManageAppearance) {
-      return { ok: false, error: "You do not have permission to change appearance for all users." };
+    // The global scope needs the privilege, read fresh under the owner lock
+    // (a role change of this owner waits for this transaction).
+    if (update.scope === "global") {
+      const access = await loadPlatformAccess(tx, session.owner.id);
+      if (!access.can(GLOBAL_APPEARANCE_PRIVILEGE)) {
+        return { ok: false, error: "You do not have permission to change appearance for all users." };
+      }
     }
 
     if (update.scope === "personal") {

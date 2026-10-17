@@ -407,26 +407,43 @@ async function createInitialAdmin(ctx: StepContext): Promise<void> {
   }
 }
 
+// The Master Tenant role (.vibe/memory/role-privilege-management.md). Its key
+// stays "owner" (existing databases); it is recognised by its system key.
+const MASTER_TENANT_DESCRIPTION =
+  "Every tenant privilege, including privileges added later. It cannot be edited, disabled or deleted.";
+
 /**
- * Description: Write the owner role, the admin user and its role link.
+ * Description: Write the Master Tenant role, the admin user and its role link.
  * Input: The tenant-role client, the admin's names and the pending password hash.
- * Output: Nothing; an existing admin keeps its row (only a pending hash is applied).
+ * Output: Nothing. The role with key "owner" is upserted as Master Tenant
+ *   (name, tenant domain, system key master_tenant, active; never back to
+ *   "Owner"); an existing admin keeps its row (only a pending hash is applied);
+ *   the admin becomes the primary staff account (unless another one already
+ *   is) and holds exactly Master Tenant (user_roles is keyed by user_id).
  * Use case: createInitialAdmin.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 async function writeInitialAdmin(
   client: Client,
   admin: { username: string; email: string; name: string },
   pendingHash: string | null,
 ): Promise<void> {
+  // Step 1: the Master Tenant role (the rbac migration normally created it already).
   const role = await client.query<{ id: string }>(
-    `INSERT INTO roles (id, key, name, is_system, updated_at)
-     VALUES ($1, 'owner', 'Owner', true, now())
-     ON CONFLICT (key) DO UPDATE SET name = EXCLUDED.name, is_system = true, updated_at = now()
+    `INSERT INTO roles (id, key, name, description, is_system, domain, system_key, status, updated_at)
+     VALUES ($1, 'owner', 'Master Tenant', $2, true, 'tenant', 'master_tenant', 'active', now())
+     ON CONFLICT (key) DO UPDATE SET
+       name        = EXCLUDED.name,
+       description = EXCLUDED.description,
+       is_system   = true,
+       domain      = 'tenant',
+       system_key  = 'master_tenant',
+       status      = 'active',
+       updated_at  = now()
      RETURNING id`,
-    [randomUUID()],
+    [randomUUID(), MASTER_TENANT_DESCRIPTION],
   );
   const roleId = role.rows[0]?.id as string;
 
@@ -464,8 +481,19 @@ async function writeInitialAdmin(
       [userId, admin.email, admin.username, pendingHash, admin.name],
     );
   }
+
+  // Step 2: the primary staff account (one at most: partial unique index).
   await client.query(
-    "INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+    `UPDATE users SET is_primary = true, updated_at = now()
+     WHERE id = $1 AND customer_id IS NULL AND NOT is_primary
+       AND NOT EXISTS (SELECT 1 FROM users p WHERE p.is_primary AND p.customer_id IS NULL AND p.id <> $1)`,
+    [userId],
+  );
+
+  // Step 3: exactly one role — Master Tenant (an upsert on the user's single row).
+  await client.query(
+    `INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)
+     ON CONFLICT (user_id) DO UPDATE SET role_id = EXCLUDED.role_id`,
     [userId, roleId],
   );
 }
@@ -515,12 +543,13 @@ async function subdomainRow(tenantId: string) {
 /**
  * Description: Step verify: confirm the tenant is ready to serve.
  * Input: The step context.
- * Output: Nothing. The subdomain resolves, the runtime login works, the admin is an
- *   active owner and the schema is at the latest version.
+ * Output: Nothing. The subdomain resolves, the runtime login works, the admin is
+ *   active and holds the Master Tenant role (recognised by its system key), and
+ *   the schema is at the latest version.
  * Use case: Every plan (last step).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 async function verify(ctx: StepContext): Promise<void> {
   await verifySubdomain(ctx);
@@ -532,14 +561,14 @@ async function verify(ctx: StepContext): Promise<void> {
     const admin = await client.query(
       `SELECT 1 FROM users u
        JOIN user_roles ur ON ur.user_id = u.id
-       JOIN roles r ON r.id = ur.role_id AND r.key = 'owner'
+       JOIN roles r ON r.id = ur.role_id AND r.system_key = 'master_tenant' AND r.status = 'active'
        WHERE u.username = $1 AND u.status = 'active' AND u.password_hash IS NOT NULL`,
       [ctx.tenant.adminUsername],
     );
     if ((admin.rowCount ?? 0) === 0) {
       throw new ProvisioningError(
         "invalid_state",
-        "The tenant admin account is missing from the tenant database or is not an active owner.",
+        "The tenant admin account is missing from the tenant database or does not hold the Master Tenant role.",
       );
     }
   });

@@ -3,7 +3,9 @@
  * Tenant Management Server Actions (docs/tenant-management.md §8.7).
  *
  * Each one is a public HTTP endpoint, so each is thin and assumes nothing:
- * the session is checked first, every argument is re-validated (types
+ * the session AND the action's privilege are checked first
+ * (authorizePlatformAction: a refusal is audited as authz.denied and answered
+ * in the action's normal error shape), every argument is re-validated (types
  * included), the service does the work, and the result is a plain object
  * with safe messages. No result carries a password, except the generated
  * master password of a successful auto-mode create.
@@ -11,7 +13,8 @@
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
-import { requirePlatformOwner } from "@/lib/platform-auth/dal";
+import type { PlatformPermissionKey } from "@/lib/authz/catalog";
+import { authorizePlatformAction } from "@/lib/authz/platform";
 import { clientIpFromForwardedFor } from "@/lib/platform-auth/rate-limit";
 import { describeError } from "@/lib/platform-auth/session";
 import { MAX_PROFILE_IMAGE_BYTES } from "@/lib/storage/image";
@@ -31,6 +34,7 @@ import {
 import type {
   ConnectionTestResult,
   CreateTenantActionState,
+  ForbiddenFailure,
   PreviewResult,
   TenantCountRecordsResult,
   TenantLifecycleActionResult,
@@ -40,20 +44,38 @@ import type {
 const TENANTS_PATH = "/platform/tenants";
 
 /**
- * Description: Identify the signed-in owner and the client address for a tenant action.
- * Input: None (reads the session cookie and X-Forwarded-For).
- * Output: The actor (owner id from the session, never the request body, and IP);
- *   a signed-out caller is redirected to the login page.
- * Use case: Every tenant Server Action.
+ * Description: Authorize a tenant action by privilege and identify its actor.
+ * Input: The platform privilege the action needs.
+ * Output: { ok: true, actor } (owner id from the session, never the request
+ *   body, and the client IP), or { ok: false, error } with the friendly
+ *   refusal (audited as authz.denied). A signed-out caller is redirected to
+ *   the login page.
+ * Use case: Every tenant Server Action, before it reads or changes anything.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
-async function currentActor(): Promise<TenantActor> {
-  const { owner } = await requirePlatformOwner();
-  const ipAddress = clientIpFromForwardedFor((await headers()).get("x-forwarded-for"));
+async function authorizeActor(
+  permission: PlatformPermissionKey,
+): Promise<{ ok: true; actor: TenantActor } | { ok: false; error: string }> {
   // The limiter's "unknown" bucket is not an address; the audit stores NULL for it anyway.
-  return { ownerId: owner.id, ipAddress };
+  const ipAddress     = clientIpFromForwardedFor((await headers()).get("x-forwarded-for"));
+  const authorization = await authorizePlatformAction(permission, { ipAddress });
+  if (!authorization.ok) return { ok: false, error: authorization.error };
+  return { ok: true, actor: { ownerId: authorization.session.owner.id, ipAddress } };
+}
+
+/**
+ * Description: Build the refusal of an action whose privilege is missing.
+ * Input: The friendly message from authorizePlatformAction.
+ * Output: The shared ForbiddenFailure shape ({ ok: false, reason: "forbidden", message }).
+ * Use case: Lifecycle and preview actions of this file.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-16
+ * Last modified: 2026-10-16
+ */
+function forbidden(message: string): ForbiddenFailure {
+  return { ok: false, reason: "forbidden", message };
 }
 
 /**
@@ -90,17 +112,20 @@ function revalidateTenant(tenantId: string): void {
  * Input: The previous form state (unused) and the submitted FormData.
  * Output: "created" with the tenant id (and the generated master password once), or
  *   "error" with field errors, the failed checks and/or a form message. Setup is
- *   scheduled with after() once the response is sent.
+ *   scheduled with after() once the response is sent. Needs
+ *   platform.tenants.create (a refusal is a form-level error).
  * Use case: The create form (useActionState).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 export async function createTenantAction(
   _previousState: CreateTenantActionState,
   formData: FormData,
 ): Promise<CreateTenantActionState> {
-  const actor = await currentActor();
+  const authorization = await authorizeActor("platform.tenants.create");
+  if (!authorization.ok) return { status: "error", formError: authorization.error, fieldErrors: {} };
+  const { actor } = authorization;
   /**
    * Description: Read one FormData field as text.
    * Input: The field name.
@@ -178,30 +203,36 @@ export async function createTenantAction(
 /**
  * Description: Generate the Auto-Generate values for a full name.
  * Input: The typed full name.
- * Output: The preview values or a rate-limit/unavailable message.
+ * Output: The preview values or a rate-limit/unavailable/forbidden message
+ *   (needs platform.tenants.create).
  * Use case: The create form's debounced preview and Regenerate.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 export async function previewTenantValuesAction(fullName: string): Promise<PreviewResult> {
-  const actor = await currentActor();
-  return previewGeneratedValues(text(fullName), actor);
+  const authorization = await authorizeActor("platform.tenants.create");
+  if (!authorization.ok) return forbidden(authorization.error);
+  return previewGeneratedValues(text(fullName), authorization.actor);
 }
 
 /**
  * Description: Test an existing database's connection without saving.
  * Input: The typed database name, user, password and port (untrusted).
- * Output: The check list, field errors, or a rate-limit/unavailable message.
+ * Output: The check list, field errors, or a rate-limit/unavailable/forbidden
+ *   message (needs platform.tenants.create).
  * Use case: The create form's Test connection button.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 export async function testDatabaseConnectionAction(
   input: TestConnectionInput,
 ): Promise<ConnectionTestResult> {
-  const actor  = await currentActor();
+  const authorization = await authorizeActor("platform.tenants.create");
+  if (!authorization.ok) return { kind: "error", reason: "forbidden", message: authorization.error };
+  const { actor } = authorization;
+
   const values = (typeof input === "object" && input !== null ? input : {}) as Record<string, unknown>;
   return testDatabaseConnection(
     {
@@ -217,17 +248,21 @@ export async function testDatabaseConnectionAction(
 /**
  * Description: Suspend a tenant.
  * Input: The tenant id and the reason.
- * Output: ok, or a safe refusal; the pages are revalidated on success.
+ * Output: ok, or a safe refusal (also without platform.tenants.suspend); the
+ *   pages are revalidated on success.
  * Use case: The Suspend confirmation (directory menu, details page).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 export async function suspendTenantAction(
   tenantId: string,
   reason: string,
 ): Promise<TenantLifecycleActionResult> {
-  const actor  = await currentActor();
+  const authorization = await authorizeActor("platform.tenants.suspend");
+  if (!authorization.ok) return forbidden(authorization.error);
+  const { actor } = authorization;
+
   const id     = text(tenantId);
   const result = await suspendTenant(id, text(reason), actor);
   if (result.ok) revalidateTenant(id);
@@ -237,14 +272,18 @@ export async function suspendTenantAction(
 /**
  * Description: Reactivate a suspended tenant.
  * Input: The tenant id.
- * Output: ok, or a safe refusal; the pages are revalidated on success.
+ * Output: ok, or a safe refusal (also without platform.tenants.suspend); the
+ *   pages are revalidated on success.
  * Use case: The Reactivate confirmation.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 export async function reactivateTenantAction(tenantId: string): Promise<TenantLifecycleActionResult> {
-  const actor  = await currentActor();
+  const authorization = await authorizeActor("platform.tenants.suspend");
+  if (!authorization.ok) return forbidden(authorization.error);
+  const { actor } = authorization;
+
   const id     = text(tenantId);
   const result = await reactivateTenant(id, actor);
   if (result.ok) revalidateTenant(id);
@@ -254,14 +293,18 @@ export async function reactivateTenantAction(tenantId: string): Promise<TenantLi
 /**
  * Description: Retry a tenant's failed or interrupted setup.
  * Input: The tenant id.
- * Output: ok (setup is scheduled after the response), or a safe refusal.
+ * Output: ok (setup is scheduled after the response), or a safe refusal (also
+ *   without platform.tenants.provision).
  * Use case: The Retry setup confirmation.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 export async function retryProvisioningAction(tenantId: string): Promise<TenantLifecycleActionResult> {
-  const actor  = await currentActor();
+  const authorization = await authorizeActor("platform.tenants.provision");
+  if (!authorization.ok) return forbidden(authorization.error);
+  const { actor } = authorization;
+
   const id     = text(tenantId);
   const result = await retryProvisioning(id, actor);
   if (result.ok) {
@@ -281,19 +324,22 @@ const COUNT_RECORDS_INVALID = "This list is not available.";
  * Input: The count's source (summary category, or the directory search and
  *   status) and the page number; both untrusted and validated here.
  * Output: The page's tenants (id, name, status, created date only), the total
- *   and the page count; or a safe message on invalid input or a database error.
+ *   and the page count; or a safe message on invalid input, a database error or
+ *   a missing platform.tenants.view privilege.
  * Use case: Count-details dialogs of the dashboard and the tenant directory
  *   (CLAUDE.md count transparency), loaded on demand with server-side paging.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-15
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 export async function loadTenantCountRecordsAction(
   source: unknown,
   page: unknown,
 ): Promise<TenantCountRecordsResult> {
-  // Step 1: only a signed-in platform owner (otherwise a redirect to login).
-  await requirePlatformOwner();
+  // Step 1: a signed-in owner with platform.tenants.view (otherwise a redirect
+  // to login, or the friendly refusal, audited).
+  const authorization = await authorizeActor("platform.tenants.view");
+  if (!authorization.ok) return { ok: false, message: authorization.error };
 
   // Step 2: validate both arguments; this endpoint is public HTTP.
   const parsedSource = parseTenantCountSource(source);

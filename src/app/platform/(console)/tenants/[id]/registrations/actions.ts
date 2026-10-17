@@ -1,7 +1,8 @@
 "use server";
 
 import { headers } from "next/headers";
-import { requirePlatformOwner } from "@/lib/platform-auth/dal";
+import type { PlatformPermissionKey } from "@/lib/authz/catalog";
+import { authorizePlatformAction, type PlatformAuthorization } from "@/lib/authz/platform";
 import { clientIpFromForwardedFor } from "@/lib/platform-auth/rate-limit";
 import { describeError } from "@/lib/platform-auth/session";
 import { openTenantForPlatformOwner } from "@/lib/workspace/platform-access";
@@ -49,10 +50,26 @@ async function clientIp(): Promise<string> {
 }
 
 /**
+ * Description: Authorize one registrations action by its platform privilege.
+ * Input: The privilege (platform.tenant_registrations.view / review / suspend).
+ * Output: The authorization ({ ok: true, session, access } or { ok: false,
+ *   error } — refusals are audited as authz.denied with the client address).
+ *   A signed-out caller is redirected to the login page.
+ * Use case: Every action of this file, before the tenant database is opened.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-16
+ * Last modified: 2026-10-16
+ */
+async function authorize(permission: PlatformPermissionKey): Promise<PlatformAuthorization> {
+  return authorizePlatformAction(permission, { ipAddress: await clientIp() });
+}
+
+/**
  * Description: Load the registrations behind a summary figure (one page) for a Platform Owner.
  * Input: The tenant id (bound by the page), the filter and the page (untrusted).
  * Output: The page of registrations, or a friendly error.
- * Use case: Count-details popups on /platform/tenants/<id>/registrations.
+ * Use case: Count-details popups on /platform/tenants/<id>/registrations
+ *   (needs platform.tenant_registrations.view).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-16
  * Last modified: 2026-10-16
@@ -62,7 +79,8 @@ export async function loadPlatformRegistrationRecordsAction(
   filter: unknown,
   page: unknown,
 ): Promise<RegistrationRecordsResult> {
-  await requirePlatformOwner();
+  const authorization = await authorize("platform.tenant_registrations.view");
+  if (!authorization.ok) return { ok: false, error: authorization.error };
   const status = parseRegistrationFilter(filter);
   if (!status) return { ok: false, error: "Choose a valid group of registrations." };
   const access = await openTenantForPlatformOwner(textOf(tenantId));
@@ -80,7 +98,8 @@ export async function loadPlatformRegistrationRecordsAction(
  * Description: Approve a pending registration of a tenant as a Platform Owner.
  * Input: The tenant id (bound by the page) and the registration id (untrusted).
  * Output: Success message or a friendly error.
- * Use case: Approve on /platform/tenants/<id>/registrations.
+ * Use case: Approve on /platform/tenants/<id>/registrations
+ *   (needs platform.tenant_registrations.review).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-16
  * Last modified: 2026-10-16
@@ -89,7 +108,10 @@ export async function approvePlatformRegistrationAction(
   tenantId: unknown,
   registrationId: unknown,
 ): Promise<RegistrationActionResult> {
-  const session = await requirePlatformOwner();
+  const authorization = await authorize("platform.tenant_registrations.review");
+  if (!authorization.ok) return { ok: false, error: authorization.error };
+  const { session } = authorization;
+
   const access  = await openTenantForPlatformOwner(textOf(tenantId));
   if (!access.ok) return { ok: false, error: TENANT_UNAVAILABLE };
   const outcome = await approveRegistration(
@@ -106,7 +128,8 @@ export async function approvePlatformRegistrationAction(
  * Description: Reject a pending registration of a tenant as a Platform Owner.
  * Input: The tenant id (bound by the page), the registration id and the reason (untrusted).
  * Output: Success message or a friendly error.
- * Use case: Reject on /platform/tenants/<id>/registrations.
+ * Use case: Reject on /platform/tenants/<id>/registrations
+ *   (needs platform.tenant_registrations.review).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-16
  * Last modified: 2026-10-16
@@ -116,7 +139,10 @@ export async function rejectPlatformRegistrationAction(
   registrationId: unknown,
   reason: unknown,
 ): Promise<RegistrationActionResult> {
-  const session = await requirePlatformOwner();
+  const authorization = await authorize("platform.tenant_registrations.review");
+  if (!authorization.ok) return { ok: false, error: authorization.error };
+  const { session } = authorization;
+
   const access  = await openTenantForPlatformOwner(textOf(tenantId));
   if (!access.ok) return { ok: false, error: TENANT_UNAVAILABLE };
   const outcome = await rejectRegistration(
@@ -134,7 +160,8 @@ export async function rejectPlatformRegistrationAction(
  * Description: Suspend the customer account of an approved registration as a Platform Owner.
  * Input: The tenant id (bound by the page) and the registration id (untrusted).
  * Output: Success message or a friendly error.
- * Use case: Suspend on /platform/tenants/<id>/registrations.
+ * Use case: Suspend on /platform/tenants/<id>/registrations
+ *   (needs platform.tenant_registrations.suspend).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-16
  * Last modified: 2026-10-16
@@ -143,7 +170,10 @@ export async function suspendPlatformCustomerAction(
   tenantId: unknown,
   registrationId: unknown,
 ): Promise<RegistrationActionResult> {
-  const session = await requirePlatformOwner();
+  const authorization = await authorize("platform.tenant_registrations.suspend");
+  if (!authorization.ok) return { ok: false, error: authorization.error };
+  const { session } = authorization;
+
   const access  = await openTenantForPlatformOwner(textOf(tenantId));
   if (!access.ok) return { ok: false, error: TENANT_UNAVAILABLE };
   const outcome = await setCustomerAccountStatus(
@@ -161,7 +191,8 @@ export async function suspendPlatformCustomerAction(
  * Description: Reactivate a suspended customer account as a Platform Owner.
  * Input: The tenant id (bound by the page) and the registration id (untrusted).
  * Output: Success message or a friendly error.
- * Use case: Reactivate on /platform/tenants/<id>/registrations.
+ * Use case: Reactivate on /platform/tenants/<id>/registrations
+ *   (needs platform.tenant_registrations.suspend).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-16
  * Last modified: 2026-10-16
@@ -170,7 +201,10 @@ export async function reactivatePlatformCustomerAction(
   tenantId: unknown,
   registrationId: unknown,
 ): Promise<RegistrationActionResult> {
-  const session = await requirePlatformOwner();
+  const authorization = await authorize("platform.tenant_registrations.suspend");
+  if (!authorization.ok) return { ok: false, error: authorization.error };
+  const { session } = authorization;
+
   const access  = await openTenantForPlatformOwner(textOf(tenantId));
   if (!access.ok) return { ok: false, error: TENANT_UNAVAILABLE };
   const outcome = await setCustomerAccountStatus(

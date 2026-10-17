@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { getInitials } from "@/app/platform/(console)/_components/initials";
 import {
+  filterNavSections,
   findActiveNavItem,
   getNavItem,
   isNavItemActive,
@@ -17,9 +18,47 @@ describe("the platform navigation", () => {
     }
   });
 
-  it("offers dashboard, tenant management, and settings; other modules remain planned", () => {
+  it("offers dashboard, tenant management, roles, sub-platform owners and settings; other modules remain planned", () => {
     const available = PLATFORM_NAV_ITEMS.filter((item) => item.status === "available");
-    expect(available.map((item) => item.id)).toEqual(["dashboard", "tenants", "settings"]);
+    expect(available.map((item) => item.id)).toEqual(["dashboard", "tenants", "roles", "users", "settings"]);
+  });
+
+  it("gates each managed module by its privilege (role-privilege-management.md, Navigation)", () => {
+    expect(getNavItem("tenants").permission).toBe("platform.tenants.view");
+    expect(getNavItem("roles").permission).toBe("platform.roles.view");
+    expect(getNavItem("users").permission).toBe("platform.users.view");
+    expect(getNavItem("dashboard").permission).toBeUndefined();
+    expect(getNavItem("subscriptions").permission).toBeUndefined();
+    expect(getNavItem("settings").children?.map((child) => [child.href, child.permission])).toEqual([
+      ["/platform/settings/appearance", undefined],
+      ["/platform/settings/modules", "platform.modules.manage"],
+    ]);
+  });
+});
+
+describe("filterNavSections", () => {
+  const ids = (permissions: string[]) =>
+    filterNavSections(permissions).flatMap((section) => section.items.map((item) => item.id));
+
+  it("shows only ungated items without privileges", () => {
+    expect(ids([])).toEqual(["dashboard", "subscriptions", "settings", "support"]);
+    const settings = filterNavSections([]).flatMap((section) => section.items).find((item) => item.id === "settings");
+    expect(settings?.children?.map((child) => child.label)).toEqual(["Appearance"]);
+  });
+
+  it("adds each gated item and child only with its privilege", () => {
+    expect(ids(["platform.tenants.view"])).toEqual(["dashboard", "tenants", "subscriptions", "settings", "support"]);
+    expect(ids(["platform.roles.view", "platform.users.view"])).toEqual([
+      "dashboard", "roles", "users", "subscriptions", "settings", "support",
+    ]);
+    const settings = filterNavSections(["platform.modules.manage"]).flatMap((section) => section.items).find((item) => item.id === "settings");
+    expect(settings?.children?.map((child) => child.label)).toEqual(["Appearance", "Modules"]);
+  });
+
+  it("finds the active item only among the visible ones when asked", () => {
+    const visible = filterNavSections([]).flatMap((section) => section.items);
+    expect(findActiveNavItem("/platform/tenants/abc", visible)).toBeUndefined();
+    expect(findActiveNavItem("/platform/tenants/abc")?.id).toBe("tenants");
   });
 });
 

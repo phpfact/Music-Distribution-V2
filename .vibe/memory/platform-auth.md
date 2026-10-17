@@ -112,3 +112,21 @@ of a protected page after logout, and functions without the mandatory doc block
 - 2026-10-15: Verification of the compliance pass: TypeScript (including tests)
   and ESLint (zero warnings) pass; the full Vitest suite passes in the app
   container: 37 files, 1136 tests, 1 pre-existing localhost-only skip.
+
+## RBAC foundation (2026-10-16)
+
+- Every platform owner holds exactly one role (`platform_owners.role_id`, NOT
+  NULL, RESTRICT). The seed bootstrap creates the first owner as the primary
+  account (`is_primary`) with the Master Platform role (found by system key);
+  `--rotate-password` is unchanged and never touches role or primary flag.
+- `requirePlatformOwner()` stays the session-only guard. New guards in
+  `src/lib/authz/platform.ts`: `getPlatformAccess()`, `requirePlatformAccess()`,
+  `authorizePlatformAction(permission, { ipAddress })` (privileges read fresh
+  per request; refusals audited as `authz.denied`). Later tasks move the
+  console pages and actions to them (role-privilege-management.md).
+
+### Change history
+
+- 2026-10-16: Seed bootstrap assigns Master Platform + primary; the rbac
+  migration mapped existing owners (oldest active → primary master, others →
+  legacy custom roles with only their previous capabilities).

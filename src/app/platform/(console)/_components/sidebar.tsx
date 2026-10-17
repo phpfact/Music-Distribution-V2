@@ -7,11 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { getNavItem, isNavItemActive, PLATFORM_NAV_SECTIONS, type PlatformNavItem } from "../navigation";
+import { getNavItem, isNavItemActive, type PlatformNavItem, type PlatformNavSection } from "../navigation";
 import { Icon } from "./icons";
 import { FOCUS_RING } from "./styles";
 
 type SidebarProps = {
+  /** The navigation the owner may see (already filtered by privilege). */
+  sections: readonly PlatformNavSection[];
   collapsed: boolean;
   onNavigate?: () => void;
   headerAction?: ReactNode;
@@ -19,15 +21,16 @@ type SidebarProps = {
 };
 
 /**
- * Render the existing navigation registry in the desktop sidebar or Sheet.
- * Input: collapsed layout, optional close-on-navigation callback and extra controls.
+ * Description: Render the existing navigation registry in the desktop sidebar or Sheet.
+ * Input: the privilege-filtered sections, collapsed layout, optional
+ *   close-on-navigation callback and extra controls.
  * Output: semantic grouped links composed with shadcn Button and Tooltip.
  * Use case: share route labels, active states, and accessible collapsed navigation.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-15
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
-export function Sidebar({ collapsed, onNavigate, headerAction, footer }: SidebarProps) {
+export function Sidebar({ sections, collapsed, onNavigate, headerAction, footer }: SidebarProps) {
   const pathname = usePathname();
   const idPrefix = useId();
 
@@ -48,7 +51,7 @@ export function Sidebar({ collapsed, onNavigate, headerAction, footer }: Sidebar
 
         <nav aria-label="Platform" className="min-h-0 flex-1 overflow-y-auto px-3 py-5">
           <div className={`flex flex-col ${collapsed ? "gap-3" : "gap-6"}`}>
-            {PLATFORM_NAV_SECTIONS.map((section, index) => {
+            {sections.map((section, index) => {
               const labelId = `${idPrefix}-${section.id}`;
               return (
                 <div key={section.id}>
@@ -58,7 +61,7 @@ export function Sidebar({ collapsed, onNavigate, headerAction, footer }: Sidebar
                     {section.items.map((item) => (
                       <li key={item.id}>
                         <SidebarLink item={item} active={isNavItemActive(item, pathname)} collapsed={collapsed} onNavigate={onNavigate} />
-                        {item.children && !collapsed ? (
+                        {item.children && item.children.length > 0 && !collapsed ? (
                           <ul className="ml-5 mt-1 space-y-1 border-l border-border pl-3" aria-label={`${item.label} pages`}>
                             {item.children.map((child) => {
                               const active = pathname === child.href || pathname.startsWith(`${child.href}/`);
@@ -93,7 +96,7 @@ type SidebarLinkProps = {
 };
 
 /**
- * Compose a navigation link and its optional collapsed-mode tooltip.
+ * Description: Compose a navigation link and its optional collapsed-mode tooltip.
  * Input: the registry item, route match, layout state and navigation callback.
  * Output: one accessible link with persistent current-page and planned labels.
  * Use case: show active navigation without relying on color alone.

@@ -9,7 +9,7 @@ import { saveViewerAppearance } from "@/lib/workspace/appearance";
 import type { WorkspaceAppearanceActionResult } from "@/lib/workspace/appearance-options";
 import { getWorkspace } from "@/lib/workspace/context";
 import { WORKSPACE_COOKIES, workspaceCookieOptions } from "@/lib/workspace/cookies";
-import { LOGIN_PATH, requireCustomer } from "@/lib/workspace/guards";
+import { LOGIN_PATH, readAreaFingerprint, requireCustomer, type AreaFingerprint } from "@/lib/workspace/guards";
 import { revokeUserSession } from "@/lib/workspace/sessions";
 import { CUSTOMER_BASE_PATH } from "./navigation";
 
@@ -62,11 +62,11 @@ export async function saveCustomerAppearanceAction(input: unknown): Promise<Work
   // Step 1: a signed-in customer of this host (redirects otherwise).
   const area = await requireCustomer();
 
-  // Step 2: validate and save (isOwner is always false for customers).
+  // Step 2: validate and save (customers never manage the workspace default).
   const clientIp = clientIpFromForwardedFor((await headers()).get("x-forwarded-for"));
   const result   = await saveViewerAppearance(
     area.db,
-    { userId: area.user.id, tenantId: area.tenant.id, isOwner: false },
+    { userId: area.user.id, tenantId: area.tenant.id, canManageWorkspace: false },
     input,
     clientIp,
   );
@@ -74,4 +74,27 @@ export async function saveCustomerAppearanceAction(input: unknown): Promise<Work
   // Step 3: re-render the customer area with the new theme.
   if (result.ok) revalidatePath(CUSTOMER_BASE_PATH, "layout");
   return result;
+}
+
+/**
+ * Description: Report whether the customer session is still valid and the hash
+ *   of the user's current privileges.
+ * Input: None (Host header and the customer area cookie).
+ * Output: { signedIn, fingerprint } and nothing else. The session is validated
+ *   with touch: false (a background poll never extends the idle timeout); a
+ *   suspended customer or main customer counts as signed out. A server error is
+ *   logged and answered with a generic error, which the browser ignores.
+ * Use case: PermissionSync in the customer layout
+ *   (.vibe/memory/role-privilege-management.md).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-16
+ * Last modified: 2026-10-16
+ */
+export async function customerFingerprintAction(): Promise<AreaFingerprint> {
+  try {
+    return await readAreaFingerprint("customer");
+  } catch (error) {
+    console.error(`[authz] could not read the customer privilege fingerprint: ${describeError(error)}`);
+    throw new Error("The privilege check is unavailable right now.");
+  }
 }

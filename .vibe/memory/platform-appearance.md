@@ -174,3 +174,35 @@ proceeds under that revised requirement; browser results are not claimed.
 - 2026-10-15: Verification of the compliance pass: TypeScript (including tests)
   and ESLint (zero warnings) pass; the full Vitest suite passes in the app
   container: 37 files, 1136 tests, 1 pre-existing localhost-only skip.
+
+## RBAC: privilege replaces the column (2026-10-16)
+
+- `platform_owners.can_manage_appearance` was dropped by the rbac migration.
+  Global apply/reset now needs the `platform.appearance.manage_global`
+  privilege, resolved from the owner's role (Master Platform, or a custom role
+  storing the key) minus a platform-wide disabled `platform.appearance`
+  module (role-privilege-management.md). `canManageGlobal` in the appearance
+  state is computed the same way.
+- In `saveAppearance` the privilege is resolved inside the existing
+  transaction, after the exclusive owner row lock and the shared session lock,
+  so a role change of that owner waits for the save. Personal appearance stays
+  available to every signed-in owner.
+- Migration mapping: owners whose flag was true got "Legacy Platform Owner"
+  (with the privilege); owners whose flag was false got "Legacy Platform
+  Owner (personal appearance)" (without it).
+
+### Change history
+
+- 2026-10-16: Replaced `canManageAppearance` with the
+  `platform.appearance.manage_global` privilege; tests now model
+  personal-only owners as a custom role without that key.
+
+## RBAC enforcement (2026-10-16)
+
+- `updateAppearanceAction` with scope `global` first calls
+  `authorizePlatformAction("platform.appearance.manage_global", { ipAddress })`
+  so a refusal is audited (`authz.denied`); the service keeps its
+  in-transaction privilege check. Personal scope needs no privilege.
+- The UI's `canManageGlobal` comes from the same privilege (resolved by the
+  service from the owner's role).
+- Change history: 2026-10-16 — audited privilege check in the action.

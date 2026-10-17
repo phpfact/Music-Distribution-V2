@@ -2,6 +2,7 @@
 
 import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { authorizePlatformAction } from "@/lib/authz/platform";
 import { getPlatformSession } from "@/lib/platform-auth/dal";
 import { clientIpFromForwardedFor } from "@/lib/platform-auth/rate-limit";
 import { describeError, SESSION_COOKIE_NAME, validateSession } from "@/lib/platform-auth/session";
@@ -35,12 +36,15 @@ function sameOrigin(requestHeaders: Headers): boolean {
  * Description: Save or reset an appearance preference (personal or platform default).
  * Input: The operation, scope, appearance (apply only) and the account-switch guard.
  * Output: The new appearance state, or a friendly error (expired session, foreign
- *   origin, invalid input, account changed, save failure). Rendered pages are
- *   revalidated after a committed save; details go to the server log.
+ *   origin, invalid input, account changed, missing privilege, save failure).
+ *   A global-scope request first goes through authorizePlatformAction(
+ *   "platform.appearance.manage_global"), so a refusal is audited as
+ *   authz.denied; the service keeps its own in-transaction check. Rendered
+ *   pages are revalidated after a committed save; details go to the server log.
  * Use case: Appearance settings' Apply/Default confirmation.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 export async function updateAppearanceAction(input: {
   operation: "apply" | "reset";
@@ -60,7 +64,13 @@ export async function updateAppearanceAction(input: {
     if (update.expectedOwnerId && update.expectedOwnerId !== session.owner.id) {
       return { ok: false, error: "Your account has changed. Refresh the page before saving appearance settings." };
     }
-    const result = await saveAppearance(session, update, clientIpFromForwardedFor(requestHeaders.get("x-forwarded-for")));
+    const ipAddress = clientIpFromForwardedFor(requestHeaders.get("x-forwarded-for"));
+    // The platform default needs its privilege; the refusal is audited (personal stays open to everyone).
+    if (update.scope === "global") {
+      const authorization = await authorizePlatformAction("platform.appearance.manage_global", { ipAddress });
+      if (!authorization.ok) return { ok: false, error: authorization.error };
+    }
+    const result = await saveAppearance(session, update, ipAddress);
     if (result.ok) {
       // Cache invalidation cannot turn a committed save into a reported failure.
       try {

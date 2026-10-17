@@ -1,9 +1,10 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
+import { filterNavSections } from "../navigation";
 import { sidebarCookie } from "../sidebar-preference";
 import { Icon } from "./icons";
 import { Sidebar } from "./sidebar";
@@ -14,20 +15,26 @@ const DESKTOP_QUERY = "(min-width: 64rem)";
 
 type ConsoleShellProps = {
   username: string;
+  /** The owner's role name (or "No active role"), shown in the account menu. */
+  roleLabel: string;
+  /** The owner's granted platform privilege keys: the navigation shows only what they allow. */
+  permissions: readonly string[];
   initialCollapsed: boolean;
   children: ReactNode;
 };
 
 /**
- * Frame console pages with saved desktop navigation and a mobile shadcn Sheet.
- * Input: owner username, server-read sidebar preference, and page content.
- * Output: responsive navigation and content using the resolved account width.
+ * Description: Frame console pages with saved desktop navigation and a mobile shadcn Sheet.
+ * Input: owner username, role label, granted privilege keys, server-read
+ *   sidebar preference, and page content.
+ * Output: responsive navigation (filtered by privilege) and content using the
+ *   resolved account width.
  * Use case: preserve layout preferences and accessible mobile navigation.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
-export function ConsoleShell({ username, initialCollapsed, children }: ConsoleShellProps) {
+export function ConsoleShell({ username, roleLabel, permissions, initialCollapsed, children }: ConsoleShellProps) {
   const [collapsed, setCollapsed] = useState(initialCollapsed);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const menuToggleRef = useRef<HTMLButtonElement>(null);
@@ -35,6 +42,8 @@ export function ConsoleShell({ username, initialCollapsed, children }: ConsoleSh
   const [drawerPath, setDrawerPath] = useState(pathname);
   const asideId  = useId();
   const drawerId = useId();
+  // The navigation this owner may see (recomputed only when the privileges change).
+  const sections = useMemo(() => filterNavSections(permissions), [permissions]);
 
   // Like ThemeRoot's identity reconciliation, reset during render so even
   // back/forward navigation cannot paint or later reopen the preceding drawer.
@@ -90,6 +99,7 @@ export function ConsoleShell({ username, initialCollapsed, children }: ConsoleSh
           className={`hidden shrink-0 flex-col border-r border-border bg-card transition-[width] duration-200 motion-reduce:transition-none lg:flex ${collapsed ? "w-[4.5rem]" : "w-[17rem] overflow-hidden"}`}
         >
           <Sidebar
+            sections={sections}
             collapsed={collapsed}
             footer={
               <div className="shrink-0 border-t border-border p-3">
@@ -117,7 +127,7 @@ export function ConsoleShell({ username, initialCollapsed, children }: ConsoleSh
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <Topbar username={username} drawerId={drawerId} drawerOpen={drawerOpen} onOpenDrawer={() => setDrawerOpen(true)} menuToggleRef={menuToggleRef} />
+          <Topbar username={username} roleLabel={roleLabel} sections={sections} drawerId={drawerId} drawerOpen={drawerOpen} onOpenDrawer={() => setDrawerOpen(true)} menuToggleRef={menuToggleRef} />
           <main id="main-content" tabIndex={-1} className="relative flex-1 overflow-y-auto focus:outline-none">
             {/* Full Width removes only the content cap, keeping mobile gutters. */}
             <div style={{ maxWidth: "var(--platform-content-max-width, 96rem)" }} className="mx-auto w-full px-4 py-7 sm:px-6 lg:px-9 lg:py-9">
@@ -140,6 +150,7 @@ export function ConsoleShell({ username, initialCollapsed, children }: ConsoleSh
         <SheetTitle className="sr-only">Navigation</SheetTitle>
         <SheetDescription className="sr-only">Navigate platform administration pages.</SheetDescription>
         <Sidebar
+          sections={sections}
           collapsed={false}
           onNavigate={() => setDrawerOpen(false)}
           headerAction={

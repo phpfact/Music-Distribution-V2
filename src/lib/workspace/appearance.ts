@@ -23,8 +23,12 @@ const WORKSPACE_ROW_ID = "workspace";
 // Theme, accent and width only: exactly what an appearance is.
 const APPEARANCE_SELECT = { theme: true, accent: true, width: true } as const;
 
-/** Who saves: the signed-in user, their area and whether they own the workspace. */
-export type AppearanceViewer = { userId: string; tenantId: string; isOwner: boolean };
+/**
+ * Who saves: the signed-in user, their tenant and whether they may change the
+ * workspace default — true only when the session's effective privileges grant
+ * `tenant.appearance.manage_workspace` (area.authz; always false for customers).
+ */
+export type AppearanceViewer = { userId: string; tenantId: string; canManageWorkspace: boolean };
 
 export type AppearanceSaveResult = WorkspaceAppearanceActionResult;
 
@@ -64,17 +68,18 @@ export async function getPublicAppearance(db: TenantDb): Promise<WorkspaceAppear
 
 /**
  * Description: Read everything a signed-in page needs about its viewer's appearance.
- * Input: The tenant database and the viewer (user id, owner flag).
+ * Input: The tenant database and the viewer (user id, and whether the viewer's
+ *   privileges include tenant.appearance.manage_workspace).
  * Output: Personal override, workspace default, the rendered appearance and its
  *   source, and whether the viewer may change the workspace default.
  * Use case: The tenant and customer layouts and their Appearance pages.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-15
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 export async function getViewerAppearanceState(
   db: TenantDb,
-  viewer: Pick<AppearanceViewer, "userId" | "isOwner">,
+  viewer: Pick<AppearanceViewer, "userId" | "canManageWorkspace">,
 ): Promise<WorkspaceAppearanceState> {
   // Step 1: the two stored levels (each falls back when missing or invalid).
   const personalRow = await db.userAppearance.findUnique({ where: { userId: viewer.userId }, select: APPEARANCE_SELECT });
@@ -86,7 +91,7 @@ export async function getViewerAppearanceState(
     personal,
     workspace,
     ...resolveWorkspaceAppearance(personal, workspace),
-    canManageWorkspace: viewer.isOwner,
+    canManageWorkspace: viewer.canManageWorkspace,
   };
 }
 
@@ -96,13 +101,15 @@ export async function getViewerAppearanceState(
  *   form) and the untrusted save request.
  * Output: The new state, or a friendly error (invalid request, no permission,
  *   account no longer active, save failure). Workspace-wide changes need the
- *   owner role; "Apply to all" also updates the owner's own existing override
- *   (other users' overrides stay); "Reset all" restores the application default.
+ *   tenant.appearance.manage_workspace privilege (the Server Action authorizes
+ *   and audits it first; this check stays as defence in depth); "Apply to all"
+ *   also updates the actor's own existing override (other users' overrides
+ *   stay); "Reset all" restores the application default.
  * Use case: The appearance Server Actions of the tenant and customer areas and
  *   the header's quick theme switch.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-15
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 export async function saveViewerAppearance(
   db: TenantDb,
@@ -113,8 +120,8 @@ export async function saveViewerAppearance(
   // Step 1: the request must be one of the known operations with valid options.
   const update = parseWorkspaceAppearanceUpdate(input);
   if (!update) return { ok: false, error: "Choose a supported appearance and try again." };
-  if (update.scope === "workspace" && !viewer.isOwner) {
-    return { ok: false, error: "Only the workspace administrator can change the appearance for everyone." };
+  if (update.scope === "workspace" && !viewer.canManageWorkspace) {
+    return { ok: false, error: "You do not have permission to change the appearance for everyone." };
   }
 
   try {
@@ -137,7 +144,7 @@ export async function saveViewerAppearance(
         return true;
       }
 
-      // Workspace scope (owner only, checked above).
+      // Workspace scope (privilege checked above).
       const appearance = update.operation === "reset" ? WORKSPACE_DEFAULT_APPEARANCE : update.appearance;
       await tx.workspaceAppearance.upsert({
         where: { id: WORKSPACE_ROW_ID },
@@ -145,7 +152,7 @@ export async function saveViewerAppearance(
         update: appearance,
       });
       if (update.operation === "apply") {
-        // The owner sees the change at once even with a personal override.
+        // The actor sees the change at once even with a personal override.
         await tx.userAppearance.updateMany({ where: { userId: viewer.userId }, data: update.appearance });
       }
       return true;

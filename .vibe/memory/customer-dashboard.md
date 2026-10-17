@@ -43,3 +43,23 @@
 - 2026-10-15: Module created — owner decisions recorded before implementation.
 
 - 2026-10-16: Implemented as recorded above. Verified: TypeScript, ESLint (0 warnings), full Vitest suite 40 files / 1174 tests passed (new: workspace-rules, workspace-portal with two real provisioned tenants, workspace-http). Browser-verified on a test tenant created in the Platform Owner panel: welcome, login (errors, wrong password, admin by username/email), tenant dashboard, dark theme switch persisting after reload, customer sign-up (validation, pending login blocked), tenant-admin approval, logout + Back, customer dashboard, customer blocked from /tenant, Platform Owner registrations page (count popup, reject with reason), rejected login -> status page -> review request, Platform Owner suspension ending the active session. Not browser-verified yet: "Apply to everyone" appearance, phone/tablet layouts.
+
+## RBAC (2026-10-16)
+
+- Navigation: NEW "Account" group with Sub-Customers
+  (`/customer/sub-customers`, `customer.sub_customers.view`) and Roles &
+  Privileges (`/customer/roles`, `customer.roles.view`), pages built by later
+  tasks; planned modules ungated. Account-menu role label =
+  "<role name> · <account type>" (or "No active role · <type>").
+- Dashboard otherwise unchanged; `NoActiveRoleNotice` when the role is not active.
+- The layout renders `PermissionSync` with `customerFingerprintAction`.
+- Change history: 2026-10-16 — privilege-filtered navigation, role label,
+  no-role notice, PermissionSync.
+
+- 2026-10-16: The "Account" pages exist now: `/customer/sub-customers`
+  (list, `/new`, `/[id]/edit`) and `/customer/roles` (list, `/new`, `/[id]`,
+  `/[id]/edit`), gated by `customer.sub_customers.*` / `customer.roles.*`;
+  everything is scoped to the signed-in user's MAIN customer (a sub-customer
+  manages its main customer's team, one level deep). Static routes win over
+  the `/customer/[module]` placeholder. Details:
+  `role-privilege-management.md` → "Workspace RBAC pages".

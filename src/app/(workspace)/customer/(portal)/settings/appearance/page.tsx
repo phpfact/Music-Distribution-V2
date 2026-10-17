@@ -19,7 +19,7 @@ export const metadata: Metadata = { title: "Appearance" };
  */
 export default async function CustomerAppearancePage() {
   const area  = await requireCustomer();
-  const state = await getViewerAppearanceState(area.db, { userId: area.user.id, isOwner: false });
+  const state = await getViewerAppearanceState(area.db, { userId: area.user.id, canManageWorkspace: false });
 
   return (
     <>

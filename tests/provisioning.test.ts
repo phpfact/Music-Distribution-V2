@@ -319,7 +319,7 @@ describe("a provisioned tenant", () => {
     expect(await roleExists("t_test_does_not_exist_app")).toBe(false);
   });
 
-  it("creates the admin account in the tenant database with an Argon2id hash and the owner role", async () => {
+  it("creates the admin account in the tenant database with an Argon2id hash and the Master Tenant role", async () => {
     const client = await connectAs(loginOf(tenantA));
     try {
       const users = await client.query<{ username: string; email: string; name: string; status: string; password_hash: string }>(
@@ -336,12 +336,25 @@ describe("a provisioned tenant", () => {
       expect(user?.password_hash.startsWith("$argon2id$")).toBe(true);
       expect(await verifyPassword(user?.password_hash ?? "", tenantA.adminPassword)).toBe(true);
 
+      // The admin is the primary staff account and holds exactly Master Tenant
+      // (key "owner" kept, recognised by its system key).
       const roles = await client.query(
-        `SELECT r.key, r.name, r.is_system FROM user_roles ur JOIN roles r ON r.id = ur.role_id
+        `SELECT r.key, r.name, r.is_system, r.domain::text AS domain, r.system_key, r.status::text AS status, u.is_primary
+         FROM user_roles ur JOIN roles r ON r.id = ur.role_id
          JOIN users u ON u.id = ur.user_id WHERE u.username = $1`,
         [tenantA.adminUsername],
       );
-      expect(roles.rows).toStrictEqual([{ key: "owner", name: "Owner", is_system: true }]);
+      expect(roles.rows).toStrictEqual([
+        {
+          key: "owner",
+          name: "Master Tenant",
+          is_system: true,
+          domain: "tenant",
+          system_key: "master_tenant",
+          status: "active",
+          is_primary: true,
+        },
+      ]);
     } finally {
       await client.end();
     }

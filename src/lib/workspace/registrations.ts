@@ -11,6 +11,7 @@ import "server-only";
  * this service enforces the business rules and the status transitions.
  */
 import { recordAudit, type AuditAction, type AuditMetadata } from "@/lib/audit";
+import { MASTER_SYSTEM_KEYS } from "@/lib/authz/catalog";
 import { getControlDb } from "@/lib/db/control";
 import type { TenantDb } from "@/lib/db/tenant";
 import type { Prisma } from "@/generated/prisma/tenant/client";
@@ -18,6 +19,7 @@ import { hashPassword, verifyPassword } from "@/lib/platform-auth/password";
 import { describeError } from "@/lib/platform-auth/session";
 import { consumeRateLimit } from "@/lib/rate-limit";
 import { isUuid } from "@/lib/uuid";
+import { lockWorkspaceIdentities } from "./identity";
 import {
   REGISTRATION_PAGE_SIZE,
   textOf,
@@ -36,10 +38,8 @@ import {
 
 export type { RegistrationPage, RegistrationRow, RegistrationSummary } from "./rules";
 
-// Serializes every write that can claim an email or username (sign-up and
-// approval) inside one tenant database. Any constant works; it only has to
-// be the same everywhere in this module.
-const IDENTITY_LOCK_ID = 7_324_515_001;
+// Every write that can claim an email or username (sign-up, approval and the
+// sub-user service) serializes on the shared identity lock (./identity.ts).
 
 // Rate limits (Redis, fail closed).
 const SIGNUP_LIMIT          = 5;
@@ -411,7 +411,7 @@ export async function submitRegistration(
 
     // Step 5: insert under the identity lock, re-checking inside it.
     const createdId = await db.$transaction(async (tx) => {
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${IDENTITY_LOCK_ID}::bigint)`;
+      await lockWorkspaceIdentities(tx);
       const match     = [{ email: value.email }, { username: value.username }];
       const userTaken = await tx.user.count({ where: { OR: match } });
       const openTaken = await tx.customerRegistration.count({
@@ -481,12 +481,13 @@ async function missedChange(db: TenantDb, registrationId: string): Promise<Revie
  * Description: Approve a pending registration: create the customer and its user.
  * Input: The tenant database and id, the registration id, the reviewer and the client address.
  * Output: ok, or why not (not found, already reviewed, email/username now taken,
- *   unavailable). One transaction: the customer, the user (same password hash)
- *   and the registration's new status are written together or not at all.
+ *   unavailable). One transaction: the customer, the user (same password hash,
+ *   primary account of the customer), the user's Master Customer role and the
+ *   registration's new status are written together or not at all.
  * Use case: Approve buttons of the tenant and Platform Owner registrations pages.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-15
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 export async function approveRegistration(
   db: TenantDb,
@@ -500,7 +501,7 @@ export async function approveRegistration(
   try {
     const outcome = await db.$transaction(async (tx): Promise<ReviewOutcome | "approved"> => {
       // Step 1: the identity lock (sign-ups wait until this approval is done).
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(${IDENTITY_LOCK_ID}::bigint)`;
+      await lockWorkspaceIdentities(tx);
 
       // Step 2: the registration must still be pending.
       const registration = await tx.customerRegistration.findUnique({
@@ -518,6 +519,14 @@ export async function approveRegistration(
       });
       if (taken > 0) return { ok: false, problem: "identity_taken", message: REVIEW_MESSAGES.identity_taken };
 
+      // Step 3b: the Master Customer role (by its protected system key). Every
+      // tenant database has it (rbac migration); without it nothing is written.
+      const masterCustomer = await tx.role.findUnique({
+        where: { systemKey: MASTER_SYSTEM_KEYS.customer },
+        select: { id: true },
+      });
+      if (!masterCustomer) throw new Error("the Master Customer role is missing");
+
       // Step 4: the customer account (its category is the chosen account type).
       const customer = await tx.customer.create({
         data: { type: registration.accountType, name: registration.fullName, status: "active" },
@@ -533,9 +542,14 @@ export async function approveRegistration(
           name: registration.fullName,
           status: "active",
           customerId: customer.id,
+          // The main customer's own user is its primary account.
+          isPrimary: true,
         },
         select: { id: true },
       });
+
+      // Step 5b: the user's single role — Master Customer.
+      await tx.userRole.create({ data: { userId: user.id, roleId: masterCustomer.id } });
 
       // Step 6: mark the registration approved (conditional: never twice).
       const updated = await tx.customerRegistration.updateMany({
@@ -620,12 +634,14 @@ export async function rejectRegistration(
  * Description: Suspend or reactivate the customer account of an approved registration.
  * Input: The tenant database and id, the registration id, the change, the
  *   reviewer and the client address.
- * Output: ok, or why not. Suspending also deletes the user's sessions, so
+ * Output: ok, or why not. The user and its main customer row change together
+ *   (disabled / active), so every sub-customer of that customer is refused on
+ *   its next request too. Suspending also deletes the user's sessions, so
  *   access ends immediately (the session check also refuses suspended users).
  * Use case: Suspend / Reactivate on both registrations pages.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-15
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 export async function setCustomerAccountStatus(
   db: TenantDb,
@@ -644,7 +660,7 @@ export async function setCustomerAccountStatus(
       // Step 1: the account created when this registration was approved.
       const registration = await tx.customerRegistration.findUnique({
         where: { id: registrationId },
-        select: { status: true, userId: true },
+        select: { status: true, userId: true, user: { select: { customerId: true } } },
       });
       if (!registration || registration.status !== "approved" || !registration.userId) return false;
 
@@ -654,6 +670,13 @@ export async function setCustomerAccountStatus(
         data: { status: to },
       });
       if (updated.count !== 1) return false;
+
+      // Step 2b: the main customer row follows (account lifecycle rule of the
+      // RBAC spec): its sub-customers are refused while it is disabled.
+      const customerId = registration.user?.customerId;
+      if (customerId) {
+        await tx.customer.updateMany({ where: { id: customerId, parentId: null }, data: { status: to } });
+      }
 
       // Step 3: a suspension ends every open session of that user right away.
       if (change === "suspend") await tx.userSession.deleteMany({ where: { userId: registration.userId } });

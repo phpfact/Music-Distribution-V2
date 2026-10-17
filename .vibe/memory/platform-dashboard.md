@@ -85,3 +85,29 @@ permission gate prevented access. No rendered-browser results are claimed.
 - 2026-10-15: Verification of the compliance pass: TypeScript (including tests)
   and ESLint (zero warnings) pass; the full Vitest suite passes in the app
   container: 37 files, 1136 tests, 1 pre-existing localhost-only skip.
+
+## RBAC (2026-10-16)
+
+- Available to every signed-in owner (`requirePlatformAccess`); the tenant
+  figures ("Platform at a glance", read only then) and the "Manage tenants"
+  button need `platform.tenants.view`; the secondary menu drops the summary
+  item when the section is hidden.
+- Quick access lists `filterNavSections(access.permissions)` minus the
+  dashboard — exactly the sidebar's rules.
+- A role that is missing/disabled/invalid shows `NoActiveRoleNotice`
+  ("Your account has no active role, so only your dashboard and personal
+  appearance are available…").
+- Change history: 2026-10-16 — widgets, quick access and notice follow the
+  owner's privileges.
+
+## Loading skeleton location (2026-10-16)
+
+- The console-wide `src/app/platform/(console)/loading.tsx` was removed: its
+  Suspense boundary wrapped every console page and made `notFound()` on the
+  RBAC `[id]` pages answer HTTP 200. The same skeleton now lives in
+  `(console)/_components/console-loading.tsx` (`ConsoleLoading`) and is
+  rendered by `dashboard/loading.tsx` (and `settings`, `subscriptions`,
+  `support`), so the dashboard's loading state is unchanged. Reason and
+  details: `role-privilege-management.md`, "RBAC pages (all panels)".
+- Change history: 2026-10-16 — dashboard got its own `loading.tsx` (same
+  skeleton) when the console-wide one was removed.

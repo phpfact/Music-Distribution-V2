@@ -2,10 +2,10 @@ import { CircleCheck } from "lucide-react";
 import type { Metadata } from "next";
 import { PageHeading } from "@/components/dashboard/page-heading";
 import { SectionCard, SectionCards } from "@/components/dashboard/section-cards";
-import { EmptyState, SectionedLayout, type SecondaryMenuItem } from "@/components/shared";
+import { EmptyState, NoActiveRoleNotice, SectionedLayout, type SecondaryMenuItem } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { requireCustomer } from "@/lib/workspace/guards";
+import { requireCustomerAccess } from "@/lib/authz/workspace";
 import { accountTypeLabel } from "@/lib/workspace/rules";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -34,16 +34,18 @@ function formatDay(date: Date): string {
 /**
  * Description: Render the customer's dashboard (shadcn dashboard-01 layout).
  * Input: None (tenant from the Host header, customer from the customer area session).
- * Output: Welcome heading; account cards (status, type, member since,
- *   workspace — facts, not counts); the streams card and the releases card as
- *   honest empty states until those modules exist. No invented figures.
- * Use case: /customer/dashboard — the landing page after a customer signs in.
+ * Output: Welcome heading; a warning notice when the user has no active role;
+ *   account cards (status, type, member since, workspace — facts, not counts);
+ *   the streams card and the releases card as honest empty states until those
+ *   modules exist. No invented figures and no privilege-gated widgets yet.
+ * Use case: /customer/dashboard — the landing page after a customer signs in
+ *   (available to every active customer user).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-16
  * Last modified: 2026-10-16
  */
 export default async function CustomerDashboardPage() {
-  const area      = await requireCustomer();
+  const area      = await requireCustomerAccess();
   const firstName = area.user.name.split(/\s+/)[0] ?? area.user.name;
 
   return (
@@ -52,6 +54,11 @@ export default async function CustomerDashboardPage() {
         title={`Welcome, ${firstName}`}
         description={`Your ${accountTypeLabel(area.user.customer.type).toLowerCase()} account at ${area.tenant.name}.`}
       />
+      {area.authz.roleState !== "active" ? (
+        <div className="px-4 lg:px-6">
+          <NoActiveRoleNotice />
+        </div>
+      ) : null}
       <div className="px-4 lg:px-6">
         <SectionedLayout items={MENU_ITEMS} variant="top" contentClassName="flex flex-col gap-4 md:gap-6">
           <section id={SECTIONS.overview.id} aria-label="Overview">

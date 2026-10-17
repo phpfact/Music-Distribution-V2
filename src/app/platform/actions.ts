@@ -2,11 +2,14 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { loadPlatformAccess } from "@/lib/authz/platform-access";
+import { getControlDb } from "@/lib/db/control";
 import {
   describeError,
   revokeSession,
   SESSION_COOKIE_NAME,
   sessionCookieOptions,
+  validateSession,
 } from "@/lib/platform-auth/session";
 
 /**
@@ -41,4 +44,36 @@ export async function logoutAction(): Promise<void> {
 
   // Throws by design, so it stays outside any try/catch.
   redirect("/platform/login");
+}
+
+/**
+ * Description: Report whether this browser is still signed in and the hash of
+ *   the owner's CURRENT platform privileges.
+ * Input: None (reads the session cookie).
+ * Output: { signedIn: false, fingerprint: null } without a valid session,
+ *   otherwise { signedIn: true, fingerprint } — never anything else (no ids,
+ *   no privilege keys). The session is validated with touch: false, so this
+ *   background poll never extends the idle timeout. A database error is logged
+ *   and answered with a generic error (the browser ignores it silently).
+ * Use case: PermissionSync in the console layout (every 30 s, on focus, on
+ *   route change): a changed fingerprint refreshes the navigation and page
+ *   (.vibe/memory/role-privilege-management.md).
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-16
+ * Last modified: 2026-10-16
+ */
+export async function platformFingerprintAction(): Promise<{ signedIn: boolean; fingerprint: string | null }> {
+  try {
+    // Step 1: the session, without counting this poll as activity.
+    const token   = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
+    const session = token ? await validateSession(token, { touch: false }) : null;
+    if (!session) return { signedIn: false, fingerprint: null };
+
+    // Step 2: the same fresh decision every page makes.
+    const access = await loadPlatformAccess(getControlDb(), session.owner.id);
+    return { signedIn: true, fingerprint: access.fingerprint };
+  } catch (error) {
+    console.error(`[authz] could not read the platform privilege fingerprint: ${describeError(error)}`);
+    throw new Error("The privilege check is unavailable right now.");
+  }
 }

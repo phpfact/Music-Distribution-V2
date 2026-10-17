@@ -100,6 +100,17 @@ describe("[R2][R4] the seed creates the default platform owner", () => {
     expect(await listSessions(db)).toHaveLength(0);
   });
 
+  it("makes the bootstrapped owner the primary account holding Master Platform", async () => {
+    const result = await runSeed({ username: "vt-seed-owner", password: newPassword() });
+    expect(result.code, result.stderr).toBe(0);
+
+    const role = await db.query<{ is_primary: boolean; system_key: string | null; name: string }>(
+      `SELECT o.is_primary, r.system_key, r.name
+       FROM platform_owners o JOIN platform_roles r ON r.id = o.role_id`,
+    );
+    expect(role.rows).toStrictEqual([{ is_primary: true, system_key: "master_platform", name: "Master Platform" }]);
+  });
+
   it("stores the username normalized (trimmed, lower case)", async () => {
     const result = await runSeed({ username: "  Test-Owner ", password: newPassword() });
 
@@ -280,6 +291,9 @@ describe("--rotate-password", () => {
     expect(result.code, result.stderr).toBe(0);
     expect(result.stdout).toContain("2 session(s) revoked");
     const after = await onlyOwner();
+    // The rotation never touches the role or the primary flag.
+    const role = await db.query("SELECT is_primary, role_id FROM platform_owners WHERE id = $1", [after.id]);
+    expect(role.rows[0]).toMatchObject({ is_primary: true });
     expect(after.password_hash).not.toBe(before.password_hash);
     expect(after.password_hash.startsWith("$argon2id$")).toBe(true);
     expect(await verifyPassword(after.password_hash, newer)).toBe(true);

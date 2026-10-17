@@ -18,28 +18,28 @@ import { Avatar } from "./avatar";
 import { Icon } from "./icons";
 import { SignOutButton } from "./sign-out-button";
 
-// The account's role, shown instead of the (sensitive) username.
-const ROLE_LABEL = "Platform Owner";
 // The same fixed-length mask as SensitiveValue: it never reveals the username's length.
 const USERNAME_MASK = "••••••••••";
 
 type ProfileMenuProps = {
   username: string;
+  /** The owner's role name (or "No active role"), shown instead of the sensitive username. */
+  roleLabel: string;
 };
 
 /**
  * Description: Render the owner's account menu without showing the username by default.
- * Input: The signed-in owner's username.
- * Output: A trigger with "Platform Owner" and generic initials; a menu with the
+ * Input: The signed-in owner's username and role label.
+ * Output: A trigger with the role name and its initials; a menu with the
  *   masked username, a "Show username" / "Hide username" item (eye icon), the
  *   settings link and the native sign-out Server Action form.
  * Use case: The console top bar on every page (CLAUDE.md sensitive-data masking:
  *   usernames are masked by default and revealed only on request).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
-export function ProfileMenu({ username }: ProfileMenuProps) {
+export function ProfileMenu({ username, roleLabel }: ProfileMenuProps) {
   const [open, setOpen] = useState(false);
   // Masked by default; reset whenever the menu closes.
   const [usernameVisible, setUsernameVisible] = useState(false);
@@ -68,10 +68,10 @@ export function ProfileMenu({ username }: ProfileMenuProps) {
             aria-label="Account menu"
             className="h-10 max-w-full gap-2 px-1.5 sm:pr-2"
           >
-            {/* Generic initials: the username's letters would reveal part of it. */}
-            <Avatar name={ROLE_LABEL} size="sm" />
+            {/* Role initials: the username's letters would reveal part of it. */}
+            <Avatar name={roleLabel} size="sm" />
             <span className="hidden max-w-[10rem] truncate text-sm font-medium sm:block">
-              {ROLE_LABEL}
+              {roleLabel}
             </span>
             <Icon
               name="chevron-down"
@@ -96,7 +96,7 @@ export function ProfileMenu({ username }: ProfileMenuProps) {
                 </>
               )}
             </p>
-            <p className="text-xs text-muted-foreground">{ROLE_LABEL}</p>
+            <p className="text-xs text-muted-foreground">{roleLabel}</p>
           </DropdownMenuLabel>
           {/* A menu item, so keyboard users reach it; selecting it keeps the menu open. */}
           <DropdownMenuItem

@@ -5,12 +5,12 @@
  */
 import type {
   ConnectionTestField,
-  ConnectionTestResult,
+  ConnectionTestResult as ServiceConnectionTestResult,
   CreateTenantField,
   CreateTenantFieldErrors,
   DatabaseCheck,
   LifecycleResult,
-  PreviewResult,
+  PreviewResult as ServicePreviewResult,
   PreviewValues,
 } from "@/lib/tenants/service";
 import type { TenantCountSource } from "@/lib/tenants/rules";
@@ -26,13 +26,27 @@ import type {
 
 export type {
   ConnectionTestField,
-  ConnectionTestResult,
   CreateTenantField,
   CreateTenantFieldErrors,
   DatabaseCheck,
-  PreviewResult,
   PreviewValues,
 };
+
+/**
+ * An action refused because the signed-in owner lacks its privilege
+ * (authorizePlatformAction, audited as authz.denied;
+ * .vibe/memory/role-privilege-management.md). The message is friendly and
+ * reveals nothing internal; clients show it like any other refusal.
+ */
+export type ForbiddenFailure = { ok: false; reason: "forbidden"; message: string };
+
+/** The create form's value preview, or a privilege refusal. */
+export type PreviewResult = ServicePreviewResult | ForbiddenFailure;
+
+/** The existing-database connection test, or a privilege refusal. */
+export type ConnectionTestResult =
+  | ServiceConnectionTestResult
+  | { kind: "error"; reason: "forbidden"; message: string };
 
 /** useActionState state of the create form. Never contains a password except as noted. */
 export type CreateTenantActionState =
@@ -59,8 +73,8 @@ export type TestConnectionInput = {
   databasePort: string;
 };
 
-/** Suspend, reactivate and retry setup. */
-export type TenantLifecycleActionResult = LifecycleResult;
+/** Suspend, reactivate and retry setup (or a privilege refusal). */
+export type TenantLifecycleActionResult = LifecycleResult | ForbiddenFailure;
 
 // ---------------------------------------------------------------------------
 // Editing, credentials and domains (manage-actions.ts)
@@ -90,14 +104,14 @@ export type ProfileImageAction = "keep" | "remove" | "replace";
 
 export type ResetMasterPasswordInput = MasterPasswordResetInput;
 
-/** Auto mode: `generatedPassword` is shown once, never stored. */
-export type ResetMasterPasswordActionResult = MasterPasswordResetResult;
+/** Auto mode: `generatedPassword` is shown once, never stored (or a privilege refusal). */
+export type ResetMasterPasswordActionResult = MasterPasswordResetResult | ForbiddenFailure;
 
-/** Rotate (provisioned) and update (existing) database password. */
-export type DatabasePasswordActionResult = CredentialResult;
+/** Rotate (provisioned) and update (existing) database password (or a privilege refusal). */
+export type DatabasePasswordActionResult = CredentialResult | ForbiddenFailure;
 
-/** "Check DNS" for the custom domain and the subdomain re-check. */
-export type DomainCheckActionResult = DomainCheckResult;
+/** "Check DNS" for the custom domain and the subdomain re-check (or a privilege refusal). */
+export type DomainCheckActionResult = DomainCheckResult | ForbiddenFailure;
 
 // ---------------------------------------------------------------------------
 // Count details (actions.ts: loadTenantCountRecordsAction)

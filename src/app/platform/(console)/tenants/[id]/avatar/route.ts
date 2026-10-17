@@ -2,12 +2,13 @@
  * GET /platform/tenants/<id>/avatar: a tenant's profile image
  * (docs/tenant-management.md §8.6).
  *
- * Route handlers are not wrapped by the console layout, so the session is
- * checked here. Without one the answer is the same 404 as for a missing
- * image: the route reveals nothing about which tenants exist. The session
- * cookie's path (/platform) covers this URL.
+ * Route handlers are not wrapped by the console layout, so the session and
+ * the platform.tenants.view privilege are checked here. Without either the
+ * answer is the same 404 as for a missing image: the route reveals nothing
+ * about which tenants exist. The session cookie's path (/platform) covers
+ * this URL.
  */
-import { getPlatformSession } from "@/lib/platform-auth/dal";
+import { getPlatformAccess } from "@/lib/authz/platform";
 import { describeError } from "@/lib/platform-auth/session";
 import { readProfileImage } from "@/lib/storage/profile-images";
 import { UUID_PATTERN } from "@/lib/uuid";
@@ -34,21 +35,23 @@ function notFound(): Response {
 }
 
 /**
- * Description: Serve a tenant's profile image to the signed-in owner.
+ * Description: Serve a tenant's profile image to a signed-in owner allowed to see tenants.
  * Input: The request and the route parameters (tenant id).
  * Output: The image (sniffed type, nosniff, sandboxed CSP, private cache) or 404
- *   for no session, a bad id, no image or a read failure (logged).
+ *   for no session, a missing platform.tenants.view privilege, a bad id, no
+ *   image or a read failure (logged).
  * Use case: GET /platform/tenants/<id>/avatar (avatars in the console).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-16
  */
 export async function GET(
   _request: Request,
   context: { params: Promise<{ id: string }> },
 ): Promise<Response> {
-  const session = await getPlatformSession();
-  if (!session) return notFound();
+  // Step 1: a valid session whose CURRENT privileges include viewing tenants.
+  const platform = await getPlatformAccess();
+  if (!platform || !platform.access.can("platform.tenants.view")) return notFound();
 
   const { id } = await context.params;
   if (!UUID_PATTERN.test(id)) return notFound();

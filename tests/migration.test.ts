@@ -60,9 +60,13 @@ describe("[R1] the migration creates the platform owner schema", () => {
       username: { data_type: "character varying", is_nullable: "NO", length: 64 },
       password_hash: { data_type: "character varying", is_nullable: "NO", length: 255 },
       status: { data_type: "USER-DEFINED", is_nullable: "NO", length: null },
-      can_manage_appearance: { data_type: "boolean", is_nullable: "NO", length: null },
       created_at: { data_type: "timestamp with time zone", is_nullable: "NO", length: null },
       updated_at: { data_type: "timestamp with time zone", is_nullable: "NO", length: null },
+      // RBAC (rbac migration): one role each, primary flag, full name, creator.
+      role_id: { data_type: "uuid", is_nullable: "NO", length: null },
+      full_name: { data_type: "character varying", is_nullable: "YES", length: 200 },
+      is_primary: { data_type: "boolean", is_nullable: "NO", length: null },
+      created_by_id: { data_type: "uuid", is_nullable: "YES", length: null },
     });
   });
 
@@ -94,11 +98,11 @@ describe("[R1] the migration creates the platform owner schema", () => {
     );
     expect(labels.rows.map((row) => row.label)).toStrictEqual(["active", "disabled"]);
 
-    await db.query("INSERT INTO platform_owners (id, username, password_hash) VALUES ($1, $2, $3)", [
-      randomUUID(),
-      "vt-default-status",
-      PLACEHOLDER_HASH,
-    ]);
+    await db.query(
+      `INSERT INTO platform_owners (id, username, password_hash, role_id)
+       VALUES ($1, $2, $3, (SELECT id FROM platform_roles WHERE system_key = 'master_platform'))`,
+      [randomUUID(), "vt-default-status", PLACEHOLDER_HASH],
+    );
     const stored = await db.query<{ status: string }>("SELECT status FROM platform_owners");
     expect(stored.rows).toStrictEqual([{ status: "active" }]);
   });
