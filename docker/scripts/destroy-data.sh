@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # DESTRUCTIVE: stops the stack and permanently deletes its named volumes
-# (PostgreSQL data, Redis data, pgAdmin and Redis Insight settings, and in
-# development the dependency/build caches).
+# (PostgreSQL data, Redis data, AIStor objects, pgAdmin and Redis Insight
+# settings, and in development the dependency/build caches).
 #
 # This is the only place in the project that deletes volumes. It is never run
 # by another target and always requires an explicit, typed confirmation.
@@ -21,8 +21,10 @@ cat <<EOF
   !!  DANGER: PERMANENT DATA LOSS  !!
 
   This stops the '$project' stack and DELETES its volumes, including the
-  PostgreSQL database and Redis data. This cannot be undone, and Docker
+  PostgreSQL database, Redis data and every object stored in AIStor (all
+  buckets, including backups kept there). This cannot be undone, and Docker
   volumes are not backups. Take one first if in doubt:  make backup
+  and keep copies of anything stored in AIStor off this machine.
 
   Volumes that currently exist for this project:
 EOF

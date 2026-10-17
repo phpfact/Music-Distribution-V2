@@ -25,24 +25,7 @@ esac
 env_file=${ENV_FILE:-.env}
 [ -f "$env_file" ] || die "'$env_file' not found. Create it with: make init"
 
-# Prints the value of one key from the env file. The file is read line by line,
-# never sourced: nothing in it is executed, and no other key is looked at.
-# Surrounding quotes are optional; the last definition wins, as in Compose.
-env_file_value() {
-  local key=$1 line value=""
-  while IFS= read -r line || [ -n "$line" ]; do
-    line=${line%$'\r'}
-    case "$line" in
-      "$key="*) value=${line#*=} ;;
-    esac
-  done < "$env_file"
-  case "$value" in
-    \"*\") value=${value#\"}; value=${value%\"} ;;
-    \'*\') value=${value#\'}; value=${value%\'} ;;
-  esac
-  printf '%s' "$value"
-}
-
+# env_file_value (lib.sh) reads one key from the env file without sourcing it.
 for name in PLATFORM_OWNER_INITIAL_USERNAME PLATFORM_OWNER_INITIAL_PASSWORD; do
   value=${!name:-}
   [ -n "$value" ] || value=$(env_file_value "$name")

@@ -7,8 +7,8 @@
 # The Makefile does this for you (`make up`, `make prod-up`).
 #
 # This file publishes NO host ports. Services reach each other on the internal
-# network by service name (postgres:5432, redis:6379). Each override decides
-# what, if anything, is reachable from the host.
+# network by service name (postgres:5432, redis:6379, aistor:9000). Each
+# override decides what, if anything, is reachable from the host.
 #
 # Images are pinned by tag AND digest. To upgrade one, change both:
 #   docker buildx imagetools inspect <image>:<new-tag>
@@ -24,6 +24,12 @@ x-logging: &default-logging
   options:
     max-size: "10m"
     max-file: "5"
+
+# MinIO AIStor server image, shared by the `aistor` service and the one-off
+# `aistor-admin` job (the image bundles the matching `mc` client). Only stable
+# RELEASE tags; never `latest` or EDGE builds. Read the release notes before
+# upgrading (see TRD §1.1).
+x-aistor-image: &aistor-image quay.io/minio/aistor/minio:RELEASE.2026-09-19T17-05-25Z@sha256:107cf2014a9583c74c11e3cdbd6903d89c2244355886b89ce532f4ecae9c23f3
 
 services:
   app:
@@ -51,6 +57,9 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      # Object storage is mandatory (PRD §4.9): the app starts only once AIStor is ready.
+      aistor:
         condition: service_healthy
     healthcheck:
       # Liveness only. Dependency status is reported by /api/health/ready.
@@ -129,6 +138,72 @@ services:
       start_interval: 2s
     stop_grace_period: 30s
     restart: unless-stopped
+    networks:
+      - internal
+    logging: *default-logging
+
+  # MinIO AIStor object storage: tenant assets and database backups (TRD §6.3,
+  # README "MinIO AIStor"). It refuses to start without its license file.
+  aistor:
+    image: *aistor-image
+    # The server binary directly, skipping the image's deprecated
+    # user-switching wrapper script.
+    entrypoint: ["/usr/bin/minio"]
+    # S3 API on 9000, Console (web UI) on 9001, objects in the aistor_data volume.
+    command:
+      - server
+      - /data
+      - --console-address
+      - ":9001"
+      - --license
+      - /run/secrets/aistor_license
+    environment:
+      # Root (admin) identity: bootstrap and break-glass only, never given to the app.
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER in your env file (see .env.example and README, "MinIO AIStor")}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in your env file (see .env.example and README, "MinIO AIStor")}
+    secrets:
+      - aistor_license
+    volumes:
+      # The image declares /data as a volume; naming it keeps the objects
+      # across `down`, recreation and upgrades.
+      - aistor_data:/data
+    healthcheck:
+      # Readiness, not just liveness: healthy only once the drive is online and
+      # the server accepts requests.
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:9000/minio/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+      start_interval: 2s
+    # Give in-flight requests time to finish on shutdown.
+    stop_grace_period: 30s
+    restart: unless-stopped
+    networks:
+      - internal
+    logging: *default-logging
+
+  # One-off admin job, not a running service: every `make aistor-*` target runs
+  # docker/aistor/admin.sh in it. The platform and backup identities' secrets
+  # are given to this job only, never to the long-running server or the app.
+  aistor-admin:
+    profiles: ["aistor-admin"]
+    image: *aistor-image
+    entrypoint: ["/bin/bash", "/opt/aistor/admin.sh"]
+    environment:
+      AISTOR_ENDPOINT: http://aistor:9000
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?Set MINIO_ROOT_USER in your env file (see .env.example and README, "MinIO AIStor")}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?Set MINIO_ROOT_PASSWORD in your env file (see .env.example and README, "MinIO AIStor")}
+      AISTOR_PLATFORM_ACCESS_KEY: ${AISTOR_PLATFORM_ACCESS_KEY:-md-platform}
+      AISTOR_PLATFORM_SECRET_KEY: ${AISTOR_PLATFORM_SECRET_KEY:?Set AISTOR_PLATFORM_SECRET_KEY in your env file (see .env.example and README, "MinIO AIStor")}
+      AISTOR_BACKUP_ACCESS_KEY: ${AISTOR_BACKUP_ACCESS_KEY:-md-backup}
+      AISTOR_BACKUP_SECRET_KEY: ${AISTOR_BACKUP_SECRET_KEY:?Set AISTOR_BACKUP_SECRET_KEY in your env file (see .env.example and README, "MinIO AIStor")}
+    volumes:
+      - ./aistor/admin.sh:/opt/aistor/admin.sh:ro
+    depends_on:
+      aistor:
+        condition: service_healthy
+    restart: "no"
     networks:
       - internal
     logging: *default-logging
@@ -213,6 +288,15 @@ networks:
   internal:
     driver: bridge
 
+# File secrets, mounted read-only at /run/secrets/<name> in the services that
+# list them.
+secrets:
+  aistor_license:
+    # Relative paths are resolved from this docker/ folder. The default is the
+    # git-ignored minio/ folder in the project root. Never commit the license:
+    # redistribution is prohibited.
+    file: ${AISTOR_LICENSE_FILE:-../minio/minio.license}
+
 # Named volumes hold all persistent state. `docker compose down` keeps them;
 # only an explicit `down --volumes` / `docker volume rm` deletes them, and no
 # Makefile target does that except the deliberately guarded `destroy-data`.
@@ -221,3 +305,4 @@ volumes:
   redis_data:
   pgadmin_data:
   redisinsight_data:
+  aistor_data:

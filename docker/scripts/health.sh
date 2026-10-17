@@ -7,7 +7,7 @@ set -uo pipefail
 # shellcheck source=docker/scripts/lib.sh
 . "$(dirname "$0")/lib.sh"
 
-required="app postgres redis"
+required="app postgres redis aistor"
 optional="pgadmin redisinsight"
 failed=0
 logs_command="make logs"

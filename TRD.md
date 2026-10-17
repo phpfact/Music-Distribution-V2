@@ -37,7 +37,7 @@
 | ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
 | Server image             | `quay.io/minio/aistor/minio`                                                                                                                                         | AIStor container docs     |
 | Latest stable release    | `RELEASE.2026-09-19T17-05-25Z` (tagged `latest` on 2026-09-20), digest `sha256:107cf2014a9583c74c11e3cdbd6903d89c2244355886b89ce532f4ecae9c23f3`                     | quay.io tag API           |
-| Client image             | `quay.io/minio/aistor/mc:RELEASE.2026-09-19T15-24-59Z`, digest `sha256:23511e340cbabf07e6a8b53f9c434975708f22f3c047d6beeddc17bf1a5aed88`                             | quay.io tag API           |
+| Client                   | `mc` RELEASE.2026-09-19T15-24-59Z is bundled in the server image (with `curl`, `bash`; no `grep`/`sed`/`awk`), so no separate client image is needed. Standalone image: `quay.io/minio/aistor/mc`, digest `sha256:23511e340cbabf07e6a8b53f9c434975708f22f3c047d6beeddc17bf1a5aed88`. | image inspection, quay.io |
 | Release channels         | `RELEASE.*` = stable. `EDGE.*`, `edge`, `edge-daily` = pre-release, not for production. `*.hotfix.*` = hotfix builds. `.fips` / `.rdma` = variants.                | quay.io tags              |
 | License                  | Required to run; passed as a file (`--license <path>`). Free tier: one node (one or more drives), no support, redistribution prohibited. Active license required for production. | AIStor docs, pricing page |
 | Ports                    | 9000 S3 API, 9001 Console                                                                                                                                            | AIStor container docs     |
@@ -194,23 +194,23 @@ The code already implements the database and domain steps (`src/lib/provisioning
 | Health check         | Probe `/minio/health/live` and `/minio/health/ready` with a command verified to exist in the pinned image (for example a bundled `mc ready` or `curl`); do not assume one. Same interval/timeout/retries/start-period style as the other services. |
 | Startup dependencies | `app` and the one-off `mc` jobs use `depends_on: aistor: condition: service_healthy`.                                                                                                              |
 | Restart              | `restart: unless-stopped`, with a `stop_grace_period` long enough for a clean shutdown.                                                                                                              |
-| Hardening (prod)     | `no-new-privileges`; run as non-root with `cap_drop: ALL` and a read-only root filesystem where the image supports it (verify); CPU/memory limits through optional `AISTOR_CPU_LIMIT` / `AISTOR_MEMORY_LIMIT`. |
+| Hardening (prod)     | `no-new-privileges`, `cap_drop: ALL`, read-only root filesystem with `tmpfs /tmp`; CPU/memory limits through optional `AISTOR_CPU_LIMIT` / `AISTOR_MEMORY_LIMIT` (defaults 1.0 / 1g). Verified: the image runs as root, and works with these settings; running as non-root needs volume-ownership handling and is not done. On Linux the license file must be readable by root without capabilities (root-owned or mode 644). |
 | Logging              | The shared `x-logging` json-file rotation (10 MB × 5).                                                                                                                                              |
-| Admin client         | `mc` from the pinned `quay.io/minio/aistor/mc` image, as a one-off service behind a Compose profile (like `migrate`), on the internal network.                                                       |
+| Admin client         | One-off `aistor-admin` service (profile `aistor-admin`, like `migrate`) using the server image and its bundled `mc`, on the internal network. It alone receives the platform and backup identities' secrets. |
 | Readiness            | `/api/health/ready` reports AIStor reachability; `make health` lists `aistor` as a required service.                                                                                                |
 
 ### 6.4 Environment variables
 
-All _proposed_, following `.env.example` conventions. None may carry a `NEXT_PUBLIC_` prefix. `src/lib/env.ts` validates the app's variables (problems name the variable, never the value; placeholders and short secrets are rejected in production).
+Following `.env.example` conventions. Implemented in phase 1: `AISTOR_LICENSE_FILE`, `MINIO_ROOT_*`, `AISTOR_PLATFORM_*`, `AISTOR_BACKUP_*`, `AISTOR_HOST_PORT`, `AISTOR_CONSOLE_PORT`, `AISTOR_*_LIMIT`; the rest stay _proposed_ for phase 2. None may carry a `NEXT_PUBLIC_` prefix. `src/lib/env.ts` validates the app's variables (problems name the variable, never the value; placeholders and short secrets are rejected in production).
 
 | Variable                                                       | Given to                    | Purpose                                                              | Secret |
 | -------------------------------------------------------------- | --------------------------- | -------------------------------------------------------------------- | ------ |
 | `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD`                       | `aistor`, admin `mc` jobs   | Root identity: bootstrap and break-glass only                        | Yes    |
 | `AISTOR_LICENSE_FILE`                                          | Compose (secret source)     | Host path of the license file                                        | License |
-| `AISTOR_PROVISIONER_ACCESS_KEY`, `AISTOR_PROVISIONER_SECRET_KEY` | `app`                     | Provisioning identity (§9.2)                                         | Yes    |
-| `AISTOR_PLATFORM_ACCESS_KEY`, `AISTOR_PLATFORM_SECRET_KEY`     | `app`                       | Platform Owner bucket access                                         | Yes    |
-| `AISTOR_BACKUP_ACCESS_KEY`, `AISTOR_BACKUP_SECRET_KEY`         | Backup jobs only            | Backup storage access                                                | Yes    |
-| `AISTOR_HOST`, `AISTOR_PORT`                                   | `app` (set in Compose)      | Internal endpoint `aistor:9000`, like `POSTGRES_HOST`                | No     |
+| `AISTOR_PROVISIONER_ACCESS_KEY`, `AISTOR_PROVISIONER_SECRET_KEY` | `app` (phase 2)           | Provisioning identity (§9.2)                                         | Yes    |
+| `AISTOR_PLATFORM_ACCESS_KEY`, `AISTOR_PLATFORM_SECRET_KEY`     | `aistor-admin`; `app` (phase 2) | Platform Owner bucket access                                     | Yes    |
+| `AISTOR_BACKUP_ACCESS_KEY`, `AISTOR_BACKUP_SECRET_KEY`         | `aistor-admin`; backup jobs | Backup storage access                                                | Yes    |
+| `AISTOR_HOST`, `AISTOR_PORT`                                   | `app` (set in Compose; phase 2) | Internal endpoint `aistor:9000`, like `POSTGRES_HOST`            | No     |
 | `AISTOR_HOST_PORT` (dev), `AISTOR_CONSOLE_PORT`                | Compose                     | Host ports on `127.0.0.1`; checked by `make ports`                   | No     |
 | `AISTOR_CPU_LIMIT`, `AISTOR_MEMORY_LIMIT`                      | Compose (prod, optional)    | Resource limits                                                      | No     |
 
@@ -392,6 +392,8 @@ These are logical entities, not a finalized schema. Confirm relationships, requi
 - **Per-tenant database:** `users`, `roles`, `permissions`, `role_permissions`, a user-to-role assignment allowing exactly one role per user (PRD C-1), `customers`, a customer relationship or parent reference, `artists`, `labels`, `audio_releases`, `video_releases`, `release_assets` (object key and metadata, never a URL or a client-chosen bucket).
 
 ## 14. Makefile: MinIO AIStor Targets
+
+**Status (2026-10-17):** phase 1 is implemented: `aistor-install`, `aistor-config-check`, `aistor-health`, `aistor-mc`, `aistor-buckets`, `aistor-bucket-inspect`, `aistor-smoke`, `aistor-usage`, `aistor-validate`, and the `destroy-data` warning. In phase 1, `aistor-validate` also checks the platform and backup identities' isolation. The other targets below come with phase 2 (tenant buckets, backups).
 
 **Conventions (from the existing Makefile):**
 

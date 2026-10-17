@@ -21,6 +21,9 @@ backups/
 # Uploaded files (STORAGE_ROOT in development: the project folder is bind-mounted)
 /storage/
 
+# MinIO AIStor license file: commercial license, redistribution prohibited
+/minio/
+
 # Logs and OS/editor files
 *.log
 .DS_Store

@@ -41,3 +41,23 @@ require_running() {
 project_name() {
   "${compose[@]}" config 2>/dev/null | sed -n 's/^name: //p' | head -n 1
 }
+
+# Prints the value of one key from the env file (ENV_FILE, default .env). The
+# file is read line by line, never sourced: nothing in it is executed, and no
+# other key is looked at. Surrounding quotes are optional; the last definition
+# wins, as in Compose.
+env_file_value() {
+  local key=$1 file=${ENV_FILE:-.env} line value=""
+  [ -f "$file" ] || return 0
+  while IFS= read -r line || [ -n "$line" ]; do
+    line=${line%$'\r'}
+    case "$line" in
+      "$key="*) value=${line#*=} ;;
+    esac
+  done < "$file"
+  case "$value" in
+    \"*\") value=${value#\"}; value=${value%\"} ;;
+    \'*\') value=${value#\'}; value=${value%\'} ;;
+  esac
+  printf '%s' "$value"
+}

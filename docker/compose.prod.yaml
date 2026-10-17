@@ -3,7 +3,7 @@
 # - The app runs the optimized standalone build as a non-root user on a
 #   read-only filesystem with all capabilities dropped.
 # - PostgreSQL and Redis publish NO host ports; they are reachable only on the
-#   internal network.
+#   internal network. AIStor publishes only its Console, on 127.0.0.1.
 # - pgAdmin and Redis Insight are behind the "tools" profile, so they do not
 #   start unless asked for (`make prod-tools-up`), and then only on 127.0.0.1.
 # - Database migrations are a one-off job behind the "migrate" profile
@@ -94,6 +94,37 @@ services:
           cpus: "${REDIS_CPU_LIMIT:-0.5}"
           # Headroom above REDIS_MAXMEMORY for AOF rewrites and snapshots.
           memory: ${REDIS_MEMORY_LIMIT:-512m}
+
+  aistor:
+    # The Console only, on this machine only (reach it through an SSH tunnel).
+    # The S3 API is not published: services use aistor:9000 inside Docker.
+    ports:
+      - "127.0.0.1:${AISTOR_CONSOLE_PORT:-9001}:9001"
+    # Runs as the image's root user, but read-only and with no capabilities
+    # (verified to work). The license file on the host must therefore be
+    # readable by root without capabilities: owned by root, or mode 644.
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "${AISTOR_CPU_LIMIT:-1.0}"
+          memory: ${AISTOR_MEMORY_LIMIT:-1g}
+
+  aistor-admin:
+    # mc keeps its configuration in /tmp/.mc (MC_CONFIG_DIR in the image).
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
 
   pgadmin:
     profiles: ["tools"]

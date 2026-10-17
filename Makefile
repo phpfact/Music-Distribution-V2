@@ -4,13 +4,14 @@
 # sudo: `sudo make up`, `sudo make down`, `sudo make sh`. sudo is never added here.
 #
 # Variables you can pass on the command line:
-#   s=<service>      limit a command to one service: app postgres redis pgadmin redisinsight
+#   s=<service>      limit a command to one service: app postgres redis aistor pgadmin redisinsight
 #   MODE=dev|prod    which Compose override to use (default: dev)
 #   ENV_FILE=<path>  environment file (default: .env; the path must not contain spaces)
 #   DOCKER=<cmd>     docker binary, e.g. DOCKER="sudo docker" if your user needs sudo
 #   FILE=<path>      backup file for `make restore`
 #   db=<name>        database for `make psql` (default: the application database)
 #   name=<words>     migration name for `make db-migration` / `make tenant-migration`
+#   bucket=<name>    bucket for `make aistor-bucket-inspect`
 #   APP_IMAGE=<name> production image name (default: mdnext-app)
 #   APP_TAG=<tag>    production image tag (default: git short SHA, or "local")
 
@@ -38,8 +39,8 @@ COMPOSE_ALL := $(COMPOSE) --profile tools
 export COMPOSE DOCKER ENV_FILE MODE APP_IMAGE APP_TAG
 
 # Host ports to check before starting (VAR:default, defaults as in the Compose files).
-DEV_PORTS   := APP_PORT:3000 POSTGRES_HOST_PORT:5433 REDIS_HOST_PORT:6380 PGADMIN_PORT:5050 REDISINSIGHT_PORT:5540
-PROD_PORTS  := APP_PORT:3000
+DEV_PORTS   := APP_PORT:3000 POSTGRES_HOST_PORT:5433 REDIS_HOST_PORT:6380 AISTOR_HOST_PORT:9000 AISTOR_CONSOLE_PORT:9001 PGADMIN_PORT:5050 REDISINSIGHT_PORT:5540
+PROD_PORTS  := APP_PORT:3000 AISTOR_CONSOLE_PORT:9001
 TOOLS_PORTS := PGADMIN_PORT:5050 REDISINSIGHT_PORT:5540
 
 SCRIPTS := docker/scripts
@@ -50,6 +51,8 @@ SCRIPTS := docker/scripts
         db-seed db-rotate-owner-password prod-seed \
         prod-build prod-up prod-deploy prod-down prod-restart prod-ps prod-logs \
         prod-health prod-images prod-tools-up prod-tools-down destroy-data \
+        aistor-install aistor-config-check aistor-health aistor-mc aistor-buckets \
+        aistor-bucket-inspect aistor-smoke aistor-usage aistor-validate \
         _require-env _require-dev
 
 ##@ Getting started
@@ -57,7 +60,7 @@ SCRIPTS := docker/scripts
 help: ## Show this help
 	@awk 'BEGIN {FS = ":.*##"} \
 		/^##@/ {printf "\n\033[1m%s\033[0m\n", substr($$0, 5); next} \
-		/^[a-zA-Z0-9_-]+:.*##/ {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+		/^[a-zA-Z0-9_-]+:.*##/ {printf "  \033[36m%-22s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 	@printf '\nOptions: s=<service>  MODE=dev|prod  ENV_FILE=<path>  DOCKER="sudo docker"  FILE=<backup>\n'
 	@printf 'Examples: make logs s=app    make restart s=redis    make restore FILE=backups/x.dump\n'
 	@printf 'Needs sudo for Docker? Prefix the command: sudo make up, sudo make down, sudo make sh\n\n'
@@ -67,7 +70,7 @@ init: ## Create .env from .env.example with generated secrets (never overwrites)
 
 ##@ Development stack
 
-up: _require-env ports ## Start the stack in the background and wait until it is healthy
+up: _require-env ports aistor-config-check ## Start the stack in the background and wait until it is healthy
 	@if [ "$(MODE)" = "prod" ]; then \
 		$(DOCKER) image inspect "$(APP_IMAGE):$(APP_TAG)" >/dev/null 2>&1 \
 			|| { echo "error: image '$(APP_IMAGE):$(APP_TAG)' not found locally. Build it (make prod-build) or pull it first."; exit 1; }; \
@@ -98,9 +101,11 @@ logs: _require-env ## Follow logs for all services, or one with s=<service>
 
 urls: _require-env ## Print the local addresses of the running web interfaces
 	@printf '\n'
-	@a=$$($(COMPOSE) port app 3000 2>/dev/null); [ -z "$$a" ] || printf '  %-14s http://%s\n' "Application" "$$a"
-	@a=$$($(COMPOSE_ALL) port pgadmin 8080 2>/dev/null); [ -z "$$a" ] || printf '  %-14s http://%s\n' "pgAdmin" "$$a"
-	@a=$$($(COMPOSE_ALL) port redisinsight 5540 2>/dev/null); [ -z "$$a" ] || printf '  %-14s http://%s\n' "Redis Insight" "$$a"
+	@a=$$($(COMPOSE) port app 3000 2>/dev/null); [ -z "$$a" ] || printf '  %-15s http://%s\n' "Application" "$$a"
+	@a=$$($(COMPOSE_ALL) port pgadmin 8080 2>/dev/null); [ -z "$$a" ] || printf '  %-15s http://%s\n' "pgAdmin" "$$a"
+	@a=$$($(COMPOSE_ALL) port redisinsight 5540 2>/dev/null); [ -z "$$a" ] || printf '  %-15s http://%s\n' "Redis Insight" "$$a"
+	@a=$$($(COMPOSE) port aistor 9001 2>/dev/null); [ -z "$$a" ] || printf '  %-15s http://%s\n' "AIStor Console" "$$a"
+	@a=$$($(COMPOSE) port aistor 9000 2>/dev/null); [ -z "$$a" ] || printf '  %-15s http://%s\n' "AIStor S3 API" "$$a"
 	@printf '\n'
 
 ports: _require-env ## Check that the host ports this stack needs are free
@@ -175,6 +180,35 @@ backup: _require-env ## Dump the database to backups/<db>_<UTC time>.dump
 
 restore: _require-env ## Restore a dump: make restore FILE=backups/<name>.dump (asks to confirm)
 	@FILE="$(FILE)" $(SCRIPTS)/pg-restore.sh
+
+##@ Object storage (MinIO AIStor; every command also works with MODE=prod)
+
+aistor-install: _require-env ## First-time AIStor setup: start it, create buckets and identities, validate (safe to repeat)
+	@$(SCRIPTS)/aistor.sh install
+
+aistor-config-check: _require-env ## Check the AIStor settings and license file without starting anything
+	@$(SCRIPTS)/aistor.sh config-check
+
+aistor-health: _require-env ## AIStor health probes, license plan and drive status
+	@$(SCRIPTS)/aistor.sh health
+
+aistor-mc: _require-env ## Admin shell with mc (aliases: aistor = root, platform, backup)
+	@$(SCRIPTS)/aistor.sh shell
+
+aistor-buckets: _require-env ## List buckets with owner tag, anonymous access and usage
+	@$(SCRIPTS)/aistor.sh buckets
+
+aistor-bucket-inspect: _require-env ## Details of one bucket: make aistor-bucket-inspect bucket=<name>
+	@BUCKET="$(bucket)" $(SCRIPTS)/aistor.sh inspect
+
+aistor-smoke: _require-env ## Upload/download/delete round trip with the platform and backup identities
+	@$(SCRIPTS)/aistor.sh smoke
+
+aistor-usage: _require-env ## Storage usage, drive capacity and AIStor container resources
+	@$(SCRIPTS)/aistor.sh usage
+
+aistor-validate: _require-env ## Check buckets, tags, permissions and isolation, then run the smoke test
+	@$(SCRIPTS)/aistor.sh validate
 
 ##@ Production (same commands with MODE=prod)
 
