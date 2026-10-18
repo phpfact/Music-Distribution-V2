@@ -109,7 +109,7 @@ export async function getViewerAppearanceState(
  *   the header's quick theme switch.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-15
- * Last modified: 2026-10-16
+ * Last modified: 2026-10-17
  */
 export async function saveViewerAppearance(
   db: TenantDb,
@@ -127,9 +127,11 @@ export async function saveViewerAppearance(
   try {
     // Step 2: one transaction; the user row is locked so this user's saves run one at a time.
     const saved = await db.$transaction(async (tx) => {
-      const users = await tx.$queryRaw<{ id: string }[]>`
-        SELECT "id" FROM "users" WHERE "id" = ${viewer.userId}::uuid AND "status" = 'active' FOR UPDATE`;
+      const users = await tx.$queryRaw<{ id: string; customerId: string | null }[]>`
+        SELECT "id", "customer_id" AS "customerId" FROM "users" WHERE "id" = ${viewer.userId}::uuid AND "status" = 'active' FOR UPDATE`;
       if (users.length === 0) return false;
+      // Actor kind comes from the active, locked database user, never the save payload.
+      const actorType = users[0]!.customerId === null ? "tenant_user" as const : "customer_user" as const;
 
       if (update.scope === "personal") {
         if (update.operation === "reset") {
@@ -141,7 +143,7 @@ export async function saveViewerAppearance(
             update: update.appearance,
           });
         }
-        return true;
+        return actorType;
       }
 
       // Workspace scope (privilege checked above).
@@ -155,14 +157,14 @@ export async function saveViewerAppearance(
         // The actor sees the change at once even with a personal override.
         await tx.userAppearance.updateMany({ where: { userId: viewer.userId }, data: update.appearance });
       }
-      return true;
+      return actorType;
     });
     if (!saved) return { ok: false, error: "Your session has ended. Sign in again to save your appearance." };
 
     // Step 3: audit after the commit (the audit log is in the control plane).
     try {
       await recordAudit(getControlDb(), {
-        actorType: "tenant_user",
+        actorType: saved,
         actorId: viewer.userId,
         tenantId: viewer.tenantId,
         action: update.operation === "reset" ? "workspace_appearance.reset" : "workspace_appearance.applied",

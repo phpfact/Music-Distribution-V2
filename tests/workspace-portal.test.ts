@@ -406,12 +406,18 @@ describe("appearance", () => {
     const personal = await saveViewerAppearance(wsA.db, viewer, { operation: "apply", scope: "personal", appearance: { theme: "dark", accent: "rose", width: "full" } }, null);
     expect(personal).toMatchObject({ ok: true, state: { source: "personal", appearance: { theme: "dark" } } });
 
+    const customerAudit = await db.query("SELECT actor_type FROM audit_events WHERE actor_id = $1 AND action = 'workspace_appearance.applied'", [customer.id]);
+    expect(customerAudit.rows).toEqual([{ actor_type: "customer_user" }]);
+
     // Owner: personal, then Apply to all (workspace default + own override, the customer's override stays).
     await saveViewerAppearance(wsA.db, owner, { operation: "apply", scope: "personal", appearance: { theme: "light", accent: "blue", width: "default" } }, null);
     const all = await saveViewerAppearance(wsA.db, owner, { operation: "apply", scope: "workspace", appearance: { theme: "system", accent: "emerald", width: "focused" } }, null);
     expect(all).toMatchObject({ ok: true, state: { appearance: { theme: "system", accent: "emerald" }, workspace: { theme: "system" } } });
     expect(await getPublicAppearance(wsA.db)).toStrictEqual({ theme: "system", accent: "emerald", width: "focused" });
     expect(await getViewerAppearanceState(wsA.db, viewer)).toMatchObject({ source: "personal", appearance: { theme: "dark" } });
+    const staffAudit = await db.query("SELECT actor_type FROM audit_events WHERE actor_id = $1 AND action = 'workspace_appearance.applied'", [admin]);
+    expect(staffAudit.rows.length).toBeGreaterThan(0);
+    expect(staffAudit.rows.every((row: { actor_type: string }) => row.actor_type === "tenant_user")).toBe(true);
     // Tenant B is untouched.
     expect(await getPublicAppearance(wsB.db)).toStrictEqual({ theme: "light", accent: "neutral", width: "default" });
 

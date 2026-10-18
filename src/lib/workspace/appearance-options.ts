@@ -188,3 +188,30 @@ export function parseWorkspaceAppearanceUpdate(value: unknown): WorkspaceAppeara
   const appearance = parseWorkspaceAppearance(value.appearance);
   return appearance ? { operation: "apply", scope: value.scope, appearance } : null;
 }
+
+/**
+ * Description: Rebase an appearance draft onto refreshed authoritative preferences.
+ * Input: Previous saved appearance, current draft and newest server appearance.
+ * Output: Untouched fields follow the server; edited fields survive with explicit conflicts.
+ * Use case: Header theme changes while tenant/customer Appearance settings remain mounted.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-17
+ * Last modified: 2026-10-17
+ */
+export function reconcileWorkspaceAppearanceDraft(
+  previous: WorkspaceAppearanceValue,
+  draft: WorkspaceAppearanceValue,
+  incoming: WorkspaceAppearanceValue,
+  previousConflicts: readonly (keyof WorkspaceAppearanceValue)[] = [],
+): { draft: WorkspaceAppearanceValue; conflicts: (keyof WorkspaceAppearanceValue)[] } {
+  const next = { ...incoming };
+  // Repeated refreshes must not silently acknowledge an unresolved conflict.
+  const conflicts = previousConflicts.filter((key) => draft[key] !== incoming[key]);
+  for (const key of ["theme", "accent", "width"] as const) {
+    if (draft[key] === previous[key]) continue;
+    // Keep the exact field the user edited, while adopting other saved fields.
+    Object.assign(next, { [key]: draft[key] });
+    if (incoming[key] !== previous[key] && incoming[key] !== draft[key] && !conflicts.includes(key)) conflicts.push(key);
+  }
+  return { draft: next, conflicts };
+}

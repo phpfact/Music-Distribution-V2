@@ -443,7 +443,8 @@ describe("what is logged", () => {
     await signIn(`vt-${WRONG_PASSWORD}`, WRONG_PASSWORD, ip);
 
     const text = logged.text();
-    expect(text).toContain("login rejected");
+    expect(text).toContain('"event":"auth.login"');
+    expect(text).toContain('"reason":"invalid_credentials"');
     expect(text).not.toContain(WRONG_PASSWORD);
     expect(text.toLowerCase()).not.toContain(WRONG_PASSWORD.toLowerCase());
     expect(text).not.toContain(owner.username);
@@ -460,7 +461,7 @@ describe("what is logged", () => {
     expect(await signIn(owner.username, PASSWORD, ip)).toStrictEqual(RATE_LIMITED);
 
     const text = logged.text();
-    expect(text).toContain("rate limited");
+    expect(text).toContain('"reason":"rate_limited"');
     expect(text).not.toContain(PASSWORD);
     expect(text).not.toContain(owner.username);
   });
@@ -471,7 +472,8 @@ describe("what is logged", () => {
     const token = await expectToken(await signIn(owner.username, PASSWORD, await newIp()));
 
     const text = logged.text();
-    expect(text).toContain("login succeeded");
+    expect(text).toContain('"outcome":"success"');
+    expect(text).toContain(owner.id);
     expect(text).not.toContain(PASSWORD);
     expect(text).not.toContain(token);
     expect(text).not.toContain(passwordHash);

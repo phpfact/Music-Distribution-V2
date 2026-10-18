@@ -1,5 +1,6 @@
 "use server";
 
+import { currentRequestContext } from "@/lib/request-context-server";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { authenticatePlatformOwner, type LoginFieldErrors } from "@/lib/platform-auth/login";
@@ -38,7 +39,7 @@ const FORM_ERRORS = {
  *   authenticatePlatformOwner. The destination is fixed; no return URL is read.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-17
  */
 export async function loginAction(
   _previousState: LoginFormState,
@@ -63,6 +64,7 @@ export async function loginAction(
   const result = await authenticatePlatformOwner(
     { username: submittedUsername, password: field("password") },
     clientIp,
+    await currentRequestContext(),
   );
 
   if (!result.ok) {

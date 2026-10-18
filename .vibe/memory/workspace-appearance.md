@@ -77,3 +77,17 @@
   ("You do not have permission to change the appearance for everyone.").
   Personal appearance stays available to every signed-in user.
 - Change history: 2026-10-16 — owner flag replaced by the privilege.
+
+## Audit remediation requested 2026-10-17 (AUD-012 / AUD-017)
+
+Refreshed authoritative appearance state must replace the saved baseline while
+preserving individually edited draft fields. Untouched fields follow the newest
+server state; overlapping external/draft edits are explicitly shown to the user
+before a save can overwrite them. Header and settings continue using the same
+server state and no full reload. Appearance audit actor kind comes from the
+verified, active user row locked by the save transaction (`customer_id`), never
+from submitted preferences or an untrusted actor flag.
+
+## Completion and verification — 2026-10-18
+
+AUD-012 and AUD-017 implemented. Untouched draft fields follow refreshed saved state, intentional edits survive, and overlapping conflicts block apply until explicitly resolved; repeated identical refreshes preserve unresolved conflicts. Customer/staff appearance audit kinds derive from the active locked database user. Pure reconciliation tests and real-database audit actor assertions passed; TypeScript, ESLint and production build passed.

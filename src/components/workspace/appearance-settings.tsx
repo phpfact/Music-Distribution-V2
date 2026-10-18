@@ -13,6 +13,7 @@ import { Spinner } from "@/components/ui/spinner";
 import {
   describeWorkspaceAppearance,
   sameWorkspaceAppearance,
+  reconcileWorkspaceAppearanceDraft,
   WORKSPACE_ACCENT_OPTIONS,
   WORKSPACE_DEFAULT_APPEARANCE,
   WORKSPACE_THEME_OPTIONS,
@@ -67,11 +68,13 @@ type AppearanceSettingsProps = {
  * Use case: /tenant/settings/appearance and /customer/settings/appearance.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-16
- * Last modified: 2026-10-16
+ * Last modified: 2026-10-17
  */
 export function AppearanceSettings({ state, saveAction }: AppearanceSettingsProps) {
   const router                        = useRouter();
   const [, startTransition]           = useTransition();
+  const [received, setReceived]       = useState(state);
+  const [conflicts, setConflicts]     = useState<(keyof WorkspaceAppearanceValue)[]>([]);
   const [saved, setSaved]             = useState(state);
   const [draft, setDraft]             = useState<WorkspaceAppearanceValue>(state.appearance);
   const [pending, setPending]         = useState(false);
@@ -81,6 +84,17 @@ export function AppearanceSettings({ state, saveAction }: AppearanceSettingsProp
 
   const running = useRef(false);
   const id      = useId();
+
+  // Reconcile during the prop-change render, before stale choices can be painted/saved.
+  // A field-by-field rebase preserves intentional draft edits, while a header save
+  // updates every untouched field and the authoritative permission/source baseline.
+  if (received !== state) {
+    const reconciled = reconcileWorkspaceAppearanceDraft(saved.appearance, draft, state.appearance, conflicts);
+    setReceived(state);
+    setSaved(state);
+    setDraft(reconciled.draft);
+    setConflicts(reconciled.conflicts);
+  }
 
   const dirty = !sameWorkspaceAppearance(draft, saved.appearance);
   const menu: SecondaryMenuItem[] = Object.values(SECTIONS).filter(
@@ -95,10 +109,10 @@ export function AppearanceSettings({ state, saveAction }: AppearanceSettingsProp
    * Use case: Every save/reset button and confirmation of this page.
    * Author: Mr. Sachin Sharma
    * Created: 2026-10-16
-   * Last modified: 2026-10-16
+   * Last modified: 2026-10-17
    */
   async function submit(update: WorkspaceAppearanceUpdate, success: string): Promise<boolean> {
-    if (running.current) return false;
+    if (running.current || (update.operation === "apply" && conflicts.length > 0)) return false;
     running.current = true;
     setPending(true);
     setNotice(null);
@@ -111,6 +125,7 @@ export function AppearanceSettings({ state, saveAction }: AppearanceSettingsProp
         else setNotice({ variant: "error", text: result.error });
         return false;
       }
+      setConflicts([]);
       setSaved(result.state);
       setDraft(result.state.appearance);
       setNotice({ variant: "success", text: success });
@@ -134,11 +149,12 @@ export function AppearanceSettings({ state, saveAction }: AppearanceSettingsProp
    * Use case: ConfirmDialog's onConfirm.
    * Author: Mr. Sachin Sharma
    * Created: 2026-10-16
-   * Last modified: 2026-10-16
+   * Last modified: 2026-10-17
    */
   async function confirmOpen() {
     if (confirm === "discard") {
       setDraft(saved.appearance);
+      setConflicts([]);
       setConfirm(null);
       return;
     }
@@ -164,6 +180,16 @@ export function AppearanceSettings({ state, saveAction }: AppearanceSettingsProp
       {notice ? (
         <Notice variant={notice.variant} onDismiss={() => setNotice(null)}>
           {notice.text}
+        </Notice>
+      ) : null}
+
+      {conflicts.length > 0 ? (
+        <Notice variant="warning" title="Saved appearance changed">
+          <p>Your saved {conflicts.join(", ")} changed while you were editing. Your draft is preserved. Choose which version to keep before saving.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button type="button" variant="outline" onClick={() => { setDraft(saved.appearance); setConflicts([]); }}>Use saved appearance</Button>
+            <Button type="button" variant="outline" onClick={() => setConflicts([])}>Keep my draft</Button>
+          </div>
         </Notice>
       ) : null}
 
@@ -278,7 +304,7 @@ export function AppearanceSettings({ state, saveAction }: AppearanceSettingsProp
                 <Badge variant="outline">{describeWorkspaceAppearance(saved.workspace ?? WORKSPACE_DEFAULT_APPEARANCE)}</Badge>
               </CardContent>
               <CardFooter className="flex flex-wrap gap-2">
-                <Button type="button" variant="outline" disabled={pending} onClick={() => setConfirm("apply-workspace")}>
+                <Button type="button" variant="outline" disabled={pending || conflicts.length > 0} onClick={() => setConfirm("apply-workspace")}>
                   <Users aria-hidden="true" />
                   Apply selection to everyone
                 </Button>
@@ -306,7 +332,7 @@ export function AppearanceSettings({ state, saveAction }: AppearanceSettingsProp
           </Button>
           <Button
             type="button"
-            disabled={pending || (!dirty && saved.source === "personal")}
+            disabled={pending || conflicts.length > 0 || (!dirty && saved.source === "personal")}
             aria-busy={pending || undefined}
             onClick={() => void submit({ operation: "apply", scope: "personal", appearance: draft }, "Your appearance was saved.")}
           >

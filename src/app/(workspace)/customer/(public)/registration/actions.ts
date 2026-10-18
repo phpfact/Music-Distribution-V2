@@ -4,12 +4,12 @@ import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { clientIpFromForwardedFor } from "@/lib/platform-auth/rate-limit";
-import { describeError } from "@/lib/platform-auth/session";
 import { getWorkspace } from "@/lib/workspace/context";
 import { WORKSPACE_COOKIES, workspaceCookieOptions } from "@/lib/workspace/cookies";
 import { LOGIN_PATH, REGISTRATION_STATUS_PATH, requireApplicant } from "@/lib/workspace/guards";
 import { requestRegistrationReview } from "@/lib/workspace/registrations";
-import { revokeRegistrationSession } from "@/lib/workspace/sessions";
+import { revokeWorkspaceSession } from "@/lib/workspace/logout";
+import { currentRequestContext } from "@/lib/request-context-server";
 
 export type ReviewRequestState = {
   status: "idle" | "error" | "success";
@@ -71,7 +71,7 @@ export async function requestReviewAction(
  * Use case: "Sign out" on /customer/registration.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-16
- * Last modified: 2026-10-16
+ * Last modified: 2026-10-17
  */
 export async function applicantLogoutAction(): Promise<void> {
   const cookieStore = await cookies();
@@ -81,11 +81,7 @@ export async function applicantLogoutAction(): Promise<void> {
   // Step 1: revoke the session in this tenant's database (best effort).
   const workspace = await getWorkspace();
   if (token && workspace.state === "ready") {
-    try {
-      await revokeRegistrationSession(workspace.db, workspace.tenant.id, token);
-    } catch (error) {
-      console.error(`[workspace-auth] could not revoke an applicant session: ${describeError(error)}`);
-    }
+    await revokeWorkspaceSession(workspace, "registration", token, await currentRequestContext());
   }
 
   // Step 2: delete the cookie with the same name and path it was set with.
