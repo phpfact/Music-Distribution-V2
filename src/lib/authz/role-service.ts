@@ -37,6 +37,7 @@ import {
 import {
   MANAGEMENT_PAGE_SIZE,
   parseManagementPage,
+  MANAGEMENT_SEARCH_MAX_LENGTH,
   ROLE_COUNT_CATEGORIES,
   type AssignableRoleOption,
   type AssignedUserRow,
@@ -71,6 +72,7 @@ import {
 } from "./policy";
 import { validateRoleStatus } from "./role-rules";
 import { storeFor, type StoredRole, type StoredUser } from "./stores";
+import type { RoleFilter } from "./stores/types";
 
 /** The submitted role form (untrusted values straight from FormData). */
 export type RoleInput = {
@@ -96,9 +98,6 @@ const MESSAGES = {
   replacementSame: "Choose a different role as the replacement.",
   replacementMissing: "The chosen replacement role is not available. Choose another role.",
 } as const;
-
-// Picker lists are short (roles of one scope); the cap only guards against abuse.
-const PICKER_LIMIT = 500;
 
 // ---------------------------------------------------------------------------
 // Shaping
@@ -479,35 +478,107 @@ export async function getRoleEditorModel(actor: AuthzActor, roleId?: unknown): P
 }
 
 /**
- * Description: List the active roles this actor may assign (role pickers).
- * Input: The actor and, optionally, a role id to leave out (the role being deleted).
- * Output: id, name, master flag and privilege count (null = all) of every
- *   assignable role, master first then by name; forbidden unless the actor may
- *   delete roles or create/edit sub-users.
+ * Description: Read the initial page of active, assignable roles for a picker.
+ * Input: The actor, optional excluded role and optional saved selected role.
+ * Output: Up to twenty choices plus that one saved option when eligible, with
+ *   id, name, master flag and privilege count; later choices remain reachable
+ *   through searchRoleOptions. Forbidden without delete/create/edit access.
  * Use case: Sub-user form role picker; "Delete and reassign" replacement picker.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-16
- * Last modified: 2026-10-16
+ * Last modified: 2026-10-18
  */
 export async function listAssignableRoles(
   actor: AuthzActor,
-  options: { excludeRoleId?: string | null } = {},
+  options: { excludeRoleId?: string | null; selectedRoleId?: string | null } = {},
 ): Promise<QueryResult<AssignableRoleOption[]>> {
-  if (!holdsAnyPrivilege(actor, ["rolesDelete", "usersCreate", "usersEdit"])) return forbidden(actor);
+  try {
+    const page = await searchRoleOptions(actor, { kind: "assignable", excludeRoleId: options.excludeRoleId });
+    if (!page.ok) return page;
+    const roles = [...page.data.rows];
+    // A saved value may sit on a later page. Fetch only that one scoped, eligible role.
+    if (isUuid(options.selectedRoleId) && !roles.some((role) => role.id === options.selectedRoleId)) {
+      const selected = await storeFor(actor).findRole(options.selectedRoleId);
+      if (selected && checkRoleAssignable(toPolicyActor(actor), selected).ok) {
+        roles.push(toRoleOption(toPolicyActor(actor), selected));
+      }
+    }
+    return { ok: true, data: roles };
+  } catch (error) {
+    logFailure(actor, "loading selected assignable role", error);
+    return { ok: false, reason: "unavailable", error: LOAD_FAILED_MESSAGE };
+  }
+}
+
+/** The untrusted role-option search, shared by pickers and directory filters. */
+export type RoleOptionsQuery = {
+  kind?: "assignable" | "filter";
+  q?: unknown;
+  page?: unknown;
+  excludeRoleId?: unknown;
+};
+
+/**
+ * Description: Map one scoped role to a serializable picker option.
+ * Input: The current policy actor and a stored role.
+ * Output: Id, name, master flag and effective privilege count.
+ * Use case: Initial role choices and paginated role searches.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-17
+ * Last modified: 2026-10-17
+ */
+function toRoleOption(actor: PolicyActor, role: StoredRole): AssignableRoleOption {
+  return {
+    id: role.id,
+    name: role.name,
+    isMaster: isMasterRole(role),
+    privilegeCount: isMasterRole(role) ? null : roleCeilingKeys(role, actor.disabledModules).length,
+  };
+}
+
+/**
+ * Description: Search one page of eligible roles entirely in the scoped database.
+ * Input: A server-built actor plus untrusted search, page, exclusion and filter purpose.
+ * Output: Twenty options and exact pagination metadata, or a friendly refusal.
+ * Use case: Every assignment/replacement picker and sub-user directory role filter.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-17
+ * Last modified: 2026-10-17
+ */
+export async function searchRoleOptions(
+  actor: AuthzActor,
+  query: RoleOptionsQuery = {},
+): Promise<QueryResult<ManagementPage<AssignableRoleOption>>> {
+  const filtering = query.kind === "filter";
+  if (filtering && !holdsPrivilege(actor, "usersView")) return forbidden(actor);
+  const allRoles = filtering && holdsPrivilege(actor, "rolesView");
+  if (!allRoles && !holdsAnyPrivilege(actor, filtering ? ["usersCreate", "usersEdit"] : ["rolesDelete", "usersCreate", "usersEdit"])) {
+    return forbidden(actor);
+  }
   try {
     const policy = toPolicyActor(actor);
-    const roles  = await storeFor(actor).listRoles({ status: "active" }, 0, PICKER_LIMIT);
-    const offered = roles
-      .filter((role) => role.id !== options.excludeRoleId && checkRoleAssignable(policy, role).ok)
-      .map((role) => ({
-        id: role.id,
-        name: role.name,
-        isMaster: isMasterRole(role),
-        privilegeCount: isMasterRole(role) ? null : roleCeilingKeys(role, policy.disabledModules).length,
-      }));
-    return { ok: true, data: offered };
+    const filter: RoleFilter = {
+      q: typeof query.q === "string" ? query.q.trim().slice(0, MANAGEMENT_SEARCH_MAX_LENGTH).trim() : "",
+      status: allRoles ? "all" : "active",
+      excludeRoleId: isUuid(query.excludeRoleId) ? query.excludeRoleId : null,
+    };
+    if (!allRoles) {
+      // Only live catalog keys outside the current ceiling block a custom role.
+      const ceiling = new Set(policy.permissions);
+      filter.assignable = {
+        allowMaster: policy.isMaster,
+        forbiddenKeys: permissionsOfDomain(actor.domain)
+          .filter((permission) => !isModuleDisabled(permission.module, policy.disabledModules) && !ceiling.has(permission.key))
+          .map((permission) => permission.key),
+      };
+    }
+    const store  = storeFor(actor);
+    const total  = await store.countRoles(filter);
+    const window = pageWindow(total, parseManagementPage(query.page));
+    const roles  = await store.listRoles(filter, window.skip, window.take);
+    return { ok: true, data: { rows: roles.map((role) => toRoleOption(policy, role)), total, page: window.page, pageCount: window.pageCount, pageSize: MANAGEMENT_PAGE_SIZE } };
   } catch (error) {
-    logFailure(actor, "listing assignable roles", error);
+    logFailure(actor, "searching role options", error);
     return { ok: false, reason: "unavailable", error: LOAD_FAILED_MESSAGE };
   }
 }

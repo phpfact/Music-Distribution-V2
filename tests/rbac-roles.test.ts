@@ -10,6 +10,7 @@ import type { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { permissionKeysOfDomain } from "@/lib/authz/catalog";
 import { loadPlatformAccess } from "@/lib/authz/platform-access";
+import { listRoleFilterOptions } from "@/lib/authz/role-filter";
 import {
   createRole,
   deleteRole,
@@ -20,6 +21,7 @@ import {
   listRoleCountRecords,
   listRoles,
   listRoleUsers,
+  searchRoleOptions,
   setRoleStatus,
   updateRole,
 } from "@/lib/authz/role-service";
@@ -491,5 +493,123 @@ describe("customer roles", () => {
 
     // A raw insert of a role owned by Y with a name X already uses is fine (names are unique per owner).
     await insertRole(tenantA.rt, { name: list.data.rows[1]?.name ?? "x", domain: "customer", owner: y.customerId, keys: ["customer.roles.view"] });
+  });
+});
+
+
+// Audit regression fixtures remain in these scratch databases and are removed by the suite teardown.
+describe("audit role editor and unbounded option reachability", () => {
+  it("keeps selected-role hydration outages inside the friendly query contract", async () => {
+    const actor = await platformActorOf(ownerM);
+    const selectedRoleId = randomUUID();
+    const lookup = vi.spyOn(getControlDb().platformRole, "findUnique");
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      lookup.mockRejectedValueOnce(new Error("simulated selected-role lookup outage"));
+      expect(await listRoleFilterOptions(actor, selectedRoleId)).toBeUndefined();
+      lookup.mockRejectedValueOnce(new Error("simulated selected-role lookup outage"));
+      expect(await listAssignableRoles(actor, { selectedRoleId })).toMatchObject({ ok: false, reason: "unavailable" });
+      expect(logged).toHaveBeenCalledTimes(2);
+    } finally {
+      lookup.mockRestore();
+      logged.mockRestore();
+    }
+  });
+  it("saves metadata for platform and tenant roles with only disabled-module grants", async () => {
+    const platformRole = await insertPlatformRole(control, { name: roleName("Disabled Only"), permissionKeys: ["platform.tenants.view"] });
+    const tenantRole = await insertRole(tenantA.rt, { name: roleName("Disabled Only"), domain: "tenant", keys: ["tenant.registrations.view"] });
+    await control.query("INSERT INTO platform_module_settings (module_key, enabled) VALUES ('platform.tenants', false)");
+    await control.query("INSERT INTO tenant_module_settings (tenant_id, module_key, enabled) VALUES ($1, 'tenant.registrations', false)", [tenantA.tenant.id]);
+    try {
+      const platform = await platformActorOf(ownerM);
+      const tenant = await tenantActorOf(tenantA, tenantA.adminId);
+      expect(await updateRole(platform, platformRole, input(roleName("Renamed Disabled"), [], "active", "Metadata only"))).toMatchObject({ ok: true });
+      expect(await updateRole(tenant, tenantRole, input(roleName("Renamed Disabled"), [], "active", "Metadata only"))).toMatchObject({ ok: true });
+      expect(await platformRoleKeys(platformRole)).toStrictEqual(["platform.tenants.view"]);
+      expect(await workspaceRoleKeys(tenantA.rt, tenantRole)).toStrictEqual(["tenant.registrations.view"]);
+      expect(await getRoleEditorModel(tenant, tenantRole)).toMatchObject({ ok: true, data: { initial: { permissionKeys: [] }, preservedKeys: ["tenant.registrations.view"] } });
+      expect(await createRole(tenant, input(roleName("Empty Still Invalid"), []))).toMatchObject({ ok: false, reason: "validation" });
+    } finally {
+      await control.query("DELETE FROM platform_module_settings");
+      await control.query("DELETE FROM tenant_module_settings WHERE tenant_id = $1", [tenantA.tenant.id]);
+    }
+  });
+
+  it("returns every affected holder through the second page, with scope enforcement", async () => {
+    const roleId = await insertPlatformRole(control, { name: roleName("Affected"), permissionKeys: ["platform.users.view"] });
+    await control.query(`INSERT INTO platform_owners (id, username, full_name, password_hash, role_id, updated_at)
+      SELECT gen_random_uuid(), 'audit-holder-' || gen_random_uuid(), 'Audit Holder', 'h', $1, now() FROM generate_series(1, 21)`, [roleId]);
+    const actor = await platformActorOf(ownerM);
+    const first = await listRoleUsers(actor, roleId, 1);
+    const second = await listRoleUsers(actor, roleId, 2);
+    expect(first).toMatchObject({ ok: true, data: { total: 21, pageCount: 2, pageSize: 20 } });
+    expect(second).toMatchObject({ ok: true, data: { total: 21, page: 2, pageCount: 2 } });
+    if (!first.ok || !second.ok) throw new Error("holder pages unavailable");
+    expect(first.data.rows).toHaveLength(20);
+    expect(second.data.rows).toHaveLength(1);
+    expect(new Set([...first.data.rows, ...second.data.rows].map((row) => row.id)).size).toBe(21);
+    expect(await listRoleUsers(await tenantActorOf(tenantA, tenantA.adminId), roleId, 2)).toMatchObject({ ok: false, reason: "not_found" });
+  });
+
+  it("applies the platform ceiling before pagination and reaches/searches roles beyond 500", async () => {
+    const prefix = `AA Audit ${suffix()}`;
+    const high = await control.query<{ id: string }>(`INSERT INTO platform_roles (id, name, updated_at)
+      SELECT gen_random_uuid(), $1 || ' ' || lpad(n::text, 4, '0'), now() FROM generate_series(1, 501) n RETURNING id`, [prefix]);
+    await control.query("INSERT INTO platform_role_permissions (role_id, permission_key) SELECT unnest($1::uuid[]), 'platform.tenants.create'", [high.rows.map((row) => row.id)]);
+    const eligible = await insertPlatformRole(control, { name: roleName("ZZ Audit Eligible"), permissionKeys: ["platform.users.view"] });
+    const limited = await platformActorOf(ownerL);
+    const page = await searchRoleOptions(limited);
+    expect(page.ok && page.data.rows.map((role) => role.id)).toContain(eligible);
+    expect(page.ok && page.data.rows.some((role) => high.rows.some((bad) => bad.id === role.id))).toBe(false);
+    // Viewing roles may include roles above the assignment ceiling, while assignment search may not.
+    expect(await searchRoleOptions(limited, { kind: "filter", q: prefix })).toMatchObject({ ok: true, data: { total: 501, pageCount: 26 } });
+    const last = await searchRoleOptions(await platformActorOf(ownerM), { q: prefix, page: 26 });
+    expect(last).toMatchObject({ ok: true, data: { total: 501, page: 26, pageCount: 26, rows: [{ name: `${prefix} 0501` }] } });
+    const found = await searchRoleOptions(await platformActorOf(ownerM), { q: `${prefix} 0501`.toLowerCase() });
+    expect(found).toMatchObject({ ok: true, data: { total: 1 } });
+    const saved = await listAssignableRoles(await platformActorOf(ownerM), { selectedRoleId: high.rows[500]?.id });
+    expect(saved.ok && saved.data.map((role) => role.id)).toContain(high.rows[500]?.id);
+    expect(saved.ok && saved.data.length).toBeLessThanOrEqual(21);
+    expect(await searchRoleOptions(limited, { q: prefix, excludeRoleId: eligible })).toMatchObject({ ok: true, data: { total: 0, rows: [] } });
+  });
+
+  it("applies tenant and customer ceilings before paging while preserving tenant/customer isolation", async () => {
+    const tenantManagerRole = await insertRole(tenantA.rt, { name: roleName("Option Tenant Manager"), domain: "tenant", keys: ["tenant.users.view", "tenant.users.create"] });
+    const tenantManager = await insertUser(tenantA.rt, { handle: "options-manager" });
+    await assignRole(tenantA.rt, tenantManager, tenantManagerRole);
+    const customer = await approvedCustomer(tenantA, "Audit Customer Options");
+    const other = await approvedCustomer(tenantA, "Audit Customer Foreign");
+    const customerManagerRole = await insertRole(tenantA.rt, { name: roleName("Option Customer Manager"), domain: "customer", owner: customer.customerId, keys: ["customer.sub_customers.view", "customer.sub_customers.create"] });
+    const sub = await insertCustomer(tenantA.rt, "Audit Option Staff", customer.customerId);
+    const customerManager = await insertUser(tenantA.rt, { handle: "customer-options-manager", customerId: sub });
+    await assignRole(tenantA.rt, customerManager, customerManagerRole);
+    const tenantActor = await tenantActorOf(tenantA, tenantManager);
+    const customerActor = await customerActorOf(tenantA, customerManager);
+    const prefix = `AA Scoped Options ${suffix()}`;
+    // Both scopes have more than 500 ineligible roles ahead of their valid choice.
+    for (const [domain, owner, blockedKey] of [["tenant", null, "tenant.registrations.view"], ["customer", customer.customerId, "customer.roles.view"]] as const) {
+      const roles = await tenantA.rt.query<{ id: string }>(`INSERT INTO roles (id, name, domain, owner_customer_id, updated_at)
+        SELECT gen_random_uuid(), $1 || ' ' || lpad(n::text, 4, '0'), $2::authz_domain, $3::uuid, now() FROM generate_series(1, 501) n RETURNING id`, [prefix, domain, owner]);
+      await tenantA.rt.query(`INSERT INTO role_permissions (role_id, permission_id)
+        SELECT unnest($1::uuid[]), id FROM permissions WHERE key = $2`, [roles.rows.map((row) => row.id), blockedKey]);
+    }
+    const tenantRole = await insertRole(tenantA.rt, { name: roleName("ZZ Scoped Tenant"), domain: "tenant", keys: ["tenant.users.view"] });
+    const customerRole = await insertRole(tenantA.rt, { name: roleName("ZZ Scoped Customer"), domain: "customer", owner: customer.customerId, keys: ["customer.sub_customers.view"] });
+    const foreignRole = await insertRole(tenantA.rt, { name: roleName("ZZ Foreign Customer"), domain: "customer", owner: other.customerId, keys: ["customer.sub_customers.view"] });
+    expect(await searchRoleOptions(tenantActor, { q: "ZZ Scoped" })).toMatchObject({ ok: true, data: { total: 1, rows: [{ id: tenantRole }] } });
+    expect(await searchRoleOptions(customerActor, { q: "ZZ Scoped" })).toMatchObject({ ok: true, data: { total: 1, rows: [{ id: customerRole }] } });
+    const tenantInitial = await listAssignableRoles(tenantActor);
+    const customerInitial = await listAssignableRoles(customerActor);
+    expect(tenantInitial.ok && tenantInitial.data.map((role) => role.id)).toContain(tenantRole);
+    expect(customerInitial.ok && customerInitial.data.map((role) => role.id)).toContain(customerRole);
+    expect(customerInitial.ok && customerInitial.data.map((role) => role.id)).not.toContain(foreignRole);
+    expect(await searchRoleOptions(customerActor, { kind: "filter", q: "ZZ Foreign" })).toMatchObject({ ok: true, data: { total: 0 } });
+    expect(await searchRoleOptions(await tenantActorOf(tenantB, tenantB.adminId), { q: "ZZ Scoped" })).toMatchObject({ ok: true, data: { total: 0 } });
+    expect(await searchRoleOptions(await customerActorOf(tenantA, other.userId), { q: "ZZ Scoped" })).toMatchObject({ ok: true, data: { total: 0 } });
+    // A user with only users.view has no role-option disclosure privilege.
+    const viewOnlyRole = await insertRole(tenantA.rt, { name: roleName("Options View Only"), domain: "tenant", keys: ["tenant.users.view"] });
+    const viewer = await insertUser(tenantA.rt, { handle: "options-viewer" });
+    await assignRole(tenantA.rt, viewer, viewOnlyRole);
+    expect(await searchRoleOptions(await tenantActorOf(tenantA, viewer), { kind: "filter" })).toMatchObject({ ok: false, reason: "forbidden" });
   });
 });

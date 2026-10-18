@@ -2,6 +2,8 @@
 
 import { CheckIcon, ChevronsUpDownIcon, SearchIcon } from "lucide-react";
 import {
+  useEffect,
+  useEffectEvent,
   useId,
   useRef,
   useState,
@@ -13,6 +15,12 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
+import { EmptyState } from "@/app/platform/(console)/_components/empty-state";
+
+/** One page of server-searched choices; rows stay bounded in the browser. */
+export type SelectOptionsResult =
+  | { ok: true; options: SearchableSelectOption[]; page: number; pageCount: number }
+  | { ok: false; error: string };
 
 /** One choice of a SearchableSelect. */
 export type SearchableSelectOption = {
@@ -36,6 +44,8 @@ export type SearchableSelectProps = {
   /** Name of the hidden input that submits the value with a native form (omit for filters). */
   name?: string;
   options: readonly SearchableSelectOption[];
+  /** Optional scoped server search. Local filtering is bypassed when supplied. */
+  loadOptions?: (search: string, page: number) => Promise<SelectOptionsResult>;
   /** Controlled value ("" = nothing chosen). */
   value?: string;
   /** Uncontrolled initial value. */
@@ -106,6 +116,7 @@ export function SearchableSelect({
   id,
   name,
   options,
+  loadOptions,
   value,
   defaultValue = "",
   onValueChange,
@@ -129,6 +140,39 @@ export function SearchableSelect({
   const [search, setSearch]         = useState("");
   // The highlighted option (keyboard/mouse), by value; null = none.
   const [activeValue, setActiveValue] = useState<string | null>(null);
+  const [optionPage, setOptionPage] = useState(1);
+  const [attempt, setAttempt]       = useState(0);
+  const [remote, setRemote]         = useState<SelectOptionsResult | null>(null);
+  const [searching, setSearching]   = useState(false);
+  // Keep just the selected row across remote pages/searches, never the full dataset.
+  const [remembered, setRemembered] = useState<SearchableSelectOption | null>(null);
+  const remoteEnabled = Boolean(loadOptions);
+  const loadPage = useEffectEvent(async (text: string, page: number) => loadOptions?.(text, page));
+
+  useEffect(() => {
+    if (!open || !remoteEnabled) return;
+    let obsolete = false;
+    // Debounce only typing; paging and opening still show an explicit loading state.
+    const timer = setTimeout(() => {
+      loadPage(search, optionPage)
+        .then((result) => {
+          if (!obsolete && result) {
+            setRemote(result);
+            setSearching(false);
+          }
+        })
+        .catch(() => {
+          if (!obsolete) {
+            setRemote({ ok: false, error: "The choices could not be loaded. Try again." });
+            setSearching(false);
+          }
+        });
+    }, search ? 250 : 0);
+    return () => {
+      obsolete = true;
+      clearTimeout(timer);
+    };
+  }, [open, search, optionPage, attempt, remoteEnabled]);
 
   const searchRef = useRef<HTMLInputElement>(null);
   const listRef   = useRef<HTMLUListElement>(null);
@@ -138,11 +182,14 @@ export function SearchableSelect({
 
   // Step 1: the current value (controlled wins) and the option it names.
   const selectedValue  = value ?? innerValue;
-  const selectedOption = options.find((option) => option.value === selectedValue);
+  const selectedOption = options.find((option) => option.value === selectedValue)
+    ?? (remembered?.value === selectedValue ? remembered : undefined);
 
   // Step 2: the options matching the search, and which of them can be chosen.
   const normalizedSearch = search.trim().toLocaleLowerCase("en-US");
-  const visible          = options.filter((option) => matches(option, normalizedSearch));
+  const visible          = loadOptions
+    ? (searching || !remote?.ok ? [] : remote.options)
+    : options.filter((option) => matches(option, normalizedSearch));
   const enabled          = visible.filter((option) => !option.disabled);
 
   // Step 3: the highlighted option must be a visible, enabled one; otherwise the first enabled.
@@ -175,6 +222,9 @@ export function SearchableSelect({
     if (next && inactive) return;
     setOpen(next);
     setSearch(next ? seed : "");
+    setOptionPage(1);
+    setRemote(null);
+    setSearching(Boolean(next && loadOptions));
     setActiveValue(next ? (selectedOption?.value ?? null) : null);
   }
 
@@ -188,7 +238,8 @@ export function SearchableSelect({
    * Last modified: 2026-10-16
    */
   function choose(option: SearchableSelectOption) {
-    if (option.disabled) return;
+    if (option.disabled || searching) return;
+    setRemembered(option);
     if (value === undefined) setInnerValue(option.value);
     onValueChange?.(option.value);
     changeOpen(false);
@@ -349,6 +400,7 @@ export function SearchableSelect({
               aria-autocomplete="list"
               aria-activedescendant={active ? optionId(visible.indexOf(active)) : undefined}
               aria-label={searchPlaceholder}
+              maxLength={loadOptions ? 100 : undefined}
               autoComplete="off"
               autoCorrect="off"
               spellCheck={false}
@@ -356,6 +408,8 @@ export function SearchableSelect({
               placeholder={searchPlaceholder}
               onChange={(event) => {
                 setSearch(event.currentTarget.value);
+                setOptionPage(1);
+                if (loadOptions) setSearching(true);
                 setActiveValue(null);
               }}
               onKeyDown={onSearchKeyDown}
@@ -366,14 +420,22 @@ export function SearchableSelect({
             ref={listRef}
             id={listboxId}
             role="listbox"
+            aria-busy={searching || undefined}
             aria-labelledby={ariaLabelledBy}
             aria-label={ariaLabelledBy ? undefined : (ariaLabel ?? placeholder)}
             className="max-h-64 overflow-y-auto p-1"
           >
-            {visible.length === 0 ? (
+            {searching ? (
+              <li role="presentation" aria-live="polite" className="flex items-center justify-center gap-2 px-3 py-6 text-sm text-muted-foreground"><Spinner /> Loading…</li>
+            ) : loadOptions && remote && !remote.ok ? (
+              <li role="presentation" className="flex flex-col gap-2 px-3 py-4 text-sm text-destructive">
+                <p role="status">{remote.error}</p>
+                <Button type="button" variant="outline" onClick={() => { setSearching(true); setAttempt((value) => value + 1); }}>Try again</Button>
+              </li>
+            ) : visible.length === 0 ? (
               // An empty list still explains itself (polite, not an option).
               <li role="presentation" aria-live="polite" className="px-3 py-6 text-center text-sm text-muted-foreground">
-                {emptyText}
+                <EmptyState size="sm" icon="search" title="No matching choices" description={emptyText} />
               </li>
             ) : (
               visible.map((option, index) => {
@@ -420,6 +482,13 @@ export function SearchableSelect({
               })
             )}
           </ul>
+          {loadOptions && remote?.ok && remote.pageCount > 1 ? (
+            <div className="flex items-center justify-between gap-2 border-t p-2">
+              <Button type="button" size="sm" variant="outline" disabled={searching || remote.page <= 1} onClick={() => { setSearching(true); setOptionPage(remote.page - 1); }}>Previous</Button>
+              <span className="text-xs text-muted-foreground">Page {remote.page} of {remote.pageCount}</span>
+              <Button type="button" size="sm" variant="outline" disabled={searching || remote.page >= remote.pageCount} onClick={() => { setSearching(true); setOptionPage(remote.page + 1); }}>Next</Button>
+            </div>
+          ) : null}
         </PopoverContent>
       </Popover>
       {/* Exactly one submitted value for native forms ("" while nothing is chosen). */}

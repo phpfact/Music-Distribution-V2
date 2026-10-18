@@ -142,6 +142,11 @@
 
 ## Change history
 
+- 2026-10-17: AUD-006 remediation: sign-in reads the customer's parent and refuses
+  an active child of a suspended main customer after password verification and
+  before session issuance. The existing `suspended` result and credential timing
+  remain consistent with session validation. Regression coverage exercises active
+  parent success and suspended-parent refusal without a new session row.
 - 2026-10-17: Resolved AUD-20261017-001/002 with transactional master-session
   revocation and hash-checked, locked workspace-session issuance, following the
   platform session pattern. Regression tests in
@@ -181,3 +186,11 @@
 - Pages/actions needing a privilege use `requireTenantAccess` /
   `authorizeTenantAction` (src/lib/authz/workspace.ts).
 - Change history: 2026-10-16 — owner flag removed, role name, fingerprint reader.
+
+## Audit remediation requested 2026-10-17 (AUD-014)
+
+Staff, customer and applicant sign-in/out must share structured authentication events with trusted IP, UTC, request correlation, tenant, outcome and verified actor or pseudonymous failure identifier. Applicant logout gains a completion event. Raw identifiers, passwords and tokens are excluded.
+
+## Completion and verification — 2026-10-18
+
+AUD-014 implemented for staff, customer and applicant sign-in/out. Shared logout attribution is best effort, revocation still runs after attribution-read errors, and applicant logout now emits success/failure outcomes. Existing real-database portal tests and database-free logout regressions passed. Root integration retains separate AUD-006 changes to customer-parent suspension checking.

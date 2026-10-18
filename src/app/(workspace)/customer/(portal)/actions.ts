@@ -10,7 +10,8 @@ import type { WorkspaceAppearanceActionResult } from "@/lib/workspace/appearance
 import { getWorkspace } from "@/lib/workspace/context";
 import { WORKSPACE_COOKIES, workspaceCookieOptions } from "@/lib/workspace/cookies";
 import { LOGIN_PATH, readAreaFingerprint, requireCustomer, type AreaFingerprint } from "@/lib/workspace/guards";
-import { revokeUserSession } from "@/lib/workspace/sessions";
+import { revokeWorkspaceSession } from "@/lib/workspace/logout";
+import { currentRequestContext } from "@/lib/request-context-server";
 import { CUSTOMER_BASE_PATH } from "./navigation";
 
 /**
@@ -22,7 +23,7 @@ import { CUSTOMER_BASE_PATH } from "./navigation";
  * Use case: "Log out" in the customer area's account menu (with and without JavaScript).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-16
- * Last modified: 2026-10-16
+ * Last modified: 2026-10-17
  */
 export async function customerLogoutAction(): Promise<void> {
   const cookieStore = await cookies();
@@ -32,12 +33,7 @@ export async function customerLogoutAction(): Promise<void> {
   // Step 1: revoke the session (best effort: the cookie goes either way).
   const workspace = await getWorkspace();
   if (token && workspace.state === "ready") {
-    try {
-      await revokeUserSession(workspace.db, workspace.tenant.id, "customer", token);
-      console.log(`[workspace-auth] tenant ${workspace.tenant.id}: customer logout succeeded`);
-    } catch (error) {
-      console.error(`[workspace-auth] could not revoke a customer session: ${describeError(error)}`);
-    }
+    await revokeWorkspaceSession(workspace, "customer", token, await currentRequestContext());
   }
 
   // Step 2: delete the cookie with the same name and path it was set with.

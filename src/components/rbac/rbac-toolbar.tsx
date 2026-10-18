@@ -12,7 +12,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { privilegeCountText } from "./format";
 import { hasRbacFilters, RBAC_SEARCH_MAX_LENGTH, rbacListHref, type RbacListQuery, type RbacStatusFilter } from "./list-href";
 import { MasterBadge } from "./role-badges";
-import type { RoleOptionView } from "./types";
+import type { LoadRoleOptions, RoleOptionView } from "./types";
 
 // Long enough not to reload on every keystroke, short enough to feel live.
 const SEARCH_DEBOUNCE_MS = 350;
@@ -28,6 +28,8 @@ type RbacToolbarProps = {
   statusLabels?: { active: string; disabled: string };
   /** When given, a searchable role filter is shown (sub-users directory). */
   roleOptions?: readonly RoleOptionView[];
+  /** Searches all scoped roles without loading the full set in the browser. */
+  loadRoles?: LoadRoleOptions;
 };
 
 /**
@@ -50,6 +52,7 @@ export function RbacToolbar({
   searchPlaceholder,
   statusLabels = { active: "Active", disabled: "Disabled" },
   roleOptions,
+  loadRoles,
 }: RbacToolbarProps) {
   const router                     = useRouter();
   const [pending, startTransition] = useTransition();
@@ -68,6 +71,12 @@ export function RbacToolbar({
     if (query.q !== search.trim()) setSearch(query.q);
   }
 
+  // A newer URL invalidates any callback that captured the earlier filters.
+  useEffect(() => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+  }, [query.q, query.status, query.role, query.page]);
+
   // A pending debounce never fires after the toolbar is gone.
   useEffect(() => () => {
     if (timer.current) clearTimeout(timer.current);
@@ -83,6 +92,9 @@ export function RbacToolbar({
    * Last modified: 2026-10-16
    */
   function navigate(changes: Partial<RbacListQuery>) {
+    // Explicit status/role/Clear choices supersede pending typed searches.
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
     const next = { ...query, q: search.trim(), ...changes, page: 1 };
     startTransition(() => router.push(rbacListHref(basePath, next), { scroll: false }));
   }
@@ -141,6 +153,18 @@ export function RbacToolbar({
           <SearchableSelect
             id={roleId}
             options={roleChoices}
+            loadOptions={loadRoles ? async (search, page) => {
+              const result = await loadRoles(search, page);
+              return result.ok ? {
+                ok: true,
+                options: [
+                  { value: "", label: "All roles" },
+                  ...result.page.rows.map((role) => ({ value: role.id, label: role.name, meta: privilegeCountText(role.privilegeCount), badge: role.isMaster ? <MasterBadge /> : undefined })),
+                ],
+                page: result.page.page,
+                pageCount: result.page.pageCount,
+              } : result;
+            } : undefined}
             value={query.role}
             onValueChange={(value) => navigate({ role: value })}
             placeholder="All roles"

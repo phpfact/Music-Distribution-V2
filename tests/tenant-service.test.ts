@@ -26,6 +26,7 @@ import {
   getTenantDetails,
   getTenantSummary,
   listTenants,
+  listTenantCountRecords,
   previewGeneratedValues,
   reactivateTenant,
   retryProvisioning,
@@ -51,7 +52,7 @@ import {
 
 const SLOW = { timeout: 90_000 };
 const BASE_DOMAIN = process.env.PLATFORM_BASE_DOMAIN?.trim() || "localhost";
-const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 1, 2, 3]);
+import { VALID_PNG as PNG } from "./support/image-fixtures";
 
 let db: Client;
 let resources: TenantResources;
@@ -691,7 +692,10 @@ describe("profile images", () => {
     expect(row?.profile_image_key).toMatch(new RegExp(`^tenants/${id}/profile/[0-9a-f-]{36}\\.png$`));
     const image = await readProfileImage(id);
     expect(image?.contentType).toBe("image/png");
-    expect(Buffer.from(image?.bytes ?? new Uint8Array())).toStrictEqual(Buffer.from(PNG));
+    const sharp = (await import("sharp")).default;
+    const decoded = await sharp(image?.bytes).raw().toBuffer({ resolveWithObject: true });
+    expect(decoded.info).toMatchObject({ width: 2, height: 2, channels: 3 });
+    expect(decoded.data).toStrictEqual(await sharp(PNG).raw().toBuffer());
     expect((await getTenantDetails(id))?.hasProfileImage).toBe(true);
   });
 
@@ -743,6 +747,7 @@ describe("listTenants", () => {
     await make("underscoreX", `Test Underscorex ${token}`, { email: `us-axb-${token}@example.com` });
     await setStatus(ids.alpha as string, "active");
     await setStatus(ids.percent as string, "suspended");
+    await db.query("UPDATE tenants SET schema_status = 'current' WHERE id = ANY($1::uuid[])", [[ids.alpha, ids.percent]]);
     await setStatus(ids.percentX as string, "failed");
     await setStatus(ids.underscore as string, "provisioning");
   });
@@ -800,6 +805,20 @@ describe("listTenants", () => {
     expect(byId.get(ids.percentX as string)).toBe("failed");
     expect(byId.get(ids.underscore as string)).toBe("provisioning");
     expect(byId.get(ids.underscoreX as string)).toBe("pending");
+  });
+
+  it("shows failed/pending schema readiness in directory and count records", async () => {
+    try {
+      await db.query("UPDATE tenants SET schema_status = 'failed' WHERE id = $1", [ids.alpha]);
+      await db.query("UPDATE tenants SET schema_status = 'pending' WHERE id = $1", [ids.percent]);
+      const directory = await listTenants({ q: token, status: "all", page: 1 });
+      expect(directory.rows.find((row) => row.id === ids.alpha)?.databaseState).toBe("failed");
+      expect(directory.rows.find((row) => row.id === ids.percent)?.databaseState).toBe("pending");
+      const counted = await listTenantCountRecords({ kind: "summary", category: "active" }, 1);
+      expect(counted.rows.find((row) => row.id === ids.alpha)?.databaseState).toBe("failed");
+    } finally {
+      await db.query("UPDATE tenants SET schema_status = 'current' WHERE id = ANY($1::uuid[])", [[ids.alpha, ids.percent]]);
+    }
   });
 
   it("pages 20 rows at a time, newest first, and falls back to page 1 for invalid pages", async () => {

@@ -14,6 +14,8 @@ import "server-only";
  */
 import { getControlDb } from "@/lib/db/control";
 import { classifyHost, parseHostHeader } from "@/lib/domains/rules";
+import { recordHostRejection } from "@/lib/security-events";
+import type { AuditRequestContext } from "@/lib/request-context";
 import { getEnv } from "@/lib/env";
 import type { TenantStatus } from "@/app/platform/(console)/tenants/labels";
 
@@ -45,11 +47,14 @@ const TENANT_SELECT = { id: true, name: true, status: true, schemaStatus: true }
  * Use case: getTenantAccess (the tenant gate).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-17
  */
-export async function resolveHost(hostHeader: string | null | undefined): Promise<HostResolution> {
+export async function resolveHost(hostHeader: string | null | undefined, requestContext?: AuditRequestContext | null): Promise<HostResolution> {
   const host = parseHostHeader(hostHeader);
-  if (!host) return "unknown";
+  if (!host) {
+    recordHostRejection(hostHeader, "invalid_host", requestContext);
+    return "unknown";
+  }
   const hostClass = classifyHost(host, getEnv().platformBaseDomain);
   if (hostClass.kind === "ip" || hostClass.kind === "base") return "platform";
 
@@ -60,7 +65,9 @@ export async function resolveHost(hostHeader: string | null | undefined): Promis
         : { type: "custom", hostname: host, status: "active" },
     select: { tenant: { select: TENANT_SELECT } },
   });
-  return domain ? { tenant: domain.tenant } : "unknown";
+  if (domain) return { tenant: domain.tenant };
+  recordHostRejection(host, "unknown_domain", requestContext);
+  return "unknown";
 }
 
 /**

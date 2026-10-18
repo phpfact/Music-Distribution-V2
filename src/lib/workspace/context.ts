@@ -8,6 +8,7 @@ import "server-only";
  * cookie or X-Forwarded-Host. Tenant data may be touched only when the gate
  * answers "allowed".
  */
+import { currentRequestContext } from "@/lib/request-context-server";
 import { cache } from "react";
 import { headers } from "next/headers";
 import { getTenantDb, type TenantDb } from "@/lib/db/tenant";
@@ -58,10 +59,10 @@ export async function openTenantDatabase(tenantId: string): Promise<TenantDb> {
  * Use case: The root page and getWorkspace.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-15
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-17
  */
 export const getHostResolution = cache(async (): Promise<HostResolution> => {
-  return resolveHost((await headers()).get("host"));
+  return resolveHost((await headers()).get("host"), await currentRequestContext());
 });
 
 /**

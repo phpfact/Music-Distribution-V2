@@ -171,3 +171,8 @@ export type RbacActionResult = { ok: true; message: string } | { ok: false; erro
 
 /** Result of loading the records behind a count (count-details popups). */
 export type RecordsResult<Row> = { ok: true; page: PageView<Row> } | { ok: false; error: string };
+
+/** Scoped role search action shared by assignment pickers and directory filters. */
+export type LoadRoleOptions = (search: string, page: number, excludeRoleId?: string) => Promise<RecordsResult<RoleOptionView>>;
+/** The role-operation purpose selects the exact current privilege on the server. */
+export type RoleOptionsPurpose = "create" | "edit" | "delete" | "filter";

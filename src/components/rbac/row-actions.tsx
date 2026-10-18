@@ -18,6 +18,7 @@ import type {
   RbacActionResult,
   RecordsResult,
   RoleOptionView,
+  LoadRoleOptions,
   RoleRowView,
   RoleStatusValue,
   SubUserRowView,
@@ -44,6 +45,8 @@ type RoleRowActionsProps = {
   deleteAction?: (roleId: string, replacementRoleId: string | null) => Promise<RbacActionResult>;
   /** Active roles the viewer may assign (delete-and-reassign choices). */
   replacementRoles: readonly RoleOptionView[];
+  /** Scoped database search for later replacement options. */
+  loadReplacementRoles?: LoadRoleOptions;
   /** Loads the users holding a role (affected users in the dialogs). */
   loadUsers?: (roleId: string, page: number) => Promise<RecordsResult<AssignedUserView>>;
   /** Called with the success message after a change. */
@@ -71,6 +74,7 @@ export function RoleRowActions({
   toggleStatusAction,
   deleteAction,
   replacementRoles,
+  loadReplacementRoles,
   loadUsers,
   onDone,
 }: RoleRowActionsProps) {
@@ -157,6 +161,7 @@ export function RoleRowActions({
           role={dialog === "delete" ? dialogRole : null}
           onClose={() => setDialog(null)}
           replacementRoles={replacementRoles}
+          loadReplacementRoles={loadReplacementRoles}
           onConfirm={deleteAction}
           onDone={onDone}
           returnFocusRef={triggerRef}

@@ -83,7 +83,7 @@ copies `prisma/tenant/migrations` (the in-app migration applier reads it).
 
 `provisioning_step` enum: add `check_database` (existing-database mode).
 
-New `tenant_provisioning_steps (tenant_id uuid FK→tenants RESTRICT, step provisioning_step, completed_at timestamptz, run_id uuid FK→tenant_provisioning_runs, PRIMARY KEY (tenant_id, step))` — which steps have *succeeded* for this tenant. Retries skip completed steps.
+New `tenant_provisioning_steps (tenant_id uuid FK→tenants RESTRICT, step provisioning_step, completed_at timestamptz, run_id uuid FK→tenant_provisioning_runs, PRIMARY KEY (tenant_id, step))` — which steps have *succeeded* for this tenant. Retries skip completed steps except migration reconciliation, which always checks the deployed migration set.
 
 New `secrets (id uuid pk, purpose varchar(50), key_version smallint, nonce bytea, ciphertext bytea, auth_tag bytea, created_at, updated_at)`.
 
@@ -158,8 +158,9 @@ Provisioned mode, in order: `create_database_user` → `create_database` →
 Existing mode: `check_database` → `grant_privileges` → `apply_migrations` →
 `create_initial_admin` → `register_domain` → `verify`.
 
-A step listed in `tenant_provisioning_steps` is skipped on retry. Every step is
-idempotent in itself as well. Ownership marker: `COMMENT … IS 'md-tenant:<tenantId>'`.
+A step listed in `tenant_provisioning_steps` is skipped on retry except
+`apply_migrations`, which always reconciles the currently deployed migration set.
+Every step is idempotent in itself as well. Ownership marker: `COMMENT … IS 'md-tenant:<tenantId>'`.
 
 | Step | What it does | Re-run / conflict rule |
 |---|---|---|
@@ -252,8 +253,19 @@ DTOs never contain password hashes, secret refs, ciphertext or connection string
 Editable: full name, phone, profile image (replace/remove), email, username,
 subdomain label, custom domain (add/change/remove). Unchanged fields are left
 alone. Username/email when the tenant admin already exists in the tenant DB:
-update the tenant DB first (as the tenant role); if that fails nothing is
-changed; then the control plane; if that fails, revert the tenant DB change.
+hold the shared workspace identity lock, validate the primary staff account and
+check user plus pending/rejected registration reservations. Save the desired
+profile with its immutable `admin_user_id`, incremented `admin_identity_version`
+and `admin_identity_sync_pending` marker in the control-plane transaction, then
+commit the tenant identity change by that immutable ID. A stale profile version
+is refused. Interrupted tenant commits retain durable desired state; the next
+edit (including a no-change submission) or master-password reset reconciles it
+under the same lock. An owner can replace a pending desired name with an
+available alternative if a registration reserved it after interruption. Only
+the matching revision may clear the recovery marker.
+Control-plane refusals happen before the tenant write; after a durable profile
+commit, a tenant failure reports pending synchronization and preserves any new
+referenced image.
 Subdomain change → row `pending` → immediate DNS check. Custom domain
 change → new token, `pending`. Audit `tenant.updated` with the changed field
 *names* only. Never regenerates credentials.
@@ -266,7 +278,11 @@ change → new token, `pending`. Audit `tenant.updated` with the changed field
 
 ### 8.6 Profile images
 PNG, JPEG or WebP only, ≤ 2 MB (2 097 152 bytes), detected from magic bytes
-(never the client's content type or file name). No SVG. Key
+(never the client's content type or file name). Browser checks reject incomplete
+containers; the server fully decodes pixels with `sharp` (16 megapixels maximum,
+five-second processing timeout), then re-encodes the first frame in the same
+format without uploaded metadata. Corrupt or oversized output is rejected before
+storage. No SVG. Key
 `tenants/<tenantId>/profile/<uuid>.<png|jpg|webp>`; path built only from that
 pattern, resolved under `STORAGE_ROOT` and checked to stay inside it. Written to a
 temp file then renamed. Served by `GET /platform/tenants/[id]/avatar` (platform

@@ -1,5 +1,7 @@
 "use server";
 
+import { recordAuthenticationEvent } from "@/lib/security-events";
+import { currentRequestContext } from "@/lib/request-context-server";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { loadPlatformAccess } from "@/lib/authz/platform-access";
@@ -22,20 +24,32 @@ import {
  *   Together with AuthPageGuard, Back after sign-out never shows a protected page.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-17
  */
 export async function logoutAction(): Promise<void> {
   const cookieStore = await cookies();
   const token       = cookieStore.get(SESSION_COOKIE_NAME)?.value;
 
   if (token) {
+    const context = await currentRequestContext();
+    let actorId: string | null = null;
+    // Attribution cannot prevent revocation when a session lookup is unavailable.
+    try {
+      actorId = (await validateSession(token, { touch: false }))?.owner.id ?? null;
+    } catch (error) {
+      console.error(`[platform-auth] logout attribution unavailable: ${describeError(error)}`);
+    }
+    let outcome: "success" | "unavailable" = "success";
     try {
       await revokeSession(token);
-      console.log("[platform-auth] logout succeeded");
     } catch (error) {
+      outcome = "unavailable";
       // The cookie is removed regardless; the session row expires on its own.
       console.error(`[platform-auth] could not revoke the session: ${describeError(error)}`);
     }
+    recordAuthenticationEvent({ operation: "logout", area: "platform", tenantId: null, actorId,
+      outcome, reason: outcome === "success" ? "logged_out" : "unavailable",
+      clientIp: context?.clientIp ?? null, requestContext: context });
   }
 
   // Same name and path as when it was set, or the browser would keep it.

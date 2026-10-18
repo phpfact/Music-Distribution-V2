@@ -301,7 +301,9 @@ async function runLocked(
     };
 
     for (const step of plan) {
-      if (done.has(step)) {
+      // Migration completion belongs to the deployed release, so every retry
+      // reconciles the current set even when an earlier release completed it.
+      if (done.has(step) && step !== "apply_migrations") {
         log(tenantId, run.attempt, `step ${step} skipped (done earlier)`);
         continue;
       }

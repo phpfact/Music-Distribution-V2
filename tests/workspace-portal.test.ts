@@ -372,6 +372,29 @@ describe("customer sign-up and approval", () => {
     });
   });
 
+  it("AUD-006 refuses a suspended parent's child before issuing any session", async () => {
+    const suffix   = randomUUID();
+    const password = `Child-${randomBytes(18).toString("base64url")}`;
+    const parent   = await wsA.db.customer.create({ data: { name: "Parent fixture", type: "label" } });
+    const child    = await wsA.db.customer.create({ data: { name: "Child fixture", type: "artist", parentId: parent.id } });
+    const user     = await wsA.db.user.create({ data: {
+      name: "Child fixture", username: `child-${suffix}`, email: `child-${suffix}@example.com`,
+      customerId: child.id, passwordHash: await hashPassword(password),
+    } });
+    secrets.add(password);
+
+    // Legitimate control: the same child signs in while both customers are active.
+    const active = await authenticateWorkspaceUser(wsA, { identifier: user.username, password }, ip());
+    expect(active).toMatchObject({ ok: true, destination: "customer" });
+    await wsA.db.userSession.deleteMany({ where: { userId: user.id } });
+    await wsA.db.customer.update({ where: { id: parent.id }, data: { status: "disabled" } });
+
+    expect(await authenticateWorkspaceUser(wsA, { identifier: user.username, password }, ip())).toEqual({ ok: false, reason: "suspended" });
+    expect(await wsA.db.userSession.count({ where: { userId: user.id } })).toBe(0);
+    // An incorrect password still reveals neither parent nor child status.
+    expect(await authenticateWorkspaceUser(wsA, { identifier: user.username, password: "incorrect-password" }, ip())).toEqual({ ok: false, reason: "invalid_credentials" });
+  });
+
   it("counts and lists registrations at the database level", async () => {
     const summary = await getRegistrationSummary(wsA.db);
     expect(summary.total).toBe(summary.pending + summary.active + summary.suspended + summary.rejected);
@@ -406,12 +429,18 @@ describe("appearance", () => {
     const personal = await saveViewerAppearance(wsA.db, viewer, { operation: "apply", scope: "personal", appearance: { theme: "dark", accent: "rose", width: "full" } }, null);
     expect(personal).toMatchObject({ ok: true, state: { source: "personal", appearance: { theme: "dark" } } });
 
+    const customerAudit = await db.query("SELECT actor_type FROM audit_events WHERE actor_id = $1 AND action = 'workspace_appearance.applied'", [customer.id]);
+    expect(customerAudit.rows).toEqual([{ actor_type: "customer_user" }]);
+
     // Owner: personal, then Apply to all (workspace default + own override, the customer's override stays).
     await saveViewerAppearance(wsA.db, owner, { operation: "apply", scope: "personal", appearance: { theme: "light", accent: "blue", width: "default" } }, null);
     const all = await saveViewerAppearance(wsA.db, owner, { operation: "apply", scope: "workspace", appearance: { theme: "system", accent: "emerald", width: "focused" } }, null);
     expect(all).toMatchObject({ ok: true, state: { appearance: { theme: "system", accent: "emerald" }, workspace: { theme: "system" } } });
     expect(await getPublicAppearance(wsA.db)).toStrictEqual({ theme: "system", accent: "emerald", width: "focused" });
     expect(await getViewerAppearanceState(wsA.db, viewer)).toMatchObject({ source: "personal", appearance: { theme: "dark" } });
+    const staffAudit = await db.query("SELECT actor_type FROM audit_events WHERE actor_id = $1 AND action = 'workspace_appearance.applied'", [admin]);
+    expect(staffAudit.rows.length).toBeGreaterThan(0);
+    expect(staffAudit.rows.every((row: { actor_type: string }) => row.actor_type === "tenant_user")).toBe(true);
     // Tenant B is untouched.
     expect(await getPublicAppearance(wsB.db)).toStrictEqual({ theme: "light", accent: "neutral", width: "default" });
 

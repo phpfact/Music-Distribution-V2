@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AffectedUsersPreview, AFFECTED_USERS_PREVIEW } from "./assigned-users";
 import { countText } from "./format";
 import { ROLE_PICKER_HINT, RolePicker } from "./role-picker";
-import type { AssignedUserView, RbacActionResult, RecordsResult, RoleOptionView, RoleStatusValue } from "./types";
+import type { AssignedUserView, RbacActionResult, RecordsResult, RoleOptionView, LoadRoleOptions, RoleStatusValue } from "./types";
 
 // Shown when a Server Action itself could not be reached.
 const ACTION_FAILED = "The change could not be saved. Check your connection and try again.";
@@ -221,6 +221,8 @@ type RoleDeleteDialogProps = AffectedUsersSource & {
   onClose: () => void;
   /** Active roles the actor may assign (the role itself is excluded automatically). */
   replacementRoles: readonly RoleOptionView[];
+  /** Scoped database search for later replacement options. */
+  loadReplacementRoles?: LoadRoleOptions;
   /**
    * The panel's bound action. `replacementRoleId` is null when nobody holds
    * the role; otherwise exactly one role id (reassign + delete in one transaction).
@@ -249,6 +251,7 @@ export function RoleDeleteDialog({
   role,
   onClose,
   replacementRoles,
+  loadReplacementRoles,
   onConfirm,
   onDone,
   returnFocusRef,
@@ -348,6 +351,7 @@ export function RoleDeleteDialog({
                 id={pickerId}
                 name="replacementRoleId"
                 roles={replacementRoles}
+                loadRoles={loadReplacementRoles}
                 excludeIds={[role.id]}
                 value={replacement}
                 onValueChange={(value) => {

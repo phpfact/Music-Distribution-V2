@@ -33,6 +33,7 @@ import {
   PRISMA_MIGRATION_LOCK_ID,
   type TenantMigration,
 } from "@/lib/provisioning/migrations";
+import * as tenantMigrations from "@/lib/provisioning/migrations";
 import { closeAppDatabase } from "./support/app-connections";
 import { captureConsole } from "./support/console";
 import { clearTenantTables, connectTo, connectToTestDatabase } from "./support/postgres";
@@ -519,6 +520,32 @@ describe("failure and retry", () => {
       "tenant.provisioned:system",
     ]);
   });
+
+  it("reconciles new release migrations after an earlier completed migration step", SLOW, async () => {
+    const tenant = await newTenant({ label: "release" });
+    const first = await run(tenant.id, OWNER, { hooks: { beforeStep(step) {
+      if (step === "verify") throw new Error("simulated late setup failure");
+    } } });
+    expect(first).toMatchObject({ status: "failed" });
+    expect(await completedSteps(tenant.id)).toContain("apply_migrations");
+    const deployed = await tenantMigrations.readTenantMigrations();
+    const sql = "CREATE TABLE audit_retry_release (id integer PRIMARY KEY);";
+    const added: TenantMigration = { name: "20990101000000_audit_retry", sql,
+      checksum: createHash("sha256").update(sql).digest("hex") };
+    const spy = vi.spyOn(tenantMigrations, "readTenantMigrations").mockResolvedValue([...deployed, added]);
+    const retrySteps: ProvisioningStep[] = [];
+    try {
+      expect(await run(tenant.id, SYSTEM, { hooks: { beforeStep(step) { retrySteps.push(step); } } }))
+        .toStrictEqual({ status: "succeeded" });
+      expect(retrySteps).toStrictEqual(["apply_migrations", "verify"]);
+      expect(await tenantRow(tenant.id)).toMatchObject({ schema_status: "current", schema_version: added.name });
+      expect(await resources.queryIn(tenant.database, "SELECT to_regclass('audit_retry_release') IS NOT NULL AS present"))
+        .toMatchObject([{ present: true }]);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
 });
 
 describe("concurrency", () => {

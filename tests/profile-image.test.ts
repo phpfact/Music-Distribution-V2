@@ -53,6 +53,8 @@ describe("validateProfileImage", () => {
     expect(MAX_PROFILE_IMAGE_BYTES).toBe(2 * 1024 * 1024);
     const atLimit = new Uint8Array(MAX_PROFILE_IMAGE_BYTES);
     atLimit.set(PNG);
+    // Keep the container end marker; pixel validity is tested by server decoding.
+    atLimit.set(PNG.subarray(-12), atLimit.length - 12);
     expect(validateProfileImage(atLimit)).toEqual({
       ok: true,
       value: { kind: "png", contentType: "image/png", extension: "png" },

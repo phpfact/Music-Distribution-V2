@@ -2,6 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { getRedis } from "../redis";
 import { withTimeout } from "../with-timeout";
+import { sanitizeLogMessage } from "../log-sanitizer";
 
 /**
  * Limits platform owner sign-in attempts, with fixed-window counters in Redis.
@@ -111,7 +112,7 @@ function withRedisTimeout<T>(work: () => Promise<T>): Promise<T> {
  * Last modified: 2026-10-15
  */
 function reportUnavailable(error: unknown): void {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = sanitizeLogMessage(error instanceof Error ? error.message : String(error));
   console.error(`[platform-auth] rate limiter unavailable: ${message}`);
 }
 
