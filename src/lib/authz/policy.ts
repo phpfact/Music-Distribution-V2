@@ -415,8 +415,8 @@ export function finalStoredKeys(
  *   (untrusted: usually FormData.getAll("permissions")) and, on edit, the
  *   role's existing stored keys.
  * Output: ok with requested / preserved / final keys, or the FIRST problem in
- *   this order: empty, unknown (not in the catalog or not a string),
- *   other_domain, module_disabled, above_ceiling, missing_requires (checked on
+ *   this order: unknown (not in the catalog or not a string),
+ *   other_domain, module_disabled, above_ceiling, empty, missing_requires (checked on
  *   the final set). Never auto-adds anything.
  * Use case: createRole / updateRole (inside the transaction, against the
  *   ceiling read fresh there).
@@ -440,9 +440,6 @@ export function validatePrivilegeRequest(
     else unknown.push(String(entry));
   }
 
-  // Step 2: at least one privilege per custom role.
-  if (unique.size === 0 && unknown.length === 0) return refuse("empty", []);
-
   // Step 3: classify every key (the first category found wins below).
   const ceiling = new Set(actor.permissions);
   const otherDomain: string[] = [];
@@ -463,6 +460,9 @@ export function validatePrivilegeRequest(
   // Step 4: the stored set keeps the role's disabled-module keys.
   const requestedKeys = (permissionKeysOfDomain(actor.domain) as string[]).filter((key) => unique.has(key));
   const stored        = finalStoredKeys(actor.domain, requestedKeys, existingKeys, actor.disabledModules);
+
+  // An edit may retain only disabled-module grants; a new/fully empty role may not.
+  if (stored.finalKeys.length === 0) return refuse("empty", []);
 
   // Step 5: `requires` dependencies must be satisfied by what is stored.
   const selection = validatePermissionSelection(actor.domain, stored.finalKeys);

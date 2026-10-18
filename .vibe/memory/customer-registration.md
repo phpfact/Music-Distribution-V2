@@ -166,3 +166,9 @@
   shared tenant identity advisory lock and inspect both users and open
   (pending/rejected) registrations. The short-lived `pg` path shares the same
   conflict classification and user-facing reservation messages as Prisma writes.
+
+## Audit correction (2026-10-17)
+
+- AUD-20261017-011: selecting a status, Clear filters, or navigating to an
+  externally changed query invalidates the pending search debounce. A stale
+  callback cannot restore an earlier search/status after the newer choice.

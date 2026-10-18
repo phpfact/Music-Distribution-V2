@@ -57,7 +57,13 @@ export type StoredUser = {
 export type UserAudience = "team" | "role_holders";
 
 /** Role list filters (database level). */
-export type RoleFilter = { q?: string; status?: RoleStatusFilter };
+export type RoleFilter = {
+  q?: string;
+  status?: RoleStatusFilter;
+  excludeRoleId?: string | null;
+  /** Database-level ceiling: no active catalog grant outside these allowed keys. */
+  assignable?: { allowMaster: boolean; forbiddenKeys: readonly string[] };
+};
 
 /** User list filters (database level). */
 export type UserFilter = {

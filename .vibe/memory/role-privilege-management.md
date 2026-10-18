@@ -1021,3 +1021,28 @@ tenants; Server Actions invoked like Next.js does).
   privileges into `permissions`. The sub-user service's identity conflict
   messages moved to `identityConflictErrors` (`src/lib/workspace/identity.ts`),
   shared with customer creation (same texts, no behaviour change).
+
+## Audit corrections (2026-10-17)
+
+- AUD-20261017-009: role metadata edits validate the final stored privilege
+  set, including the existing grants of disabled modules. Those preserved
+  grants appear read-only in the editor and never travel as editable grants.
+  Creating an empty custom role remains forbidden.
+- AUD-20261017-010: the editor's affected-users count opens the existing
+  paginated role-users records component, so every supporting user can be
+  inspected with current authorization and scope checks.
+- AUD-20261017-011: competing status/role/Clear navigation and external URL
+  changes cancel pending search callbacks in the shared directory toolbar.
+- AUD-20261017-013: role assignment/replacement and directory filters use
+  scoped database search and pages of 20. Assignment ceiling and master-role
+  eligibility are applied before pagination, with no 500-role collection cap.
+  The selected saved option remains visible even when outside the first page.
+  Server Actions authorize the current panel and operation on every search;
+  submission continues to revalidate the role under transaction locks.
+
+- Verification: 7 focused RBAC suites / 122 tests passed, including 501-role
+  fixtures in each assignment scope and cross-tenant/cross-customer negatives.
+  Real client components were browser-tested in a disposable local fixture:
+  disabled-only metadata submission; affected-user holder 21 on page two;
+  rapid status/Clear changes in both toolbars; external query cancellation;
+  remote option paging/search and selected-label persistence.

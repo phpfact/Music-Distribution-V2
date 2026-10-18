@@ -299,3 +299,12 @@ nothing here reads a session, a database or `server-only` code.
 - Change history: 2026-10-17 — AccountTypeField, exported PagedRecords,
   CountDetails min-w-0 fix.
 
+
+## RBAC audit update (2026-10-17)
+
+- `SearchableSelect` accepts an optional `loadOptions(search, page)` callback
+  for bounded server searches. It debounces typing, ignores obsolete replies,
+  shows loading/retry/illustrated empty states, and pages with Previous/Next.
+  Existing static selects retain local matching. Only the selected option is
+  retained across remote pages; full datasets are never accumulated in the
+  browser. `RolePicker` and the RBAC toolbar use this mode for all three panels.

@@ -88,7 +88,7 @@ export async function SubUsersListScreen({ binding, searchParams }: SubUsersList
   // with the roles view privilege, else the assignable ones, else no filter).
   const summary     = await getSubUserSummary(actor);
   const page        = await listSubUsers(actor, toSubUserListQuery(searchParams));
-  const roleOptions = await listRoleFilterOptions(actor);
+  const roleOptions = await listRoleFilterOptions(actor, query.role);
 
   const addButton = permissions.create ? (
     <Button asChild>
@@ -151,6 +151,7 @@ export async function SubUsersListScreen({ binding, searchParams }: SubUsersList
                 searchPlaceholder={withEmail ? "Name, username or email" : "Name or username"}
                 statusLabels={{ active: "Active", disabled: "Suspended" }}
                 roleOptions={roleOptions}
+                loadRoles={binding.loadRoleOptions.bind(null, "filter")}
               />
               <SubUsersDirectory
                 variant={binding.variant}
@@ -218,6 +219,7 @@ export async function SubUserFormScreen({ binding, mode, userId }: SubUserFormSc
             variant={binding.variant}
             mode="create"
             roles={roles.data.map(toRoleOptionView)}
+            loadRoles={binding.loadRoleOptions.bind(null, "create")}
             action={binding.actions.create}
             cancelHref={binding.list}
           />
@@ -278,6 +280,7 @@ export async function SubUserFormScreen({ binding, mode, userId }: SubUserFormSc
         variant={binding.variant}
         mode="edit"
         roles={assignableRoles.map(toRoleOptionView)}
+        loadRoles={binding.loadRoleOptions.bind(null, "edit")}
         initial={{
           fullName: user.fullName,
           username: user.username ?? "",

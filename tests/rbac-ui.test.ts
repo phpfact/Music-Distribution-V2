@@ -143,6 +143,26 @@ describe("RoleEditor", () => {
     expect(html).not.toContain('value="tenant.appearance.manage_workspace"');
   });
 
+  it("shows saved disabled-module grants read-only and wires the paginated affected-users popup", () => {
+    const html = renderToStaticMarkup(createElement(RoleEditor, {
+      mode: "edit",
+      modules: [],
+      locked,
+      initial: { name: "Disabled module only", description: "", status: "active", privileges: [] },
+      preservedKeys: ["tenant.appearance.manage_workspace"],
+      affectedUserCount: 21,
+      loadAffectedUsers: async () => ({ ok: true as const, page: { rows: [], total: 21, page: 1, pageCount: 2, pageSize: 20 } }),
+      action: noopAction,
+      cancelHref: "/tenant/roles",
+    }));
+    expect(html).toContain("Preserved privileges (read-only)");
+    expect(html).toContain("Workspace Appearance: Manage workspace appearance");
+    expect(html).not.toContain('value="tenant.appearance.manage_workspace"');
+    expect(html).toContain("21 users affected");
+    expect(html).toContain('aria-haspopup="dialog"');
+    expect(html).not.toContain("No privileges selected");
+  });
+
   it("renders the field names, required markers, counter, needs-hint and sections", () => {
     const html = render("create");
     expect(html).toContain('name="name"');

@@ -4,7 +4,7 @@ import type { Ref } from "react";
 import { SearchableSelect, type SearchableSelectOption } from "@/components/shared";
 import { privilegeCountText } from "./format";
 import { MasterBadge } from "./role-badges";
-import type { RoleOptionView } from "./types";
+import type { LoadRoleOptions, RoleOptionView } from "./types";
 
 /** The helper text the spec requires under every role picker. */
 export const ROLE_PICKER_HINT = "Exactly one role. It takes effect on the user's next request.";
@@ -16,6 +16,8 @@ type RolePickerProps = {
   name?: string;
   /** Only active roles the actor may assign (the server re-checks). */
   roles: readonly RoleOptionView[];
+  /** Searches/paginates eligible roles on the server when the list is opened. */
+  loadRoles?: LoadRoleOptions;
   value?: string;
   defaultValue?: string;
   onValueChange?: (roleId: string) => void;
@@ -69,6 +71,7 @@ export function RolePicker({
   id,
   name = "roleId",
   roles,
+  loadRoles,
   value,
   defaultValue,
   onValueChange,
@@ -88,6 +91,10 @@ export function RolePicker({
       id={id}
       name={name}
       options={toOptions(roles, excludeIds)}
+      loadOptions={loadRoles ? async (search, page) => {
+        const result = await loadRoles(search, page, excludeIds[0]);
+        return result.ok ? { ok: true, options: toOptions(result.page.rows, excludeIds), page: result.page.page, pageCount: result.page.pageCount } : result;
+      } : undefined}
       value={value}
       defaultValue={defaultValue}
       onValueChange={onValueChange}

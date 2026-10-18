@@ -13,7 +13,7 @@ import { hasRbacFilters, rbacListHref, type RbacListQuery } from "./list-href";
 import { RolePrivilegesRecords, RoleUsersRecords, type PrivilegesResult } from "./rbac-records";
 import { AboveAuthorityBadge, RoleStatusBadge, SystemRoleBadge } from "./role-badges";
 import { RoleRowActions } from "./row-actions";
-import type { AssignedUserView, PageView, RbacActionResult, RecordsResult, RoleOptionView, RoleRowView, RoleStatusValue } from "./types";
+import type { AssignedUserView, PageView, RbacActionResult, RecordsResult, RoleOptionView, LoadRoleOptions, RoleRowView, RoleStatusValue } from "./types";
 
 export type RolesDirectoryProps = {
   /** One server page of roles (search, filters and paging already applied by the server). */
@@ -39,6 +39,8 @@ export type RolesDirectoryProps = {
   deleteAction?: (roleId: string, replacementRoleId: string | null) => Promise<RbacActionResult>;
   /** Active roles the viewer may assign (delete-and-reassign choices). */
   replacementRoles?: readonly RoleOptionView[];
+  /** Scoped database search for later replacement options. */
+  loadReplacementRoles?: LoadRoleOptions;
   /** Optional per-row override of the built-in actions, keyed by role id. */
   rowActions?: Partial<Record<string, ReactNode>>;
 };
@@ -71,6 +73,7 @@ export function RolesDirectory({
   toggleStatusAction,
   deleteAction,
   replacementRoles = [],
+  loadReplacementRoles,
   rowActions,
 }: RolesDirectoryProps) {
   const router                = useRouter();
@@ -112,6 +115,7 @@ export function RolesDirectory({
         toggleStatusAction={toggleStatusAction}
         deleteAction={deleteAction}
         replacementRoles={replacementRoles}
+        loadReplacementRoles={loadReplacementRoles}
         loadUsers={loadUsers}
         onDone={done}
       />

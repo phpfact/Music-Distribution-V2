@@ -47,9 +47,11 @@ import {
 } from "@/lib/authz/role-rules";
 import { cn } from "@/lib/utils";
 import { AssignedUsersTable } from "./assigned-users";
+import { RoleUsersRecords } from "./rbac-records";
 import { countText } from "./format";
 import type {
   AssignedUserView,
+  RecordsResult,
   LockedPrivilegeView,
   ModuleView,
   PrivilegeView,
@@ -107,8 +109,14 @@ export type RoleEditorProps = {
   initial?: RoleEditorInitial;
   /** Users holding the role (edit): saving asks for confirmation when > 0. */
   affectedUserCount?: number;
+  /** The edited role id, used by its paginated affected-users records. */
+  roleId?: string;
   /** Optional: the affected users, so "N users affected" opens them (count transparency). */
   affectedUsers?: readonly AssignedUserView[];
+  /** Current, paginated holders; mounted only while the affected-users popup is open. */
+  loadAffectedUsers?: (page: number) => Promise<RecordsResult<AssignedUserView>>;
+  /** Existing disabled-module grants, shown read-only and retained by the server. */
+  preservedKeys?: readonly string[];
   /** The panel's bound Server Action (useActionState signature); redirects on success. */
   action: (state: RoleFormState, formData: FormData) => Promise<RoleFormState>;
   /** Where Cancel goes (the roles list or the role details page). */
@@ -204,7 +212,10 @@ export function RoleEditor({
   locked,
   initial,
   affectedUserCount = 0,
+  roleId = "",
   affectedUsers,
+  loadAffectedUsers,
+  preservedKeys = [],
   action,
   cancelHref,
 }: RoleEditorProps) {
@@ -288,7 +299,9 @@ export function RoleEditor({
       const result = validateRoleStatus(values.status);
       return result.ok ? undefined : result.error;
     }
-    return values.selected.size > 0 ? undefined : "Choose at least one privilege.";
+    return values.selected.size > 0 || (mode === "edit" && preservedKeys.length > 0)
+      ? undefined
+      : "Choose at least one privilege.";
   }
 
   /**
@@ -474,7 +487,7 @@ export function RoleEditor({
   const visibleModules   = modules
     .map((module) => ({ module, privileges: module.privileges.filter((privilege) => privilegeMatches(privilege, normalizedSearch)) }))
     .filter((entry) => entry.privileges.length > 0);
-  const visibleLocked = locked.filter((item) => privilegeMatches(item, normalizedSearch));
+  const visibleLocked = locked.filter((item) => !preservedKeys.includes(item.key) && privilegeMatches(item, normalizedSearch));
 
   // The review: selected privileges grouped by module, in catalog order.
   const review = modules
@@ -697,6 +710,17 @@ export function RoleEditor({
             )}
           </div>
 
+          {preservedKeys.length > 0 ? (
+            <div className="flex flex-col gap-2 rounded-lg border border-dashed p-3" aria-label="Preserved disabled-module privileges">
+              <p className="text-sm font-medium">Preserved privileges (read-only)</p>
+              <p className="text-sm text-muted-foreground">These saved grants stay unchanged while their modules are disabled. They grant no access until those modules are enabled.</p>
+              <ul className="list-inside list-disc text-sm text-muted-foreground">
+                {locked.filter((item) => preservedKeys.includes(item.key)).map((item) => (
+                  <li key={item.key}>{item.moduleLabel}: {item.label}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           {visibleLocked.length > 0 ? <LockedGroup items={visibleLocked} /> : null}
         </FormSection>
 
@@ -709,13 +733,13 @@ export function RoleEditor({
             </p>
             {mode === "edit" ? (
               <p>
-                {affectedUsers ? (
+                {loadAffectedUsers || affectedUsers ? (
                   <CountDetails
                     label={`${countText(affectedUserCount, "user", "users")} affected. Show the users who hold this role.`}
                     title="Users affected by this change"
                     description="Everyone who holds this role gets the saved privileges on their next request."
                     calculation={`Users whose single role is this role: ${affectedUserCount}.`}
-                    records={<AssignedUsersTable users={affectedUsers} caption="Users who hold this role" size="sm" />}
+                    records={loadAffectedUsers ? <RoleUsersRecords roleId={roleId} loadUsers={(_roleId, page) => loadAffectedUsers(page)} /> : <AssignedUsersTable users={affectedUsers ?? []} caption="Users who hold this role" size="sm" />}
                     className="font-semibold tabular-nums"
                   >
                     {countText(affectedUserCount, "user", "users")} affected
@@ -727,7 +751,10 @@ export function RoleEditor({
             ) : null}
           </div>
 
-          {review.length === 0 ? (
+          {preservedKeys.length > 0 ? (
+            <p className="text-sm text-muted-foreground">The read-only disabled-module privileges listed above will also stay on this role.</p>
+          ) : null}
+          {review.length === 0 && preservedKeys.length === 0 ? (
             <EmptyState
               size="sm"
               icon="key-round"

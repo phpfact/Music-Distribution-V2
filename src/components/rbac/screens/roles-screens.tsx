@@ -49,7 +49,6 @@ import {
   getRoleSummary,
   listAssignableRoles,
   listRoles,
-  listRoleUsers,
 } from "@/lib/authz/role-service";
 import { rbacNoticeMessage } from "./notices";
 import { RoleDetailsActions } from "./role-details-actions";
@@ -187,6 +186,7 @@ export async function RolesListScreen({ binding, searchParams }: RolesListScreen
                 toggleStatusAction={permissions.edit ? actions.setStatus : undefined}
                 deleteAction={permissions.delete ? actions.remove : undefined}
                 replacementRoles={replacements?.ok ? replacements.data.map(toRoleOptionView) : []}
+                loadReplacementRoles={binding.loadRoleOptions.bind(null, "delete")}
               />
             </CardContent>
           </Card>
@@ -284,6 +284,7 @@ export async function RoleDetailsScreen({ binding, roleId, searchParams }: RoleD
           toggleStatusAction={canEdit ? actions.setStatus : undefined}
           deleteAction={canDelete ? actions.remove : undefined}
           replacementRoles={replacements?.ok ? replacements.data.map(toRoleOptionView) : []}
+          loadReplacementRoles={binding.loadRoleOptions.bind(null, "delete")}
           affectedUsers={affected}
         />
       }
@@ -424,11 +425,6 @@ export async function RoleEditorScreen({ binding, mode, roleId }: RoleEditorScre
   // Step 3: checkboxes vs. locked privileges, and (edit) the users a save affects.
   const { modules, locked } = toEditorModules(model.data.modules);
   const editedRoleId        = model.data.roleId;
-  let affectedUsers: AssignedUserView[] | undefined;
-  if (editedRoleId && model.data.affectedUserCount > 0) {
-    const holders = await listRoleUsers(actor, editedRoleId, 1);
-    if (holders.ok) affectedUsers = holders.data.rows.map(toAssignedUserView);
-  }
 
   // Step 4 (create): an empty editor; the action redirects to the new role on success.
   if (!editedRoleId) {
@@ -467,8 +463,10 @@ export async function RoleEditorScreen({ binding, mode, roleId }: RoleEditorScre
           status: model.data.initial.status,
           privileges: model.data.initial.permissionKeys,
         }}
+        roleId={editedRoleId}
         affectedUserCount={model.data.affectedUserCount}
-        affectedUsers={affectedUsers}
+        preservedKeys={model.data.preservedKeys}
+        loadAffectedUsers={actions.loadUsers.bind(null, editedRoleId)}
         action={actions.update.bind(null, editedRoleId)}
         cancelHref={detailsHref}
       />
