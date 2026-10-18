@@ -1,0 +1,1600 @@
+<!doctype html>
+<html lang="hi-Latn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Music Distribution Strategic Audit</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="color-scheme" content="light dark">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: compact masthead band, then a two-column grid — sticky section index on the left,
+   reading column on the right. Below 1000px the index becomes a sticky horizontal bar.
+   Palette follows the project's shadcn neutral black-and-white system; colour is reserved for
+   severity and requirement status. */
+:root {
+  --bg: #fafafa;
+  --surface: #ffffff;
+  --surface-2: #f3f4f6;
+  --fg: #101217;
+  --muted: #5b616e;
+  --line: #e4e6eb;
+  --line-strong: #cfd3da;
+  --ink: #18181b;
+  --ink-fg: #fafafa;
+  --focus: #2563eb;
+  --crit: #b42318; --crit-bg: #fef3f2;
+  --high: #c4320a; --high-bg: #fff4ed;
+  --med: #935406;  --med-bg: #fef7e6;
+  --low: #475467;  --low-bg: #f2f4f7;
+  --ok: #067647;   --ok-bg: #ecfdf3;
+  --part: #935406; --part-bg: #fef7e6;
+  --miss: #b42318; --miss-bg: #fef3f2;
+  --div: #6927da;  --div-bg: #f4f3ff;
+  --und: #175cd3;  --und-bg: #eff8ff;
+  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  --radius: 10px;
+  --toc-w: 236px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c0d10; --surface: #131418; --surface-2: #1b1d23; --fg: #ececf0; --muted: #9ba1ad;
+    --line: #272a32; --line-strong: #393d48; --ink: #f4f4f5; --ink-fg: #111214; --focus: #60a5fa;
+    --crit: #fda29b; --crit-bg: #3a1513; --high: #fdba74; --high-bg: #3a1d0d; --med: #fcd34d; --med-bg: #33270c;
+    --low: #cbd5e1; --low-bg: #1e2430; --ok: #75e0a7; --ok-bg: #0f2b1d; --part: #fcd34d; --part-bg: #33270c;
+    --miss: #fda29b; --miss-bg: #3a1513; --div: #c4b5fd; --div-bg: #251c45; --und: #93c5fd; --und-bg: #122340;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0c0d10; --surface: #131418; --surface-2: #1b1d23; --fg: #ececf0; --muted: #9ba1ad;
+  --line: #272a32; --line-strong: #393d48; --ink: #f4f4f5; --ink-fg: #111214; --focus: #60a5fa;
+  --crit: #fda29b; --crit-bg: #3a1513; --high: #fdba74; --high-bg: #3a1d0d; --med: #fcd34d; --med-bg: #33270c;
+  --low: #cbd5e1; --low-bg: #1e2430; --ok: #75e0a7; --ok-bg: #0f2b1d; --part: #fcd34d; --part-bg: #33270c;
+  --miss: #fda29b; --miss-bg: #3a1513; --div: #c4b5fd; --div-bg: #251c45; --und: #93c5fd; --und-bg: #122340;
+  color-scheme: dark;
+}
+:root[data-theme="light"] { color-scheme: light; }
+
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { transition: none !important; } }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font: 15px/1.6 var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+img, svg { max-width: 100%; }
+[hidden] { display: none !important; }
+a { color: inherit; text-underline-offset: 3px; }
+code, .mono { font-family: var(--font-mono); font-size: 0.86em; }
+code { background: var(--surface-2); border: 1px solid var(--line); border-radius: 5px; padding: 0.05em 0.35em; word-break: break-word; }
+h1, h2, h3, h4 { text-wrap: balance; line-height: 1.25; margin: 0; letter-spacing: -0.01em; }
+h2 { font-size: 1.5rem; font-weight: 650; }
+h3 { font-size: 1.12rem; font-weight: 600; }
+h4 { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+p { margin: 0; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+button { font: inherit; color: inherit; }
+
+.gutter { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+
+/* Masthead */
+.masthead { border-bottom: 1px solid var(--line); background: var(--surface); }
+.masthead-inner { max-width: 1240px; margin: 0 auto; padding-block: 28px 24px; display: grid; gap: 14px; }
+.eyebrow { font-family: var(--font-mono); font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.masthead h1 { font-size: clamp(1.6rem, 3.2vw, 2.25rem); font-weight: 700; max-width: 26ch; }
+.lede { color: var(--muted); max-width: 72ch; }
+.meta-row { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 0.85rem; color: var(--muted); align-items: center; }
+.meta-row b { color: var(--fg); font-weight: 600; }
+.theme-switch { margin-left: auto; display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.theme-switch button { background: transparent; border: 0; padding: 5px 10px; font-size: 0.8rem; cursor: pointer; color: var(--muted); }
+.theme-switch button[aria-pressed="true"] { background: var(--ink); color: var(--ink-fg); }
+
+/* Grid */
+.layout { max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: var(--toc-w) minmax(0, 1fr); gap: 40px; padding-block: 28px 64px; }
+.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 20px); align-self: start; max-height: calc(100vh - 40px); overflow: auto; padding-right: 4px; }
+.toc h4 { margin-bottom: 10px; }
+.toc ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+.toc a { display: block; text-decoration: none; padding: 6px 10px; border-radius: 7px; color: var(--muted); font-size: 0.88rem; line-height: 1.35; }
+.toc a:hover { background: var(--surface-2); color: var(--fg); }
+.toc a[aria-current="true"] { background: var(--ink); color: var(--ink-fg); }
+.toc .sub a { padding-left: 22px; font-size: 0.82rem; }
+main { min-width: 0; display: grid; gap: 56px; }
+main > section { scroll-margin-top: 24px; display: grid; gap: 18px; min-width: 0; }
+.section-head { display: grid; gap: 6px; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+.section-num { font-family: var(--font-mono); font-size: 0.78rem; color: var(--muted); }
+.prose { display: grid; gap: 12px; max-width: 72ch; }
+.prose p, .prose li { color: var(--fg); }
+.muted { color: var(--muted); }
+.small { font-size: 0.86rem; }
+
+@media (max-width: 999px) {
+  .layout { grid-template-columns: minmax(0, 1fr); gap: 20px; padding-top: 0; }
+  .toc { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; max-height: none; background: var(--bg); border-bottom: 1px solid var(--line); margin-left: calc(-1 * max(16px, env(safe-area-inset-left, 0px))); margin-right: calc(-1 * max(16px, env(safe-area-inset-right, 0px))); padding: 8px max(16px, env(safe-area-inset-right, 0px)) 8px max(16px, env(safe-area-inset-left, 0px)); overflow-x: auto; }
+  .toc h4, .toc .sub { display: none; }
+  .toc ol { display: flex; gap: 6px; width: max-content; }
+  .toc a { white-space: nowrap; border: 1px solid var(--line); }
+  main > section, .cat { scroll-margin-top: 70px; }
+  .theme-switch { margin-left: 0; }
+}
+
+/* Verdict + tiles */
+.verdict { display: grid; gap: 10px; padding: 18px 20px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--surface); }
+.verdict-title { font-size: 1.15rem; font-weight: 650; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.tile { text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; cursor: pointer; display: grid; gap: 2px; }
+.tile:hover { border-color: var(--line-strong); background: var(--surface-2); }
+.tile .n { font-size: 1.7rem; font-weight: 650; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.tile .l { font-size: 0.82rem; color: var(--muted); }
+.tile .hint { font-size: 0.72rem; color: var(--muted); }
+.tile[data-tone="crit"] .n { color: var(--crit); }
+.tile[data-tone="high"] .n { color: var(--high); }
+.tile[data-tone="med"] .n { color: var(--med); }
+.tile[data-tone="low"] .n { color: var(--low); }
+.tile-group { display: grid; gap: 8px; }
+
+/* Lists */
+.top-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.top-list li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: baseline; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.top-list a { text-decoration: none; font-weight: 500; }
+.top-list a:hover { text-decoration: underline; }
+.steps { margin: 0; padding-left: 1.3em; display: grid; gap: 8px; max-width: 74ch; }
+.bullets { margin: 0; padding-left: 1.15em; display: grid; gap: 6px; }
+
+/* Chips */
+.chip { display: inline-flex; align-items: center; gap: 5px; font-size: 0.74rem; font-weight: 600; line-height: 1; padding: 4px 8px; border-radius: 999px; border: 1px solid transparent; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.chip::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.chip.plain::before { display: none; }
+.sev-Critical { color: var(--crit); background: var(--crit-bg); }
+.sev-High { color: var(--high); background: var(--high-bg); }
+.sev-Medium { color: var(--med); background: var(--med-bg); }
+.sev-Low { color: var(--low); background: var(--low-bg); }
+.st-Implemented { color: var(--ok); background: var(--ok-bg); }
+.st-Partial { color: var(--part); background: var(--part-bg); }
+.st-Missing { color: var(--miss); background: var(--miss-bg); }
+.st-Divergent { color: var(--div); background: var(--div-bg); }
+.st-Undocumented { color: var(--und); background: var(--und-bg); }
+.pri { color: var(--fg); background: var(--surface-2); border-color: var(--line); }
+.pri::before { display: none; }
+.pri-P0 { background: var(--ink); color: var(--ink-fg); border-color: var(--ink); }
+.tag { color: var(--muted); background: transparent; border-color: var(--line); }
+.tag::before { display: none; }
+
+/* Architecture */
+.flow { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; counter-reset: step; }
+.flow li { counter-increment: step; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 12px; align-items: start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.flow li::before { content: counter(step); font-family: var(--font-mono); font-size: 0.8rem; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--surface-2); border: 1px solid var(--line); }
+.planes { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+.plane { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; background: var(--surface); display: grid; gap: 6px; align-content: start; }
+.plane h3 { font-size: 0.98rem; }
+.plane p { font-size: 0.86rem; color: var(--muted); }
+.plane .state { font-size: 0.74rem; }
+
+/* Tables */
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.88rem; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+th { font-size: 0.76rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; background: var(--surface-2); position: sticky; top: 0; }
+tr:last-child td { border-bottom: 0; }
+td.nowrap, th.nowrap { white-space: nowrap; }
+.rating { display: inline-flex; gap: 3px; vertical-align: middle; }
+.rating i { width: 9px; height: 9px; border-radius: 50%; background: var(--line-strong); display: block; }
+.rating i.on { background: var(--fg); }
+.linkish { background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; color: var(--fg); }
+
+/* Toolbar */
+.toolbar { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.toolbar-row { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
+.toolbar label { font-size: 0.78rem; color: var(--muted); }
+.field { display: grid; gap: 4px; min-width: 0; }
+input[type="search"], select { font: inherit; font-size: 0.88rem; color: var(--fg); background: var(--bg); border: 1px solid var(--line-strong); border-radius: 8px; padding: 7px 10px; min-width: 0; }
+input[type="search"] { width: min(320px, 100%); }
+.toggle { cursor: pointer; border: 1px solid var(--line-strong); background: var(--bg); border-radius: 999px; padding: 5px 11px; font-size: 0.8rem; }
+.toggle[aria-pressed="true"] { background: var(--ink); color: var(--ink-fg); border-color: var(--ink); }
+.btn { cursor: pointer; border: 1px solid var(--line-strong); background: var(--surface); border-radius: 8px; padding: 7px 12px; font-size: 0.85rem; }
+.btn:hover { background: var(--surface-2); }
+.result-count { font-size: 0.85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* Findings */
+.cat { display: grid; gap: 12px; scroll-margin-top: 24px; }
+.cat-head { display: grid; gap: 4px; padding-top: 6px; }
+.cat-head .cat-meta { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; font-size: 0.82rem; color: var(--muted); }
+.cards { display: grid; gap: 12px; }
+.card { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: 16px 18px; display: grid; gap: 12px; scroll-margin-top: 80px; min-width: 0; }
+.card:target, .card.flash { border-color: var(--fg); }
+.card-head { display: grid; gap: 8px; }
+.card-id { font-family: var(--font-mono); font-size: 0.78rem; color: var(--muted); }
+.card-title { font-size: 1.02rem; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--fg); line-height: 1.35; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.card-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.block { display: grid; gap: 6px; min-width: 0; }
+.ev { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ev li { display: grid; gap: 2px; padding-left: 10px; border-left: 2px solid var(--line); }
+.ev .path { font-family: var(--font-mono); font-size: 0.78rem; color: var(--muted); word-break: break-all; }
+.dep { font-size: 0.82rem; color: var(--muted); }
+
+.empty { display: grid; justify-items: center; text-align: center; gap: 10px; padding: 36px 18px; border: 1px dashed var(--line-strong); border-radius: var(--radius); background: var(--surface); }
+.empty svg { width: 96px; height: 96px; }
+.empty .art-stroke { stroke: var(--muted); }
+.empty .art-fill { fill: var(--surface-2); }
+
+/* Strengths */
+.strengths { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+.strength { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; background: var(--surface); display: grid; gap: 4px; }
+.strength b { font-weight: 600; }
+.strength span { font-size: 0.85rem; color: var(--muted); }
+
+/* Phases */
+.phases { display: grid; gap: 12px; }
+.phase { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: 14px 16px; display: grid; gap: 8px; }
+.phase-head { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: baseline; }
+.phase-head h3 { font-size: 1rem; }
+
+/* Dialog */
+dialog { border: 1px solid var(--line-strong); border-radius: 12px; padding: 0; background: var(--surface); color: var(--fg); width: min(640px, calc(100vw - 32px)); max-height: min(80vh, 720px); }
+dialog::backdrop { background: rgba(10, 12, 16, 0.45); }
+.dlg { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; max-height: min(80vh, 720px); }
+.dlg-head { display: flex; justify-content: space-between; gap: 12px; padding: 16px 18px 6px; align-items: start; }
+.dlg-how { padding: 0 18px 12px; font-size: 0.85rem; color: var(--muted); border-bottom: 1px solid var(--line); }
+.dlg-list { list-style: none; margin: 0; padding: 8px 10px; overflow: auto; display: grid; gap: 4px; }
+.dlg-list li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: baseline; padding: 8px; border-radius: 8px; }
+.dlg-list li:hover { background: var(--surface-2); }
+.dlg-foot { padding: 10px 18px 14px; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; }
+.icon-btn { background: none; border: 1px solid var(--line); border-radius: 8px; width: 32px; height: 32px; cursor: pointer; display: grid; place-items: center; flex: none; }
+
+footer { border-top: 1px solid var(--line); }
+footer .inner { max-width: 1240px; margin: 0 auto; padding-block: 18px 28px; font-size: 0.82rem; color: var(--muted); display: grid; gap: 4px; }
+
+@media (max-width: 560px) {
+  .top-list li { grid-template-columns: minmax(0, 1fr); }
+  .card { padding: 14px; }
+  th, td { padding: 8px 10px; }
+}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-inner gutter">
+    <span class="eyebrow">Strategic audit · Hinglish report · Code mein koi change nahi</span>
+    <h1>Music Distribution SaaS: poore project ka audit aur aage ka roadmap</h1>
+    <p class="lede">Is report mein PRD, TRD aur asli codebase ko compare karke architecture, database, security, performance, testing, UI/UX, business workflows, DevOps, documentation aur product position par evidence-based findings di gayi hain. Har finding ke saath file/line reference, risk, sujhaav aur priority hai.</p>
+    <div class="meta-row">
+      <span>Date: <b>18 October 2026, 08:21 IST</b></span>
+      <span>Snapshot: <b class="mono">main @ f88fb56</b></span>
+      <span>Taiyaar kiya: <b>Claude Code (AI audit assistant)</b></span>
+      <span>Scope: <b>PRD v1.1, TRD v1.1, src/, prisma/, docker/, tests/</b></span>
+      <div class="theme-switch" role="group" aria-label="Theme">
+        <button type="button" id="theme-system" data-theme-set="system" aria-pressed="true">System</button>
+        <button type="button" id="theme-light" data-theme-set="light" aria-pressed="false">Light</button>
+        <button type="button" id="theme-dark" data-theme-set="dark" aria-pressed="false">Dark</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="layout gutter">
+  <nav class="toc" aria-label="Report sections">
+    <h4>Report sections</h4>
+    <ol id="toc-list">
+      <li><a href="#summary">1. Executive Summary</a></li>
+      <li><a href="#understanding">2. Project Understanding</a></li>
+      <li><a href="#findings">3. Category-wise Findings</a></li>
+      <li class="sub" id="toc-cats"></li>
+      <li><a href="#traceability">4. Requirement Traceability</a></li>
+      <li><a href="#backlog">5. Missing Functionality</a></li>
+      <li><a href="#strategy">6. Competitive Opportunities</a></li>
+      <li><a href="#plan">7. Prioritized Action Plan</a></li>
+      <li><a href="#questions">8. Open Questions</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <!-- 1. Executive summary -->
+    <section id="summary" data-spy>
+      <div class="section-head">
+        <span class="section-num">Section 1</span>
+        <h2>Executive Summary</h2>
+      </div>
+
+      <div class="verdict">
+        <span class="eyebrow">Overall project health</span>
+        <p class="verdict-title">Foundation mazboot hai, lekin production ke liye abhi taiyaar nahi.</p>
+        <p>Yeh project ek multi-tenant music distribution SaaS ki core foundation hai. Tenant isolation, authentication, RBAC aur provisioning ka kaam engineering ke hisaab se kaafi achha hai: har tenant ka alag PostgreSQL database aur least-privilege login hai, tenant sirf <code>Host</code> header se resolve hota hai, sessions tenant aur area se bound hain, aur cross-tenant negative tests maujood hain.</p>
+        <p>Sabse bade risks operations aur adhoore requirements mein hain. Tenant databases ka automated backup nahi hai, app ka control-plane connection PostgreSQL superuser se chalta hai, koi CI gate nahi hai, aur 16 product decisions open hone se object storage, public tenant signup aur backups ka kaam ruka hua hai. Music distribution ka asli workflow (release submission aur review) abhi shuru nahi hua, jo PRD ke hisaab se expected hai.</p>
+      </div>
+
+      <div class="tile-group">
+        <h4>Findings severity ke hisaab se (click karke records dekhein)</h4>
+        <div class="tiles" id="sev-tiles"></div>
+      </div>
+      <div class="tile-group">
+        <h4>Findings priority ke hisaab se</h4>
+        <div class="tiles" id="pri-tiles"></div>
+      </div>
+
+      <div class="prose">
+        <h3>Top findings</h3>
+      </div>
+      <ul class="top-list" id="top-list"></ul>
+
+      <div class="prose">
+        <h3>Recommended next steps</h3>
+        <ol class="steps">
+          <li>Is hafte ek decision workshop karein (<a href="#F-04">F-04</a>): D-13 (backup policy), D-1/D-2 (hosting, domain), D-3 (verification), D-9 (jobs), D-16, D-11, D-17 pehle.</li>
+          <li><code>main</code> par CI quality gate lagayein (<a href="#F-03">F-03</a>), kyunki kai AI agents parallel worktrees se merge kar rahe hain.</li>
+          <li>Control plane ke liye least-privilege database roles banayein aur superuser ko sirf admin/migrations tak rakhein (<a href="#F-02">F-02</a>).</li>
+          <li>Saare databases (control plane + har tenant + roles) ka scheduled backup, off-host copy aur restore drill shuru karein (<a href="#F-01">F-01</a>).</li>
+          <li>Phir P1: security quick wins (<a href="#F-08">F-08</a>, <a href="#F-09">F-09</a>, <a href="#F-07">F-07</a>), Platform Owner MFA (<a href="#F-06">F-06</a>), observability (<a href="#F-13">F-13</a>), aur decisions ke baad storage phase 2 (<a href="#F-05">F-05</a>).</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- 2. Project understanding -->
+    <section id="understanding" data-spy>
+      <div class="section-head">
+        <span class="section-num">Section 2</span>
+        <h2>Project Understanding</h2>
+      </div>
+      <div class="prose">
+        <p><b>Project kya karta hai:</b> Platform Owner apne panel se tenants (organizations) banata hai. Har tenant ko <code>&lt;slug&gt;.&lt;PLATFORM_BASE_DOMAIN&gt;</code> subdomain, apna PostgreSQL database aur alag database login milta hai. Tenant portal mein staff (Master Tenant + Sub-Tenants), customers (artist, label, white-label) aur unke sub-customers hote hain. Teen RBAC domains hain: platform, tenant aur customer. Customers public signup kar sakte hain jise tenant staff ya Platform Owner approve/reject karta hai. Releases, artists, labels, distribution, analytics aur royalties abhi "coming soon" pages hain.</p>
+        <p><b>Tech stack:</b> Next.js 16.4 (App Router, Server Actions), React 19.3, TypeScript 6.0 strict, Prisma 7.10 (do alag schemas), PostgreSQL 18.6, Redis 8.10, MinIO AIStor (sirf phase 1 Docker setup), Tailwind 4 + shadcn/Radix, Argon2id passwords, Docker Compose (dev + hardened prod override), Vitest.</p>
+        <p><b>Size:</b> 378 source files (~57,200 TS/TSX lines), 82 test files (~20,500 lines), 13 migrations (8 control + 5 tenant, 1,581 SQL lines), 21 module memory files <code>.vibe/memory/</code> mein.</p>
+      </div>
+
+      <h3>Ek tenant request ka flow</h3>
+      <ol class="flow">
+        <li><div><b><code>src/proxy.ts</code></b><br><span class="muted small">Request ID banata hai. <code>/platform/**</code> sirf platform host par, <code>/login</code>, <code>/tenant/**</code>, <code>/customer/**</code> sirf tenant host par; galat host par plain 404.</span></div></li>
+        <li><div><b>Host resolution</b> <span class="muted small">(<code>src/lib/domains/resolve.ts</code>)</span><br><span class="muted small"><code>Host</code> header → control plane ki <code>tenant_domains</code> table. Query string, cookie ya <code>X-Forwarded-Host</code> se tenant kabhi nahi liya jaata.</span></div></li>
+        <li><div><b>Tenant gate</b><br><span class="muted small">Sirf <code>active</code> status + <code>schemaStatus = current</code> wala tenant serve hota hai; suspended/not-ready par friendly page.</span></div></li>
+        <li><div><b>Tenant database</b> <span class="muted small">(<code>src/lib/workspace/context.ts</code>, <code>src/lib/db/tenant.ts</code>)</span><br><span class="muted small">Control plane se DB name/login + <code>secrets</code> table ka AES-256-GCM password decrypt, phir size-capped Prisma client cache.</span></div></li>
+        <li><div><b>Guard + session</b> <span class="muted small">(<code>src/lib/workspace/guards.ts</code>, <code>sessions.ts</code>)</span><br><span class="muted small">Area-specific cookie → token ka SHA-256 (tenantId:area:token) → user, customer aur single role ek query mein.</span></div></li>
+        <li><div><b>Authorization</b> <span class="muted small">(<code>src/lib/authz/</code>)</span><br><span class="muted small">Role privileges minus centrally disabled modules = effective access; mutations par delegation-ceiling policy dobara check hoti hai.</span></div></li>
+        <li><div><b>Service + audit</b><br><span class="muted small">Transaction ke andar business logic; audit row control plane ki <code>audit_events</code> (append-only trigger) mein.</span></div></li>
+      </ol>
+
+      <h3>Data aur infrastructure planes</h3>
+      <div class="planes">
+        <div class="plane"><span class="chip st-Implemented state">Ready</span><h3>Control-plane DB</h3><p>Tenants, domains, provisioning runs/steps, encrypted secrets, audit events, platform owners, roles, sessions, module switches, appearance.</p></div>
+        <div class="plane"><span class="chip st-Implemented state">Ready</span><h3>Tenant DB × N</h3><p>Users, roles, permissions, customers (1 level sub-customers), registrations, sessions, appearance; artists/labels/releases ka skeleton.</p></div>
+        <div class="plane"><span class="chip st-Implemented state">Ready</span><h3>Redis</h3><p>Fixed-window rate limits (login, signup, credentials, tenant create), fail-closed.</p></div>
+        <div class="plane"><span class="chip st-Partial state">Phase 1</span><h3>MinIO AIStor</h3><p><code>md-platform</code> aur <code>md-backups</code> buckets + identities. App integration, tenant buckets aur backups abhi nahi.</p></div>
+        <div class="plane"><span class="chip st-Divergent state">Interim</span><h3>Local storage volume</h3><p>Tenant profile images <code>STORAGE_ROOT</code> par (TRD TC-4); backup mein shaamil nahi.</p></div>
+      </div>
+
+      <h3>Key modules</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Module</th><th>Zimmedari</th><th class="nowrap">Haal</th></tr></thead>
+          <tbody>
+            <tr><td><code>lib/tenants</code>, <code>lib/provisioning</code></td><td>Tenant create/edit/lifecycle, DB + login provisioning, migration applier, existing-database checks, credentials</td><td><span class="chip st-Implemented">Strong</span></td></tr>
+            <tr><td><code>lib/domains</code></td><td>Host rules, reserved names, DNS checks, host → tenant gate</td><td><span class="chip st-Implemented">Strong</span></td></tr>
+            <tr><td><code>lib/authz</code></td><td>Catalog, resolver, delegation policy, role/sub-user services, module switches</td><td><span class="chip st-Implemented">Strong</span></td></tr>
+            <tr><td><code>lib/workspace</code></td><td>Tenant portal context, guards, sessions, shared login, customers, registrations</td><td><span class="chip st-Partial">Partial</span></td></tr>
+            <tr><td><code>lib/platform-auth</code>, <code>lib/secrets</code></td><td>Platform Owner login/sessions, Argon2id, rate limits; AES-256-GCM secret store</td><td><span class="chip st-Implemented">Strong</span></td></tr>
+            <tr><td><code>lib/storage</code></td><td>Local filesystem profile images, image sniffing/normalization</td><td><span class="chip st-Divergent">Interim</span></td></tr>
+            <tr><td><code>lib/audit</code>, <code>security-events</code>, <code>log-sanitizer</code></td><td>Audit rows, structured auth events, secret redaction</td><td><span class="chip st-Partial">Partial</span></td></tr>
+            <tr><td><code>app/platform/(console)</code></td><td>Platform Owner console: dashboard, tenants, roles, users, settings</td><td><span class="chip st-Implemented">Ready</span></td></tr>
+            <tr><td><code>app/(workspace)</code></td><td>Tenant aur customer portals, public signup, registration status</td><td><span class="chip st-Partial">Partial</span></td></tr>
+            <tr><td><code>docker/</code>, <code>Makefile</code></td><td>Dev/prod compose, hardening, backup/restore (control plane), AIStor phase 1</td><td><span class="chip st-Partial">Partial</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Requirement coverage matrix</h3>
+      <p class="muted small">Section 4 ke traceability rows ka saar. Kisi bhi count par click karke exact requirements dekhein.</p>
+      <div class="tiles" id="req-tiles"></div>
+
+      <h3>Kya achha bana hai</h3>
+      <div class="strengths">
+        <div class="strength"><b>Database-per-tenant + least privilege</b><span>Tenant login <code>NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS CONNECTION LIMIT 20</code>, PUBLIC se REVOKE (<code>src/lib/provisioning/steps.ts:156, 295-307</code>).</span></div>
+        <div class="strength"><b>Trusted tenant context</b><span>Tenant sirf Host header se; client ka tenantId kabhi authority nahi (<code>src/lib/domains/resolve.ts</code>).</span></div>
+        <div class="strength"><b>Session design</b><span>Hashed tokens tenant + area se bound, 30 min idle / 8 h absolute, path-scoped host-only cookies, password change par row-lock ke saath revocation.</span></div>
+        <div class="strength"><b>RBAC jo DB tak enforce hai</b><span><code>user_roles</code> ka PK <code>user_id</code> (ek hi role), domain-check trigger, pure delegation-ceiling policy (<code>src/lib/authz/policy.ts</code>).</span></div>
+        <div class="strength"><b>Idempotent provisioning</b><span>Advisory lock, step ledger, retry sirf baaki steps, aur "koi step missing ho to active nahi" check (<code>runner.ts</code>).</span></div>
+        <div class="strength"><b>Secrets handling</b><span>AES-256-GCM with AAD (id + purpose), plaintext kabhi store/log nahi; log sanitizer credentials redact karta hai.</span></div>
+        <div class="strength"><b>Production hardening</b><span>Read-only containers, <code>cap_drop: ALL</code>, <code>no-new-privileges</code>, images tag + digest pinned, DB/Redis ports unpublished.</span></div>
+        <div class="strength"><b>Testing culture</b><span>82 test files, jinmein <code>rbac-security-matrix.test.ts</code> (974 lines) jaise cross-tenant aur escalation negative tests.</span></div>
+        <div class="strength"><b>Maintainability</b><span>Har function par doc-block, step-wise logic, server-side pagination, count-details popups, aur 21 module memory files.</span></div>
+      </div>
+    </section>
+
+    <!-- 3. Findings -->
+    <section id="findings" data-spy>
+      <div class="section-head">
+        <span class="section-num">Section 3</span>
+        <h2>Category-wise Findings</h2>
+        <p class="muted small">Har finding mein Severity (Critical / High / Medium / Low), Effort aur Impact (S / M / L / XL), Priority (P0–P3) aur Type (Quick win / Strategic investment / Tech debt) hai. Legend Section 7 mein hai.</p>
+      </div>
+
+      <div class="toolbar" role="search">
+        <div class="toolbar-row">
+          <div class="field">
+            <label for="f-q">Search (ID, title, file)</label>
+            <input type="search" id="f-q" placeholder="Jaise: backup, F-09, sessions.ts" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="f-cat">Category</label>
+            <select id="f-cat"><option value="">Saari categories</option></select>
+          </div>
+          <div class="field">
+            <label for="f-pri">Priority</label>
+            <select id="f-pri"><option value="">Saari priorities</option><option>P0</option><option>P1</option><option>P2</option><option>P3</option></select>
+          </div>
+          <div class="field">
+            <label for="f-type">Type</label>
+            <select id="f-type"><option value="">Saare types</option><option>Quick win</option><option>Strategic investment</option><option>Tech debt</option></select>
+          </div>
+        </div>
+        <div class="toolbar-row">
+          <span class="muted small">Severity:</span>
+          <button type="button" class="toggle" id="f-sev-Critical" data-sev="Critical" aria-pressed="false">Critical</button>
+          <button type="button" class="toggle" id="f-sev-High" data-sev="High" aria-pressed="false">High</button>
+          <button type="button" class="toggle" id="f-sev-Medium" data-sev="Medium" aria-pressed="false">Medium</button>
+          <button type="button" class="toggle" id="f-sev-Low" data-sev="Low" aria-pressed="false">Low</button>
+          <button type="button" class="btn" id="f-clear">Filters hatao</button>
+          <span class="result-count" id="f-count" aria-live="polite"></span>
+        </div>
+      </div>
+
+      <div id="findings-body"></div>
+      <div class="empty" id="findings-empty" hidden>
+        <svg viewBox="0 0 96 96" aria-hidden="true"><rect class="art-fill art-stroke" x="14" y="18" width="54" height="64" rx="7" stroke-width="2.5"/><path class="art-stroke" d="M26 36h30M26 48h22M26 60h14" stroke-width="2.5" stroke-linecap="round" fill="none"/><circle class="art-fill art-stroke" cx="64" cy="62" r="13" stroke-width="2.5"/><path class="art-stroke" d="M73.5 71.5 84 82" stroke-width="3" stroke-linecap="round" fill="none"/></svg>
+        <h3>Is filter se koi finding match nahi hui</h3>
+        <p class="muted small">Search text ya filters badlein, ya saare filters hata kar poori list dekhein.</p>
+        <button type="button" class="btn" id="f-clear-2">Filters hatao</button>
+      </div>
+    </section>
+
+    <!-- 4. Traceability -->
+    <section id="traceability" data-spy>
+      <div class="section-head">
+        <span class="section-num">Section 4</span>
+        <h2>Requirement Traceability Table</h2>
+        <p class="muted small">PRD ke saare acceptance criteria (AC-1 se AC-25), main functional/non-functional requirements, aur code mein maujood undocumented behaviour. Status: Implemented, Partial (Partially Implemented), Missing, Divergent, Undocumented. "Implemented" ka matlab code mein maujood hai; is audit mein tests dobara run nahi kiye gaye.</p>
+      </div>
+      <div class="toolbar-row" id="req-filters" role="group" aria-label="Status filter"></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th class="nowrap">ID</th><th class="nowrap">Source</th><th>Requirement</th><th class="nowrap">Status</th><th>Notes / evidence</th></tr></thead>
+          <tbody id="req-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 5. Backlog -->
+    <section id="backlog" data-spy>
+      <div class="section-head">
+        <span class="section-num">Section 5</span>
+        <h2>Missing Functionality &amp; Future Requirements</h2>
+        <p class="muted small">Prioritized backlog. "Future" items PRD §7 ke hisaab se MVP se bahar hain; unhe requirement ki tarah tay karke hi banayein.</p>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th class="nowrap">#</th><th>Item</th><th class="nowrap">Source</th><th class="nowrap">Priority</th><th>Depends on</th><th class="nowrap">Findings</th></tr></thead>
+          <tbody id="backlog-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 6. Strategy -->
+    <section id="strategy" data-spy>
+      <div class="section-head">
+        <span class="section-num">Section 6</span>
+        <h2>Competitive &amp; Strategic Opportunities</h2>
+        <p class="muted small">Competitor benchmarking ka context nahi diya gaya tha, isliye kisi specific competitor ke features ka claim nahi kiya gaya. Neeche ke opportunities codebase ki existing strengths aur music distribution market ki general expectations par based hain.</p>
+      </div>
+      <div class="cards" id="opps"></div>
+    </section>
+
+    <!-- 7. Plan -->
+    <section id="plan" data-spy>
+      <div class="section-head">
+        <span class="section-num">Section 7</span>
+        <h2>Prioritized Action Plan</h2>
+      </div>
+      <div class="prose small">
+        <p><b>Legend.</b> Effort (1 developer, rough andaaza): S ≈ 1–2 din, M ≈ 3–7 din, L ≈ 2–4 hafte, XL ≈ 1 mahine se zyada. Impact: S chhota/local, M ek module, L kai modules ya users, XL poora platform ya business. Priority: P0 production se pehle turant, P1 agle 1–2 sprints, P2 agla quarter, P3 jab mauka mile. Type: Quick win (kam effort, jaldi faayda), Strategic investment (naya bada capability), Tech debt (purana karz chukana).</p>
+      </div>
+      <h3>Sequencing</h3>
+      <div class="phases" id="phases"></div>
+      <h3>Priority-wise list</h3>
+      <div id="plan-tables" class="phases"></div>
+    </section>
+
+    <!-- 8. Questions -->
+    <section id="questions" data-spy>
+      <div class="section-head">
+        <span class="section-num">Section 8</span>
+        <h2>Open Questions &amp; Assumptions</h2>
+      </div>
+      <div class="prose">
+        <h3>Aapse jaanna hai</h3>
+        <ol class="steps">
+          <li>Production hosting provider aur base domain (D-1, D-2) kab tak tay honge? Backup ka off-host target isi par depend hai.</li>
+          <li>Target market India-first hai ya global? Isse phone rule, i18n (Hindi/Hinglish UI), aur aage payouts/tax design tay honge.</li>
+          <li>Platform Owner MFA ke liye TOTP app chahiye ya passkeys (WebAuthn)?</li>
+          <li>Transactional email provider ki koi preference hai? (verification, password reset, registration updates)</li>
+          <li>Custom domains MVP mein feature flag se band rakhne hain ya paid-plan feature ke roop mein scope mein lene hain (C-5, AUD-007)?</li>
+          <li>Sub-customer sirf 1 level deep hai (DB CHECK). Kya yeh final business rule hai?</li>
+          <li>Customer profile mein kaun se fields chahiye (contact, address, bank/payout, KYC documents)?</li>
+          <li>Agle 12 mahine mein kitne tenants aur concurrent users expected hain? Connection strategy aur scale-out isi se tay hoga.</li>
+          <li>DPDP Act 2023 (India) ya GDPR (EU users) applicable hai? Legal team se confirm karna hoga.</li>
+          <li>Kin competitors se benchmark karna hai? List milne par Section 6 mein feature comparison jod sakte hain.</li>
+        </ol>
+        <h3>Assumptions aur audit coverage</h3>
+        <ul class="bullets">
+          <li>Snapshot <code>main @ f88fb56</code> (18 Oct 2026, 08:21 IST) ka hai. Doosre worktrees (<code>codex/*</code>, <code>claude/*</code>, <code>feature/*</code>) ke unmerged changes shaamil nahi.</li>
+          <li>Method: risk-based sampling. PRD (379 lines), TRD (565 lines) aur dono Prisma schemas (926 lines) poore padhe. Security-critical request path line-by-line padha (~5,000 TS lines, lagbhag 9%). Baaki 378 files ka structure aur pattern-level grep scan (raw SQL, secrets, headers, rate limits, TODOs, logging, UI rules) kiya.</li>
+          <li>Poora padha: <code>proxy.ts</code>, <code>domains/resolve.ts</code>, <code>workspace/context.ts</code>, <code>guards.ts</code>, <code>sessions.ts</code>, <code>cookies.ts</code>, <code>logout.ts</code>, <code>platform-auth/session.ts</code>, <code>password.ts</code>, <code>db/tenant.ts</code>, <code>db/control.ts</code>, <code>postgres.ts</code>, <code>secrets/*</code>, <code>provisioning/runner.ts</code>, <code>storage/files.ts</code>, avatar route, <code>workspace/customers.ts</code>, <code>rate-limit.ts</code>, <code>request-context.ts</code>, health routes, <code>next.config.ts</code>, <code>vitest.config.ts</code>, <code>compose.prod.yaml</code>, <code>pg-backup.sh</code>, <code>migrate-tenants.ts</code>.</li>
+          <li>Sample kiya: <code>authz/policy.ts</code>, <code>catalog.ts</code>, navigation files, <code>registrations.ts</code>, <code>tenants/service/queries.ts</code>, <code>create.ts</code>, <code>tenants/rules.ts</code>, <code>security-events.ts</code>, README ke relevant sections.</li>
+          <li>Gehraai se cover nahi hua: badi UI components (<code>create-tenant-form.tsx</code>, <code>role-editor.tsx</code>, appearance settings), <code>tenants/service/update.ts</code>, <code>credentials.ts</code>, <code>existing-database.ts</code>, management-* files, migrations ki poori SQL, <code>docker/aistor/admin.sh</code>, aur test files ka content (sirf list aur naam).</li>
+          <li>Tests, lint, typecheck, build aur app is audit mein run nahi kiye. Pichhla recorded result (<code>.vibe/memory/audit-report.md</code>, 18 Oct 2026): 67 test files, 1,616 passed, 1 skipped. Yeh dobara verify nahi hua.</li>
+          <li>Pichhli bug audit (<code>audit-report/audit-report-2026-10-17-14-48-29.html</code>) ke 20 fixed tickets yahan dobara list nahi kiye; sirf deferred AUD-20261017-007 ka reference hai.</li>
+          <li>Severity production go-live ke context mein tay ki gayi hai. Sirf local development mein inka risk kam hai.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+</div>
+
+<footer>
+  <div class="inner gutter">
+    <span>Report file: <code>audit/suggestion-2026-10-18_08-31-36.html</code>. Is audit mein code, database ya config mein koi change nahi kiya gaya.</span>
+    <span>File/line references snapshot <code>f88fb56</code> ke hain; code badalne par line numbers khisak sakte hain.</span>
+  </div>
+</footer>
+
+<dialog id="details" aria-labelledby="dlg-title">
+  <div class="dlg">
+    <div class="dlg-head">
+      <h3 id="dlg-title">Details</h3>
+      <button type="button" class="icon-btn" id="dlg-close" aria-label="Band karein">
+        <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 2l10 10M12 2 2 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></svg>
+      </button>
+    </div>
+    <p class="dlg-how" id="dlg-how"></p>
+    <ul class="dlg-list" id="dlg-list"></ul>
+    <div class="dlg-foot"><button type="button" class="btn" id="dlg-close-2">Band karein</button></div>
+  </div>
+</dialog>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ------------------------------------------------------------------ */
+  /* Data                                                                */
+  /* ------------------------------------------------------------------ */
+
+  var CATS = [
+    { id: "arch", name: "Architecture & Code Quality", rating: 4,
+      verdict: "Module boundaries saaf hain (tenants, provisioning, domains, authz, workspace), pure policy functions alag hain aur har function par doc-block hai. Kamzori: single-instance assumptions, durable jobs ki kami, kuch bahut badi files aur UI primitives ka duplication." },
+    { id: "db", name: "Database & Data Layer", rating: 3,
+      verdict: "Schema design mazboot hai: database-per-tenant, CHECK constraints, partial unique indexes, single-role PK aur append-only audit trigger. Lekin backups sirf control plane ke hain, object storage phase 2 baaki hai, aur schema version gate kamzor hai." },
+    { id: "sec", name: "Security & Compliance", rating: 3,
+      verdict: "Base security achhi hai: hashed tenant-bound sessions, Argon2id, AES-GCM secrets, host-only tenant resolution aur fail-closed rate limits. Production se pehle superuser runtime, MFA, security headers, trusted proxy, audit durability aur key rotation theek karne honge." },
+    { id: "perf", name: "Performance & Scalability", rating: 3,
+      verdict: "Bounded pools aur LRU tenant client cache sahi direction hai. Koi load test ya measurement nahi hai, isliye performance aur scale ke claims abhi unproven hain." },
+    { id: "qa", name: "QA & Testing", rating: 3,
+      verdict: "Backend integration tests kaafi strong hain, cross-tenant negative matrix ke saath. Browser E2E, coverage, load, backup aur accessibility tests nahi hain, aur CI bhi nahi." },
+    { id: "ux", name: "UI/UX & Accessibility", rating: 3,
+      verdict: "shadcn/Radix par consistent UI, secondary menu, empty states, count-details aur masking jaise project rules follow hote hain. Accessibility verify nahi hui, UI sirf English mein hai aur kai planned menu items hain." },
+    { id: "biz", name: "Business Logic & Workflows", rating: 2,
+      verdict: "Tenant lifecycle, RBAC aur customer registration flows achhe se bane hain. Public tenant signup, notifications, customer edit/detail, Platform Owner ke on-behalf actions aur offboarding baaki hain." },
+    { id: "ops", name: "DevOps & Operations", rating: 2,
+      verdict: "Docker hardening, pinned digests aur Makefile kaafi professional hain. Automated backups, CI, monitoring/alerting aur vulnerability scanning nahi hain, isliye production readiness kam hai." },
+    { id: "docs", name: "Documentation & Maintainability", rating: 4,
+      verdict: "README, PRD, TRD aur 21 module memory files bahut detailed hain. Kuch jagah drift hai, aur 16 open decisions delivery ko rok rahe hain." },
+    { id: "prod", name: "Product & Competitive Position", rating: 2,
+      verdict: "Foundation strong hai, lekin user-facing music value (releases, distribution) abhi shuru nahi hui. White-label aur isolation ko differentiator banaya ja sakta hai." }
+  ];
+
+  var F = [
+    { id: "F-01", cat: "ops", top: true, sev: "Critical", eff: "L", imp: "XL", pri: "P0", type: "Strategic investment", dep: "Interim ke liye kuch nahi; off-host target ke liye D-13",
+      title: "Tenant databases ka automated backup nahi hai",
+      ev: [
+        ["docker/scripts/pg-backup.sh:20-29", "`make backup` sirf `POSTGRES_DB` (control plane) ka `pg_dump` leta hai."],
+        ["README.md:853-862", "Docs khud batate hain: har tenant DB, PostgreSQL roles aur `app_storage` volume backup mein shaamil nahi."],
+        ["README.md:838-851", "Koi scheduler nahi; backup usi host ke `backups/` folder mein likha jaata hai."],
+        ["PRD.md:193-203", "§4.10: har tenant DB + control plane, verification, restore test aur off-host copy zaroori (AC-23)."],
+        ["backups/", "17 Oct ke kuch tenant dumps manually liye gaye dikhte hain; process automated nahi."]
+      ],
+      risk: "Disk failure, galat `DROP` ya corrupted volume par tenants ka poora business data hamesha ke liye ja sakta hai. Tenant restore kabhi test nahi hua, roles dump nahi hote, aur `TENANT_SECRETS_KEY` khone par saare tenant DB passwords unrecoverable ho jaate hain.",
+      rec: [
+        "Interim (1–2 din): control plane se tenants ki list lekar har DB ka `pg_dump --format=custom`, `pg_restore --list` check, SHA-256, aur `pg_dumpall --roles-only`. Host cron ya systemd timer se schedule karein.",
+        "D-13 tay karke off-host copy: `md-backups` bucket + doosre host ya cloud par replica. Same disk wala backup disaster recovery nahi hai.",
+        "TRD §11 ke hisaab se `backup_runs` table (status, checksum, schema version) aur failure Platform Owner ko dikhana.",
+        "Har hafte scratch DB mein restore test, result record karein; AC-23 ke liye automated test.",
+        "`app_storage` volume aur `TENANT_SECRETS_KEY` ka out-of-band backup runbook mein likhein."
+      ] },
+
+    { id: "F-02", cat: "sec", top: true, sev: "High", eff: "M", imp: "L", pri: "P0", type: "Tech debt", dep: "Kuch nahi",
+      title: "App ka runtime control-plane connection PostgreSQL superuser se chalta hai",
+      ev: [
+        ["src/lib/postgres.ts:19-28", "Shared pool `POSTGRES_USER` se connect hota hai, jo official image mein superuser hai."],
+        ["README.md:1040-1044", "README kehta hai yeh tab tak theek tha jab sirf `SELECT 1` query thi; ab sessions, RBAC, tenants aur audit sab isi connection par hain."],
+        ["TRD.md:87", "§3.2: normal application queries ke liye superuser kabhi use na karein."],
+        ["src/lib/provisioning/runner.ts:86-96", "Provisioning lock aur admin SQL bhi wahi login use karte hain; TRD §19.1 mein dedicated provisioning login pending hai."]
+      ],
+      risk: "Kisi SQL injection, ORM bug ya compromised dependency ka blast radius poora PostgreSQL cluster ban jaata hai: har tenant DB, `COPY ... PROGRAM` se DB container par command execution, aur superuser `audit_events` ka append-only trigger bhi hata sakta hai. Database-per-tenant isolation ka faayda kam ho jaata hai.",
+      rec: [
+        "Teen roles: `md_app` (control plane par sirf zaroori DML; `audit_events` par sirf INSERT/SELECT), `md_provisioner` (CREATEDB CREATEROLE NOSUPERUSER, sirf provisioning service), `md_migrator` (sirf migrations job).",
+        "Compose aur env mein alag credentials; app container ko superuser password na mile.",
+        "Negative test: app login se `DROP TRIGGER`, `TRUNCATE audit_events` aur `CREATE ROLE` fail hon.",
+        "README ka 'Database role' note update karein."
+      ] },
+
+    { id: "F-03", cat: "ops", top: true, sev: "High", eff: "M", imp: "L", pri: "P0", type: "Quick win", dep: "Kuch nahi",
+      title: "Koi CI pipeline ya merge quality gate nahi, jabki kai AI agents parallel kaam kar rahe hain",
+      ev: [
+        [".github/ (absent)", "Repository mein koi CI config (GitHub Actions, GitLab CI) nahi."],
+        ["Makefile:133-145", "`make check` aur `make test` sirf manually chalte hain."],
+        ["git worktree list", "14 alag worktrees (`codex/*`, `claude/*`, `feature/*`) ek saath active; sab `main` mein merge hote hain."],
+        ["vitest.config.ts:27", "Tests serial (`fileParallelism: false`) hain aur poora Docker stack maangte hain, isliye skip hone ka chance badhta hai."]
+      ],
+      risk: "Do branches alag-alag pass hokar bhi merge ke baad saath mein toot sakti hain. Automated gate ke bina regression `main` tak pahunch jaata hai, aur kis commit par build green tha iska record nahi rehta.",
+      rec: [
+        "Pipeline: `npm ci` → lint → typecheck → `next build` → Vitest (PostgreSQL 18.6 + Redis 8.10 service containers) → Prisma migration check.",
+        "`main` par required status check. Agar repo sirf local hai to merge se pehle `make check test` chalane wala pre-merge script ya hook.",
+        "Har merge ke saath test result (files/tests passed) commit message ya CHANGELOG mein.",
+        "Dependency audit aur container scan bhi isi pipeline mein (F-14)."
+      ] },
+
+    { id: "F-04", cat: "docs", top: true, sev: "High", eff: "S", imp: "XL", pri: "P0", type: "Quick win", dep: "Product owner ka samay",
+      title: "Requirements ke 16 open decisions kai features ko block kar rahe hain",
+      ev: [
+        ["PRD.md:348-367", "D-1 se D-18 mein sirf D-4 decided aur D-5 partial; baaki 16 Open."],
+        ["PRD.md:369-378", "C-1 se C-6 conflicts approval ke intezaar mein."],
+        ["TRD.md:551-560", "TC-1 se TC-6 technical conflicts (Auth.js, local storage, backup scope)."],
+        [".vibe/memory/object-storage.md:11-14, 41-45", "Storage phase 2 explicitly D-11 aur D-13 se D-18 par blocked."]
+      ],
+      risk: "Public signup (D-3), storage (D-11, D-16, D-17, D-18), backups (D-13), production (D-1, D-2) aur background jobs (D-9) decisions ke bina shuru nahi ho sakte. Agents ko guess karna padega, jo CLAUDE.md ke 'never assume' rule ke khilaaf hai.",
+      rec: [
+        "Ek decision workshop: har D/C/TC item ka owner, due date aur kaunsa feature unblock hota hai.",
+        "Har faisla `docs/decisions/` mein chhote ADR ke roop mein, aur PRD/TRD tables update.",
+        "Pehle wo decisions jo P0/P1 kholte hain: D-13, D-1/D-2, D-3, D-9, D-16, D-11, D-17."
+      ] },
+
+    { id: "F-05", cat: "db", top: true, sev: "High", eff: "XL", imp: "XL", pri: "P1", type: "Strategic investment", dep: "F-04 (D-11, D-16, D-17, D-18), F-01",
+      title: "Object storage phase 2 (tenant buckets aur storage isolation) shuru nahi hua",
+      ev: [
+        [".vibe/memory/object-storage.md:11-14", "Status: Phase 1 (Docker setup) done, Phase 2 not started."],
+        ["package.json", "App mein koi S3/MinIO client dependency nahi."],
+        ["src/lib/storage/files.ts", "Profile images local `STORAGE_ROOT` par likhe jaate hain."],
+        ["prisma/control/schema.prisma:74-86", "`ProvisioningStep` mein bucket/identity/policy steps nahi; `tenant_buckets` aur `backup_runs` tables nahi."],
+        ["PRD.md:156-192", "§4.9 mandatory hai; AC-14, AC-15, AC-16, AC-18, AC-19, AC-20 Missing."]
+      ],
+      risk: "Audio/video upload, release workflow aur customer assets ka kaam shuru nahi ho sakta. Pehle se active tenants bucket ke bina hain (C-6), aur profile images ka volume backup mein bhi nahi.",
+      rec: [
+        "Pehle D-11, D-16, D-17, D-18 tay karein (F-04).",
+        "TRD §9 ko phases mein: (1) server-only `storage` module + S3-compatible client, (2) provisioner identity, (3) bucket, identity aur policy provisioning steps + `tenant_buckets` table (UNIQUE bucket aur access key), (4) verify step mein isolation probe.",
+        "`aistor-isolation-test` suite (A↔B denied, anonymous denied, tampered URL denied) CI mein.",
+        "Existing tenants ke liye tracked backfill run; profile images checksum ke saath migrate (TRD §9.9)."
+      ] },
+
+    { id: "F-06", cat: "sec", top: true, sev: "High", eff: "M", imp: "L", pri: "P1", type: "Strategic investment", dep: "Recovery emails ke liye F-11",
+      title: "Platform Owner ke liye MFA nahi, aur kisi user ke liye self-service account recovery nahi",
+      ev: [
+        ["src/lib/platform-auth/", "Sirf username + password (Argon2id); TOTP ya WebAuthn ka koi code nahi."],
+        ["prisma/control/schema.prisma:313-346", "`PlatformOwner` mein email ya MFA fields nahi."],
+        ["README.md:455-560", "Platform Owner ka password sirf CLI (`make db-rotate-owner-password`) se reset hota hai."],
+        ["TRD.md:237, 538", "§8.1: account recovery requirements define karna baaki (TRD §19.1 Open)."]
+      ],
+      risk: "Platform Owner sab tenants manage karta hai; ek phished password poore platform ka admin access de deta hai. Tenant staff aur customers password bhoolne par support par depend karte hain.",
+      rec: [
+        "Platform Owner aur Sub-Platform Owners ke liye mandatory MFA (TOTP ya passkeys), recovery codes aur audit events.",
+        "Tenant master aur staff ke liye optional MFA, baad mein tenant-level policy.",
+        "Email service (F-11) ke baad time-limited, single-use reset tokens (sirf hash store), reset par saare sessions revoke (existing pattern)."
+      ] },
+
+    { id: "F-07", cat: "db", top: true, sev: "Medium", eff: "S", imp: "M", pri: "P1", type: "Quick win", dep: "Alerts ke liye F-13",
+      title: "Tenant gate schema version ko deployed code se match nahi karta",
+      ev: [
+        ["src/lib/domains/resolve.ts:86", "Access sirf `schemaStatus === current` par; `schemaVersion` ko build ki latest tenant migration se compare nahi kiya jaata."],
+        ["prisma/migrate-tenants.ts:102-121", "Tenant migrations ek-ek karke alag job mein; fail hone par `schemaStatus: failed` aur tenant `not_ready` (offline)."],
+        ["README.md:957-983", "Deploy order (backup → migrate → up) manual hai; galat order ka koi runtime guard nahi."]
+      ],
+      risk: "Deploy order mein galti (code pehle, migration baad mein) par tenant pages Prisma 'Unknown field' jaise 500 errors dete hain. Ek tenant ki failed migration us tenant ko bina alert ke offline rakhti hai.",
+      rec: [
+        "Build time par expected tenant migration naam embed karein; gate `schemaVersion` mismatch par friendly maintenance state dikhaye.",
+        "`migrate-tenants` mein summary report, limited concurrency aur failure par alert (F-13).",
+        "Release checklist: backup → control migrate → tenant migrate → app up; expand/contract migrations."
+      ] },
+
+    { id: "F-08", cat: "sec", top: false, sev: "Medium", eff: "M", imp: "M", pri: "P1", type: "Quick win", dep: "Kuch nahi",
+      title: "CSP, HSTS aur Permissions-Policy headers nahi",
+      ev: [
+        ["next.config.ts:23-35", "Sirf `X-Content-Type-Options`, `X-Frame-Options` aur `Referrer-Policy` set hain."],
+        ["src/app/platform/(console)/tenants/[id]/avatar/route.ts:76", "CSP sirf avatar response par hai, pages par nahi."],
+        ["docker/compose.prod.yaml:11-12", "TLS reverse proxy par hai, lekin HSTS kaun set karega yeh documented nahi."]
+      ],
+      risk: "XSS hone par browser-level doosri layer nahi. HTTPS downgrade aur first-visit attacks se protection poori tarah proxy ke bharose hai.",
+      rec: [
+        "CSP pehle `Content-Security-Policy-Report-Only` mode mein (nonce-based scripts, `frame-ancestors 'none'`, `object-src 'none'`), phir enforce.",
+        "HSTS (lamba `max-age`, wildcard tenants ke liye `includeSubDomains`) reverse proxy config ke saath README mein.",
+        "`Permissions-Policy` (camera, microphone, geolocation off) aur `Cross-Origin-Opener-Policy: same-origin`."
+      ] },
+
+    { id: "F-09", cat: "sec", top: false, sev: "Medium", eff: "S", imp: "M", pri: "P1", type: "Quick win", dep: "Kuch nahi",
+      title: "Client IP X-Forwarded-For ki aakhri entry se liya jaata hai; trusted proxy config nahi",
+      ev: [
+        ["src/lib/request-context.ts:59", "Last XFF entry ko client IP maana jaata hai."],
+        ["src/lib/platform-auth/rate-limit.ts:46-56, 70-71", "Header na ho to IP `unknown`; aise sab requests ek hi bucket share karte hain."],
+        ["src/lib/workspace/registrations.ts:392", "Signup limit key `ws-signup:<tenant>:ip:<ip>`."],
+        ["src/lib/workspace/login.ts:27-28", "Login limits: 5 per identifier, 20 per IP."]
+      ],
+      risk: "Proxy ke bina ya XFF overwrite na karne wale proxy ke saath attacker header badal kar IP limit bypass kar sakta hai. Ulta, sab users ek bucket mein aayein to ek attacker sabka login/signup quota khatam kar sakta hai. CDN + nginx jaise do hops par sab users proxy ka IP share karenge.",
+      rec: [
+        "`TRUSTED_PROXY_HOPS` (ya trusted CIDR list) env, `src/lib/env.ts` mein validate; ek hi helper sab jagah reuse.",
+        "Production mein XFF missing ho to warning log.",
+        "README Production mein proxy ko XFF overwrite karne ki config (nginx real_ip, Caddy trusted_proxies).",
+        "Unit tests: spoofed header, multi-hop, missing header."
+      ] },
+
+    { id: "F-10", cat: "biz", top: true, sev: "Medium", eff: "L", imp: "L", pri: "P1", type: "Strategic investment", dep: "F-04 (D-3), F-11",
+      title: "Public website se tenant signup nahi hai",
+      ev: [
+        ["src/app/page.tsx:80-110", "Platform host ka home page sirf infrastructure status card hai."],
+        ["PRD.md:73-76", "§4.2: do entry points; public website signup inmein se ek."],
+        ["src/lib/tenants/service/create.ts:495-501", "`createTenant` Platform Owner actor maangta hai (rate limit `tenant-create:<ownerId>`)."]
+      ],
+      risk: "Self-service growth nahi ho sakti; har tenant Platform Owner ko manually banana padega. AC-1 aur AC-15 poore nahi.",
+      rec: [
+        "D-3 tay karein (email verification ya manual approval).",
+        "Base domain par signup page: slug availability (existing `availability.ts`), strong rate limit + verification, aur wahi `createTenant` service public/system actor ke saath (TRD §4.1).",
+        "Provisioning status page aur 'tenant ready' email (F-11)."
+      ] },
+
+    { id: "F-11", cat: "biz", top: false, sev: "Medium", eff: "L", imp: "L", pri: "P1", type: "Strategic investment", dep: "Provider decision (TRD §19.1); reliable delivery ke liye F-17",
+      title: "Email aur notification system nahi hai",
+      ev: [
+        ["package.json", "Koi email/SMTP dependency nahi."],
+        ["TRD.md:537", "§19.1: 'Email delivery and verification method' Open."],
+        ["TRD.md:130", "Provisioning step 16 'Notify the user' implement nahi."],
+        ["src/app/(workspace)/customer/(public)/registration/page.tsx", "Applicant ko approval/rejection jaanne ke liye khud login karna padta hai."]
+      ],
+      risk: "Verification, password reset, registration updates aur security alerts sab is par depend karte hain; iske bina F-06 aur F-10 adhoore rahenge.",
+      rec: [
+        "Transactional email provider chunein; `notifications` outbox table + worker (F-17), taaki DB transaction ke saath email reliable ho.",
+        "Templates: tenant ready, registration received/approved/rejected, password reset, new-device login.",
+        "Baad mein tenant-branded sender (white-label)."
+      ] },
+
+    { id: "F-12", cat: "biz", top: false, sev: "Medium", eff: "M", imp: "L", pri: "P1", type: "Strategic investment", dep: "Business se profile fields confirm karna",
+      title: "Customer module adhoora: edit, detail page aur tenant ke liye sub-customer view nahi",
+      ev: [
+        ["src/app/(workspace)/tenant/customers/", "Sirf `(list)` aur `new` routes; `[id]` detail/edit nahi."],
+        ["src/lib/authz/catalog.ts:170-172", "`tenant.customers` mein sirf view, create, suspend; `edit` privilege nahi."],
+        ["src/lib/workspace/customers.ts:215", "List sirf `parentId: null` (main customers); tenant sub-customers nahi dekh sakta."],
+        ["prisma/tenant/schema.prisma:176-199", "Customer mein sirf type, name, status; contact, address ya payout fields nahi."]
+      ],
+      risk: "Galat naam ya type theek karne ka raasta nahi. PRD §4.3 ka 'customers and sub-customers manage' aur AC-9 adhoore hain. Future royalty/payout ke liye profile data ka model tay nahi.",
+      rec: [
+        "Customer detail page: profile, primary login, sub-customers, registration history aur audit.",
+        "`tenant.customers.edit` privilege + update service (duplicate checks, transaction, audit) existing patterns se.",
+        "Tenant ke liye sub-customers ka read-only view pehle, phir suspend.",
+        "Profile fields (Personal, Contact, Bank Information sections) business se confirm karke hi add karein; khud se fields na banayein."
+      ] },
+
+    { id: "F-13", cat: "ops", top: false, sev: "Medium", eff: "M", imp: "L", pri: "P1", type: "Strategic investment", dep: "Kuch nahi",
+      title: "Observability: structured logging, metrics, alerting aur error tracking nahi",
+      ev: [
+        ["src/ (grep)", "122 jagah direct `console.*`; kuch lines `[module] text`, kuch JSON (`src/lib/security-events.ts:50`)."],
+        ["README.md:1022-1025", "Logs Docker json-file mein, 10 MB × 5 per container; shipping ya retention configured nahi."],
+        ["PRD.md:279, 287", "§6.2 storage health monitored, §6.3 measurable monitoring."],
+        ["src/proxy.ts", "Request ID banta hai (achha), lekin har log line mein nahi jaata."]
+      ],
+      risk: "Production mein provisioning failure, login attacks, Redis outage ya migration failure ka pata user ki complaint se chalega. 50 MB rotation par security events jaldi mit jaate hain.",
+      rec: [
+        "Ek reusable logging helper (JSON, levels, request ID, andar existing `log-sanitizer`), aur `console.*` calls dheere-dheere usi par.",
+        "Key metrics: provisioning success/fail, login failures, rate-limit `unavailable`, tenant schema status, backup status.",
+        "Logs central store mein ship karein; alerts: backup fail, readiness 503, provisioning failed.",
+        "Uptime monitor `/api/health/ready` par."
+      ] },
+
+    { id: "F-14", cat: "ops", top: false, sev: "Medium", eff: "M", imp: "M", pri: "P1", type: "Quick win", dep: "F-03",
+      title: "Dependency/image vulnerability scanning aur repeatable deploy pipeline nahi",
+      ev: [
+        ["TRD.md:444", "§15: dependencies aur AIStor image updated aur scanned honi chahiye."],
+        ["Repository", "Dependabot/Renovate, `npm audit`, SBOM ya image scan ka koi setup nahi."],
+        ["README.md:957-983", "Production image server par hi build hota hai; `prod-up` container recreate karta hai (chhota downtime), blue/green nahi."]
+      ],
+      risk: "Known CVE wali dependency bina pata chale production mein reh sakti hai. Server par build hone se deploy kam reproducible hai.",
+      rec: [
+        "CI mein `npm audit --omit=dev`, image scan aur grouped dependency update PRs (pinned versions ki policy barkarar).",
+        "CI mein image build karke registry par digest se push; server par sirf pull + `prod-up APP_TAG=<sha>`.",
+        "Health-gated restart aur rollback runbook (README mein base pehle se hai)."
+      ] },
+
+    { id: "F-15", cat: "qa", top: false, sev: "Medium", eff: "L", imp: "L", pri: "P1", type: "Strategic investment", dep: "F-03",
+      title: "Browser E2E, coverage aur load tests nahi",
+      ev: [
+        ["tests/", "82 files (~20.5k lines) Vitest integration/unit; `rbac-security-matrix.test.ts` (974 lines) jaise strong negative tests."],
+        ["vitest.config.ts:22", "Environment `node`; React components ka DOM-level test nahi."],
+        ["Repository", "Playwright/Cypress, coverage config aur load test nahi; backup/restore test nahi."],
+        ["PRD.md:287, 334", "§6.3 aur AC-25: claims measured results se backed hon."]
+      ],
+      risk: "UI flows (secondary menu, dialogs, back-button guard, PermissionSync) ka regression sirf manual check se pakda jaata hai. Coverage ka pata nahi, aur performance ka koi baseline nahi.",
+      rec: [
+        "Playwright smoke suite (6 journeys): PO login → tenant create → provisioning; tenant login → customer create; customer signup → approve; logout → Back; suspend → turant deny; cross-tenant URL tamper.",
+        "Isi suite mein axe-core checks (F-27).",
+        "Coverage report aur `src/lib` par threshold (pehle measure, phir lock).",
+        "Load baseline: login, tenant dashboard, list pages; result date aur version ke saath record (AC-25)."
+      ] },
+
+    { id: "F-16", cat: "prod", top: false, sev: "Medium", eff: "XL", imp: "XL", pri: "P1", type: "Strategic investment", dep: "F-05, PRD v1.2",
+      title: "Core music workflow (release submission → review) abhi shuru nahi hua",
+      ev: [
+        ["src/app/(workspace)/tenant/[module]/page.tsx:27-31", "Releases, Artists, Labels, Distribution, Analytics, Royalties sab 'coming soon'."],
+        ["src/app/(workspace)/customer/(portal)/navigation.ts:108-109", "Customer ke 'Music' aur 'Earnings' groups planned."],
+        ["prisma/tenant/schema.prisma:9-10, 231-269", "Release tables mein sirf ownership + title; workflow columns requirements tay hone par."],
+        ["PRD.md:150-154", "§4.8 abhi sirf foundation; DSP aur royalty ko finalized requirement ki tarah invent nahi karna."]
+      ],
+      risk: "Product ki asli value (music distribute karna) abhi users tak nahi pahunchti. Yeh defect nahi, roadmap gap hai.",
+      rec: [
+        "PRD v1.2: release lifecycle (draft → submitted → in review → approved/rejected → ready), roles, required metadata aur asset rules (D-11).",
+        "Storage phase 2 (F-05) iska prerequisite hai.",
+        "DSP delivery aur royalties abhi out of scope rakhein (PRD §7)."
+      ] },
+
+    { id: "F-17", cat: "arch", top: false, sev: "Medium", eff: "L", imp: "M", pri: "P2", type: "Strategic investment", dep: "F-04 (D-9)",
+      title: "Provisioning web process ke andar after() se chalta hai; durable job queue nahi",
+      ev: [
+        ["src/app/platform/(console)/tenants/actions.ts:196, 311", "`after(() => startProvisioning(...))`."],
+        ["src/lib/provisioning/runner.ts:52-54, 245-254", "Restart par adhoora run agli baar 'interrupted' mark hota hai; khud resume nahi hota."],
+        ["PRD.md:358", "D-9 (queue / background jobs) Open."]
+      ],
+      risk: "Deploy ya crash ke beech tenant `provisioning`/`failed` mein atka rehta hai jab tak koi manual Retry na kare. Backups, emails aur media processing ke liye bhi worker chahiye hoga.",
+      rec: [
+        "Control plane mein `jobs` table (status, lease, attempts, next_run_at) + alag `worker` compose service (same image).",
+        "Existing idempotent runner + advisory lock reuse; transient errors par backoff retry.",
+        "Yahi worker backups (F-01), emails (F-11) aur cleanup (F-34) chalaye."
+      ] },
+
+    { id: "F-18", cat: "sec", top: false, sev: "Medium", eff: "M", imp: "M", pri: "P2", type: "Tech debt", dep: "F-02, F-17",
+      title: "Audit trail best-effort hai, login events sirf stdout mein, aur audit viewer nahi",
+      ev: [
+        ["src/lib/workspace/customers.ts:100-124", "Tenant DB commit ke baad control plane mein audit; fail hone par sirf `console.error`, action safal rehta hai."],
+        ["src/lib/security-events.ts:50-51", "Login/logout events sirf log lines; `audit_events` mein nahi."],
+        ["src/lib/tenants/service/queries.ts:345", "Tenant detail par sirf last 50 events; platform-wide search, filter ya export UI nahi."],
+        ["F-02", "Superuser runtime append-only trigger ko bypass kar sakta hai."]
+      ],
+      risk: "Investigation ke waqt kuch admin actions ka record gayab ho sakta hai, brute-force patterns ka durable record nahi, aur compliance audit mushkil.",
+      rec: [
+        "Outbox pattern: tenant DB mein audit outbox row usi transaction mein; worker control plane mein copy kare (retry ke saath).",
+        "Security events (login failure, rate-limit hit) ke liye durable table + retention.",
+        "`platform.audit.view` privilege ke saath audit viewer: filters (tenant, actor, action, date), server-side pagination, CSV export."
+      ] },
+
+    { id: "F-19", cat: "sec", top: false, sev: "Medium", eff: "M", imp: "M", pri: "P2", type: "Tech debt", dep: "Kuch nahi",
+      title: "TENANT_SECRETS_KEY rotate nahi ho sakti",
+      ev: [
+        ["src/lib/secrets/crypto.ts:23, 125", "`SECRET_KEY_VERSION = 1` fixed; doosra version decrypt par reject."],
+        ["README.md:187-196", "Key badalne se saare tenant DB passwords toot jaate hain."],
+        ["src/lib/security-events.ts:41", "Wahi key auth identifier HMAC ke liye bhi use hoti hai."],
+        ["PRD.md:269", "§6.1: secrets rotate ho sakne chahiye."]
+      ],
+      risk: "Key leak hone par sab tenant DB passwords expose ho sakte hain; rotation ka raasta na hone se incident response mein downtime ya manual re-entry.",
+      rec: [
+        "Keyring: active + purane versions, decrypt version se, aur audited re-encrypt job.",
+        "HMAC ke liye alag derived key (HKDF info alag).",
+        "Rotation runbook aur test."
+      ] },
+
+    { id: "F-20", cat: "biz", top: false, sev: "Medium", eff: "M", imp: "M", pri: "P2", type: "Strategic investment", dep: "F-04 (C-3, D-5)",
+      title: "Platform Owner selected tenant ke behalf customers nahi bana sakta",
+      ev: [
+        ["src/app/platform/(console)/tenants/[id]/registrations/", "Sirf registrations approve/reject aur customer suspend/reactivate."],
+        ["src/app/(workspace)/tenant/customers/actions.ts:135", "`createCustomer` sirf tenant area se call hota hai."],
+        ["PRD.md:227", "§5.3: PO selected tenant ke Customers aur Sub-Customers create aur manage kar sake."],
+        ["PRD.md:375", "C-3: approval aur audit workflow tay hona baaki."]
+      ],
+      risk: "Support ya onboarding ke liye PO ko tenant ke login ki zaroorat padegi, jo PRD ke 'without logging in' rule ke khilaaf hai.",
+      rec: [
+        "C-3 aur D-5 tay karein.",
+        "`platform.tenant_customers.*` privileges; existing `createCustomer` reuse (CustomerActor pehle se `platform_owner` support karta hai).",
+        "Audit metadata mein on-behalf tenant aur reason."
+      ] },
+
+    { id: "F-21", cat: "biz", top: false, sev: "Medium", eff: "L", imp: "M", pri: "P2", type: "Strategic investment", dep: "F-04 (D-10), F-01",
+      title: "Tenant offboarding aur deprovisioning flow nahi",
+      ev: [
+        ["prisma/control/schema.prisma:20-29", "`deprovisioning` status enum mein hai."],
+        ["src/app/platform/(console)/tenants/labels.ts:14, 35", "Sirf label; koi service ya action nahi."],
+        ["PRD.md:359", "D-10 (deletion, offboarding) Open."]
+      ],
+      risk: "Band hue tenants ka data, DB role aur files hamesha pade rahenge; data deletion request ka jawab nahi diya ja sakta.",
+      rec: [
+        "D-10 tay karein: suspend → export → retention period → DB aur role drop, bucket retire (kabhi reuse nahi), audit retain.",
+        "Typed confirmation + dry run (Makefile pattern), audited."
+      ] },
+
+    { id: "F-22", cat: "sec", top: false, sev: "Medium", eff: "M", imp: "M", pri: "P2", type: "Strategic investment", dep: "Legal applicability",
+      title: "Data privacy: export, deletion aur retention policy nahi",
+      ev: [
+        ["prisma/tenant/schema.prisma:355-387", "Rejected registrations password hash ke saath hamesha rehte hain."],
+        ["Sessions, audit, logs", "Retention ya purge job nahi."],
+        ["README.md:1023-1025", "README ke hisaab se PostgreSQL logs mein personal data aa sakta hai."]
+      ],
+      risk: "India ke DPDP Act 2023 ya EU users par GDPR jaisi obligations (access, erasure, retention) ka jawab nahi; applicability legal team se confirm karni hogi.",
+      rec: [
+        "Data inventory + retention matrix (registrations, sessions, audit, logs, backups).",
+        "User aur customer data export/erasure flow, audit ke saath.",
+        "Signup par privacy notice aur consent text."
+      ] },
+
+    { id: "F-23", cat: "arch", top: false, sev: "Medium", eff: "M", imp: "M", pri: "P2", type: "Tech debt", dep: "Kuch nahi",
+      title: "Redis down hone par login aur signup band (single point of failure)",
+      ev: [
+        ["src/lib/rate-limit.ts:79-98", "Redis error par result `unavailable`."],
+        ["src/lib/workspace/registrations.ts:396", "`unavailable` par request refuse (fail closed); login bhi isi tarah (`login.ts:55`)."],
+        ["docker/compose.yaml:112", "Ek Redis container, HA nahi."]
+      ],
+      risk: "Security ke liye fail-closed sahi hai, lekin Redis outage ka matlab poore platform par koi login nahi. Yeh trade-off soch-samajh kar tay hona chahiye.",
+      rec: [
+        "Redis monitoring + alert; production mein managed Redis ya Sentinel.",
+        "Option: Redis unavailable par per-instance bounded in-memory limiter (strict) + alert, taaki security aur availability dono rahen.",
+        "Faisla ADR mein likhein."
+      ] },
+
+    { id: "F-24", cat: "perf", top: false, sev: "Medium", eff: "L", imp: "M", pri: "P2", type: "Strategic investment", dep: "Target scale decision, F-17",
+      title: "Architecture abhi single app instance maanta hai",
+      ev: [
+        ["src/lib/db/tenant.ts:30-35", "Tenant Prisma clients process memory (`globalThis`) mein cached."],
+        ["src/app/platform/(console)/tenants/actions.ts:196", "Background kaam isi process mein."],
+        ["README.md:1033-1039", "Connection math: instances × (pool + busy tenants × tenant pool) < `max_connections` (100)."],
+        ["TRD.md:539", "Expected tenant count aur connection strategy Open."]
+      ],
+      risk: "Traffic badhne par doosra instance jodne se connections tezi se badhenge, aur in-process jobs duplicate ya miss ho sakte hain.",
+      rec: [
+        "Target scale (tenants, concurrent users) tay karein.",
+        "PgBouncer (transaction mode) ko Prisma adapter ke saath test karein; connection budget document karein.",
+        "Worker (F-17) ke baad 2 replicas ke saath load test."
+      ] },
+
+    { id: "F-25", cat: "perf", top: false, sev: "Low", eff: "M", imp: "M", pri: "P2", type: "Tech debt", dep: "F-15 (baseline)",
+      title: "Har tenant request par kai control-plane queries aur 30 second polling",
+      ev: [
+        ["src/lib/domains/resolve.ts:61", "Har request par host → tenant lookup."],
+        ["src/lib/tenants/database-target.ts:42-67", "Har request par tenant row + secret row + AES decrypt."],
+        ["src/lib/authz/workspace-access.ts:27-36", "Disabled modules query."],
+        ["src/components/shared/permission-sync.tsx:7", "Har khule tab se har 30 second yahi chain."]
+      ],
+      risk: "Chhote scale par theek hai; hazaron active users par control plane bottleneck ban sakta hai. Bina measurement ke optimize na karein.",
+      rec: [
+        "Pehle load baseline (F-15).",
+        "Zaroorat ho to host → tenant aur DB target ka 30–60 second in-memory cache, suspend aur password rotation par invalidate (`evictTenantDb` pehle se hai).",
+        "PermissionSync interval adaptive rakhein aur hidden tab par pause confirm karein."
+      ] },
+
+    { id: "F-26", cat: "ops", top: false, sev: "Low", eff: "S", imp: "S", pri: "P2", type: "Quick win", dep: "Kuch nahi",
+      title: "Readiness check adhoora aur health details public",
+      ev: [
+        ["src/app/api/health/ready/route.ts:45-48", "Sirf PostgreSQL aur Redis; AIStor nahi."],
+        ["TRD.md:200", "§6.3: `/api/health/ready` AIStor reachability report kare."],
+        ["src/app/page.tsx:12-15", "Platform home page public taur par health links dikhata hai; readiness response dependency status aur latency batata hai."]
+      ],
+      risk: "AIStor down hone par bhi readiness green rahega. Public dependency status attackers ko thodi recon info deta hai (low risk).",
+      rec: [
+        "AIStor `/minio/health/ready` check jodein.",
+        "Public liveness minimal rakhein; detailed readiness internal network ya token ke peeche."
+      ] },
+
+    { id: "F-27", cat: "ux", top: false, sev: "Medium", eff: "M", imp: "M", pri: "P2", type: "Tech debt", dep: "F-15",
+      title: "Accessibility (WCAG) verify nahi hui",
+      ev: [
+        ["tests/", "Koi automated accessibility test nahi."],
+        ["src/ (grep)", "`aria-live`, `role=alert`, `aria-invalid` sirf 43 jagah."],
+        ["src/lib/appearance/", "7 accents × light/dark; har combination ka contrast check nahi."]
+      ],
+      risk: "Keyboard ya screen reader users ke liye forms aur dialogs mushkil ho sakte hain; bade label clients accessibility maang sakte hain.",
+      rec: [
+        "Playwright mein axe-core; keyboard-only walkthrough: secondary menu, dialogs, searchable select, tables.",
+        "Har accent theme ka contrast (WCAG AA 4.5:1) check.",
+        "Form errors ke liye `aria-describedby` + `aria-invalid` consistent."
+      ] },
+
+    { id: "F-28", cat: "biz", top: false, sev: "Low", eff: "S", imp: "S", pri: "P2", type: "Quick win", dep: "F-04 (C-5)",
+      title: "Custom domain code MVP scope se bahar hai par maujood hai",
+      ev: [
+        ["src/lib/domains/resolve.ts:61-64", "Verified custom domains resolve hote hain."],
+        ["PRD.md:139, 297, 377", "§4.6 aur §7: custom domains MVP se bahar (C-5)."],
+        ["audit-report/audit-report-2026-10-17-14-48-29.html", "AUD-20261017-007 (exact incoming server match) user ke kehne par deferred."]
+      ],
+      risk: "Out-of-scope code ka maintenance aur security surface; TLS automation ke bina custom domain production mein kaam nahi karega.",
+      rec: [
+        "C-5 tay karein: MVP mein feature flag off, ya paid-plan feature ke roop mein scope mein lein aur AUD-007 + TLS plan saath rakhein."
+      ] },
+
+    { id: "F-29", cat: "docs", top: false, sev: "Low", eff: "S", imp: "M", pri: "P2", type: "Quick win", dep: "Kuch nahi",
+      title: "Documentation drift: README aur home page purani haalat batate hain",
+      ev: [
+        ["README.md:6, src/app/page.tsx:88", "'No product features yet' likha hai, jabki tenants, RBAC, customers aur registrations ban chuke hain."],
+        ["README.md:1023-1025 vs docker/postgres/postgresql.conf:42", "README slow statements (>1s) log hona batata hai; config mein `-1` (off)."],
+        ["README.md:96-145", "Layout section mein `lib/authz`, `lib/workspace`, `components/rbac` nahi."],
+        ["docs/", "Sirf 2 docs; ADRs, runbooks (incident, restore drill) aur CHANGELOG nahi."]
+      ],
+      risk: "Naye developer ya agent galat assumptions ke saath kaam karenge; operations ke waqt runbook nahi milega.",
+      rec: [
+        "README refresh: status, layout, logging, DB role.",
+        "`docs/runbooks/` (backup/restore drill, incident, key rotation), `docs/decisions/` (ADR) aur `CHANGELOG.md`.",
+        "Merge checklist mein 'docs + .vibe memory updated' item."
+      ] },
+
+    { id: "F-30", cat: "arch", top: false, sev: "Low", eff: "M", imp: "S", pri: "P3", type: "Tech debt", dep: "Kuch nahi",
+      title: "Kuch files bahut badi hain",
+      ev: [
+        ["src/app/platform/(console)/tenants/new/create-tenant-form.tsx", "1,764 lines."],
+        ["src/app/platform/(console)/tenants/[id]/page.tsx", "1,029 lines."],
+        ["src/components/rbac/role-editor.tsx, src/lib/authz/role-service.ts", "962 aur 930 lines."],
+        ["tenants/new/form-model.ts, tenants/page.tsx, [id]/edit/edit-tenant-form.tsx", "862, 813 aur 798 lines."]
+      ],
+      risk: "Review, debugging aur parallel agents ke merge conflicts mushkil; ek change ka asar samajhna bhaari.",
+      rec: [
+        "Jab agli baar file touch ho, section components aur hooks mein todein. Big-bang refactor nahi (CLAUDE.md 'protect existing functionality').",
+        "~400 lines ki soft limit review checklist mein."
+      ] },
+
+    { id: "F-31", cat: "arch", top: false, sev: "Low", eff: "M", imp: "S", pri: "P3", type: "Tech debt", dep: "Kuch nahi",
+      title: "UI primitives ke do alag sets aur panel wrappers ka duplication",
+      ev: [
+        ["src/app/platform/(console)/_components/ vs src/components/shared/", "EmptyState, ComingSoon, Notice, Field jaise primitives alag-alag."],
+        ["_components/coming-soon.tsx, components/dashboard/coming-soon.tsx", "Do ComingSoon components."],
+        ["src/app/platform/theme-root.tsx, src/components/workspace/theme-root.tsx", "Do theme roots (255 aur 60 lines); appearance settings bhi do (695 aur 493 lines)."],
+        ["rbac-actor.ts, rbac-bindings.ts, roles/actions.ts", "Teen panels mein lagbhag same wrappers (~147 lines har panel)."]
+      ],
+      risk: "Ek jagah fix doosri jagah miss ho jaata hai; theme ya behaviour inconsistent ho sakta hai (CLAUDE.md shared component rule).",
+      rec: [
+        "Platform `_components` ko dheere-dheere `src/components/shared` mein merge; ek ComingSoon, ek EmptyState.",
+        "RBAC panel bindings ek factory se, panel-specific config ke saath."
+      ] },
+
+    { id: "F-32", cat: "perf", top: false, sev: "Low", eff: "S", imp: "S", pri: "P3", type: "Tech debt", dep: "Measurement",
+      title: "Search ILIKE '%q%' bina trigram index ke",
+      ev: [
+        ["src/lib/tenants/service/queries.ts:180", "Tenant search condition."],
+        ["src/lib/workspace/customers.ts:188-198", "Customer search `contains` insensitive."]
+      ],
+      risk: "Hazaron rows par sequential scan; abhi impact kam.",
+      rec: ["Measure karein; zaroorat par migration se `pg_trgm` GIN indexes."] },
+
+    { id: "F-33", cat: "ux", top: false, sev: "Low", eff: "L", imp: "M", pri: "P3", type: "Strategic investment", dep: "Target market decision",
+      title: "UI sirf English mein, aur tenant phone rule sirf Indian numbers ke liye",
+      ev: [
+        ["src/app/layout.tsx", "`<html lang=en>`, strings hard-coded."],
+        ["src/lib/tenants/rules.ts:108-116", "Phone exactly 10 digits, 6–9 se shuru (India)."],
+        ["prisma/control/schema.prisma:138", "DB comment optional leading '+' allow karta hai."]
+      ],
+      risk: "Hindi/Hinglish users aur international tenants ke liye rukawat; target market tay hona baaki.",
+      rec: [
+        "Target market tay karein; zaroorat par i18n framework aur Hindi/Hinglish strings.",
+        "Global jaana ho to phone rule market-wise configurable (E.164)."
+      ] },
+
+    { id: "F-34", cat: "db", top: false, sev: "Low", eff: "S", imp: "S", pri: "P3", type: "Tech debt", dep: "F-17",
+      title: "Sessions cleanup aur 'active sessions' UI nahi",
+      ev: [
+        ["src/lib/workspace/sessions.ts:152-158", "Purane sessions sirf usi user ke next login par delete hote hain."],
+        ["Portal UI", "Koi scheduled cleanup ya 'sab devices se sign out' option nahi."]
+      ],
+      risk: "Session tables dheere-dheere badhti hain; user khoye device ka session khud band nahi kar sakta.",
+      rec: [
+        "Daily cleanup job (worker, F-17).",
+        "Profile mein active sessions list + 'sab devices se sign out'."
+      ] },
+
+    { id: "F-35", cat: "sec", top: false, sev: "Low", eff: "S", imp: "S", pri: "P3", type: "Tech debt", dep: "Kuch nahi",
+      title: "Sensitive values ka masking sirf UI level par hai",
+      ev: [
+        ["src/components/customers/customers-directory.tsx:135-136", "`SensitiveValue` ko plaintext prop milta hai; value page payload mein hoti hai."]
+      ],
+      risk: "Masking shoulder-surfing se bachata hai, data protection control nahi hai. Ise security boundary na samjhein.",
+      rec: [
+        "Documentation mein yeh clear karein.",
+        "Bahut sensitive values (passwords, keys) ke liye reveal par hi server se fetch karein."
+      ] },
+
+    { id: "F-36", cat: "ux", top: false, sev: "Low", eff: "S", imp: "S", pri: "P3", type: "Quick win", dep: "F-10",
+      title: "Platform home placeholder hai aur menu mein bahut saare 'coming soon' items",
+      ev: [
+        ["src/app/page.tsx:80-110", "Base domain par 'Running' status card."],
+        ["src/app/(workspace)/tenant/navigation.ts:129-130", "Catalog aur Business groups mein planned items."],
+        ["src/app/platform/(console)/navigation.ts:100-104, 126-130", "Subscriptions aur Support planned."]
+      ],
+      risk: "Pehli impression adhoore product jaisi; users planned items par click karke disappoint hote hain.",
+      rec: [
+        "Base domain par simple landing page + tenant signup CTA (F-10).",
+        "Planned items ko flag se chhupayein ya ek 'Roadmap' jagah par rakhein."
+      ] },
+
+    { id: "F-37", cat: "prod", top: false, sev: "Low", eff: "L", imp: "M", pri: "P3", type: "Strategic investment", dep: "F-04 (D-11)",
+      title: "Subscription aur plan management abhi nahi",
+      ev: [
+        ["prisma/control/schema.prisma:105-117", "Plan mein sirf code, name, isDefault."],
+        ["src/app/platform/(console)/subscriptions/page.tsx", "Planned page."],
+        ["PRD.md:144-148", "MVP mein billing out of scope; model aage plans allow kare."]
+      ],
+      risk: "Monetization abhi possible nahi; MVP scope ke hisaab se yeh theek hai.",
+      rec: [
+        "Plan entitlements (customers limit, storage quota D-11, modules) ka model; existing tenant module switches ko plan se jodna.",
+        "Billing provider baad ke phase mein."
+      ] }
+  ];
+
+  var REQS = [
+    ["AC-1", "PRD §8", "Naya user valid, unique slug ke saath tenant register kar sake", "Partial", "Platform Owner panel se create hota hai (`create.ts:495`). Public website signup nahi (F-10)."],
+    ["AC-2", "PRD §8", "Har tenant ka dedicated PostgreSQL database aur DB user", "Implemented", "`steps.ts`: create_database, create_database_user (least-privilege role)."],
+    ["AC-3", "PRD §8", "Unique SaaS subdomain sahi tenant par resolve ho", "Implemented", "`resolve.ts:61-64`; `tenant_domains` par `@@unique([type, hostname])`."],
+    ["AC-4", "PRD §8", "Doosre tenant ko alag DB, user, bucket aur subdomain", "Partial", "DB, user, subdomain alag; bucket provision nahi hota (F-05)."],
+    ["AC-5", "PRD §8", "Tenant A, Tenant B ka data na padh sake na badal sake", "Implemented", "Host-only context, alag DB, tenant-bound token hash. Tests: `rbac-security-matrix`, `tenant-gate` (is audit mein run nahi)."],
+    ["AC-6", "PRD §8", "DB aur storage credentials browser tak kabhi na jaayen", "Implemented", "`server-only` modules, AES-256-GCM `secrets`; storage credentials abhi exist hi nahi."],
+    ["AC-7", "PRD §8", "Tenant admin Sub-Tenant bana kar permitted role de sake", "Implemented", "`tenant/users`, `tenant/roles`, `sub-user-service.ts`."],
+    ["AC-8", "PRD §8", "Sub-Tenant apni permissions se bahar action na kar sake", "Implemented", "Server-side authorize + delegation ceiling (`policy.ts`); rbac-enforcement tests."],
+    ["AC-9", "PRD §8", "Customers aur sub-customers sirf allowed hierarchy mein", "Partial", "Customer apne sub-customers manage karta hai; tenant sub-customers nahi dekh sakta, customer edit nahi (F-12)."],
+    ["AC-10", "PRD §8", "Customer category RBAC bypass na kare", "Implemented", "`CustomerType` sirf category; access roles se (`tenant schema.prisma:28-35`)."],
+    ["AC-11", "PRD §8", "Failed provisioning PO ko dikhe aur safe retry ho", "Implemented", "Step ledger, advisory lock, retry action (`actions.ts:311`)."],
+    ["AC-12", "PRD §8", "Same codebase local Docker aur production host par", "Partial", "`compose.prod.yaml` taiyaar; production host tay nahi (D-1), verify nahi."],
+    ["AC-13", "PRD §8", "Kubernetes ya Docker Swarm ki zaroorat nahi", "Implemented", "Single-host Docker Compose."],
+    ["AC-14", "PRD §8", "Panel se bane tenant ko apna bucket", "Missing", "Storage phase 2 shuru nahi (F-05)."],
+    ["AC-15", "PRD §8", "Public signup se bane tenant ko apna bucket", "Missing", "Public signup aur bucket dono missing (F-10, F-05)."],
+    ["AC-16", "PRD §8", "Manual bucket assignment sirf authorized PO, validation ke saath", "Missing", "F-05."],
+    ["AC-17", "PRD §8", "Dedicated Platform Owner bucket", "Implemented", "`make aistor-install`: `md-platform` bucket + identity (`object-storage.md`)."],
+    ["AC-18", "PRD §8", "Tenant A ka bucket Tenant B se isolated (app, S3 API, pre-signed URLs)", "Missing", "Tenant buckets aur identities nahi (F-05)."],
+    ["AC-19", "PRD §8", "Customers sirf apne tenant bucket mein authorized operations", "Missing", "F-05."],
+    ["AC-20", "PRD §8", "PO ka tenant bucket access authorized aur audited", "Missing", "F-05."],
+    ["AC-21", "PRD §8", "DB ya storage step fail par safe retry, duplicate resources nahi", "Partial", "DB steps idempotent; storage steps exist nahi."],
+    ["AC-22", "PRD §8", "Docker restart ke baad assets aur backups intact (checksums match)", "Partial", "Named volumes persist hote hain; checksum verification test nahi."],
+    ["AC-23", "PRD §8", "Backup, integrity verification aur restore tests se verified", "Partial", "`make backup` sirf control plane + `pg_restore --list`; tenant DBs aur automated tests nahi (F-01)."],
+    ["AC-24", "PRD §8", "AIStor Makefile commands documented, functional, failure-safe", "Partial", "Phase 1 targets bane; backup/restore/rotate/isolation targets baaki."],
+    ["AC-25", "PRD §8", "Performance claims recorded measurements se backed", "Missing", "Load/perf results recorded nahi (F-15)."],
+    ["FR-4.1a", "PRD §4.1", "PO tenant list, status aur provisioning status dekhe; create, suspend, retry", "Implemented", "`tenants/page.tsx`, `[id]/page.tsx`, `queries.ts`, lifecycle actions."],
+    ["FR-4.1b", "PRD §4.1, §5.3", "PO selected tenant ke behalf customers/sub-customers manage kare", "Partial", "Sirf registrations review aur suspend (F-20)."],
+    ["FR-4.2a", "PRD §4.2", "Panel aur public website, dono entry points same workflow se", "Partial", "Sirf panel entry point (F-10)."],
+    ["FR-4.2b", "PRD §4.2, D-3", "Activation se pehle contact verification (agar enabled)", "Missing", "D-3 Open; email service nahi (F-11)."],
+    ["FR-4.3", "PRD §4.3", "Tenant settings, users aur Sub-Tenants manage", "Implemented", "Appearance, users, roles modules."],
+    ["FR-4.4", "PRD §4.4", "RBAC: single role, deny by default, nav sirf accessible modules", "Implemented", "`user_roles` PK `user_id`; `catalog.ts`; navigation permission filter."],
+    ["FR-4.5", "PRD §4.5", "Customers aur sub-customers management", "Partial", "F-12."],
+    ["FR-4.6a", "PRD §4.6", "Subdomain normalize, reserved names block, duplicates reject", "Implemented", "`domains/rules.ts`, `tenants/rules.ts`."],
+    ["FR-4.6b", "PRD §4.6, C-5", "Custom domains MVP se bahar", "Divergent", "Code custom domain verify aur resolve karta hai; AUD-007 deferred (F-28)."],
+    ["FR-4.7", "PRD §4.7", "Ek free plan; model aage plans allow kare", "Implemented", "`plans` table + `isDefault`."],
+    ["FR-4.8", "PRD §4.8", "Music foundation: artists, labels, releases, assets", "Partial", "Tables hain; workflow abhi scope mein nahi (F-16)."],
+    ["FR-4.9", "PRD §4.9", "Har tenant ka bucket aur strict access rules", "Missing", "Phase 2 (F-05)."],
+    ["FR-4.9.4", "PRD §4.9.4, TRD §9.9", "Assets sahi tenant bucket mein", "Divergent", "Profile images local filesystem par (TRD TC-4)."],
+    ["FR-4.10", "PRD §4.10", "Sab DBs ka backup, verify, restore test, off-host copy", "Partial", "Sirf control plane, manual (F-01)."],
+    ["NFR-5.5", "PRD §5.5", "Revocation turant effective", "Implemented", "Har request par session + role DB se validate; PermissionSync 30s mein UI refresh."],
+    ["NFR-5.6", "PRD §5.6", "Cross-tenant aur escalation negative tests", "Implemented", "`rbac-security-matrix.test.ts` (974 lines) aur doosre tests."],
+    ["NFR-6.1a", "TRD §3.2", "Normal queries superuser se nahi", "Divergent", "Control plane `POSTGRES_USER` superuser (F-02)."],
+    ["NFR-6.1b", "PRD §6.1", "Secrets rotate ho saken", "Partial", "Tenant DB password rotate hota hai; `TENANT_SECRETS_KEY` nahi (F-19)."],
+    ["NFR-6.3a", "PRD §6.3", "DB connections exhaust na hon", "Implemented", "Bounded pools aur LRU tenant client cache (`db/tenant.ts`)."],
+    ["NFR-6.3b", "PRD §6.3", "Load tests aur monitoring se backed claims", "Missing", "F-13, F-15."],
+    ["TRD-8.1", "TRD §1, §8.1, TC-3", "Auth.js authentication", "Divergent", "Custom Argon2id session auth; decision pending."],
+    ["TRD-6.3", "TRD §6.3", "Readiness AIStor reachability report kare", "Missing", "Sirf postgres aur redis (F-26)."],
+    ["TRD-10", "TRD §10", "Durable queue / background jobs", "Missing", "`after()` in-process (F-17)."],
+    ["TRD-15a", "TRD §15", "Registration aur login rate limiting", "Implemented", "Redis fixed window, fail closed (`rate-limit.ts`)."],
+    ["TRD-15b", "TRD §15", "Dependencies aur images scanned", "Missing", "F-14."],
+    ["UND-1", "Code", "Customer self-signup + approval + rejected applicant ka review request flow", "Undocumented", "PRD mein nahi; `.vibe/memory/customer-registration.md` mein documented."],
+    ["UND-2", "Code", "PO dwara per-tenant module switches (`platform.tenant_modules`)", "Undocumented", "`catalog.ts:85`; PRD mein nahi."],
+    ["UND-3", "Code", "Appearance personalization (theme, accent, width; per user + global)", "Undocumented", "PRD mein nahi; CLAUDE.md requirement."],
+    ["UND-4", "Code", "Existing-database mode (pehle se bana DB attach karna)", "Undocumented", "TRD §4.2 step 6 mein mention; PRD mein nahi."],
+    ["UND-5", "Code", "Sub-customer sirf 1 level deep (DB CHECK)", "Undocumented", "Tenant rbac migration:448; PRD is par chup hai."],
+    ["UND-6", "Code", "Tenant staff aur customers ka shared `/login` page", "Undocumented", "`src/lib/workspace/login.ts`."]
+  ];
+
+  var BACKLOG = [
+    ["Saare databases ka scheduled backup, off-host copy aur restore drill", "PRD §4.10", "P0", "D-13", ["F-01"]],
+    ["Least-privilege control-plane, provisioner aur migrator roles", "TRD §3.2", "P0", "—", ["F-02"]],
+    ["Tenant bucket provisioning aur storage isolation", "PRD §4.9, §5.7", "P1", "D-11, D-16, D-17, D-18", ["F-05"]],
+    ["Asset upload pipeline (staging prefix, content sniffing, multipart, size limits)", "TRD §9.6", "P1", "F-05, D-11", ["F-05"]],
+    ["Public tenant signup + contact verification", "PRD §4.2", "P1", "D-3, email service", ["F-10"]],
+    ["Transactional email / notification service", "TRD §4.2 step 16, §19.1", "P1", "Provider decision", ["F-11"]],
+    ["Platform Owner MFA + self-service password recovery", "TRD §8.1", "P1", "Email service", ["F-06"]],
+    ["Customer detail/edit + tenant ke liye sub-customer view", "PRD §4.3, §4.5", "P1", "Profile fields confirm", ["F-12"]],
+    ["Release submission aur tenant review workflow", "PRD §4.8", "P1", "F-05, PRD v1.2", ["F-16"]],
+    ["Durable job queue aur worker process", "TRD §10, D-9", "P2", "D-9", ["F-17"]],
+    ["Platform audit log viewer, export aur durable security events", "PRD §6.1, TRD §15", "P2", "Worker", ["F-18"]],
+    ["PO ke on-behalf customer/sub-customer operations", "PRD §5.3", "P2", "C-3, D-5", ["F-20"]],
+    ["Tenant offboarding, data export aur deletion", "PRD D-10", "P2", "D-10", ["F-21"]],
+    ["TENANT_SECRETS_KEY rotation", "PRD §6.1", "P2", "—", ["F-19"]],
+    ["Data export, erasure aur retention (privacy)", "Legal", "P2", "Legal applicability", ["F-22"]],
+    ["Plan entitlements aur quotas", "PRD §4.7, D-11", "P3", "D-11", ["F-37"]],
+    ["Custom domains (paid) + TLS automation", "PRD §4.6, C-5", "P3", "C-5", ["F-28"]],
+    ["Hindi/Hinglish UI aur multi-market phone rules", "Product", "P3", "Target market", ["F-33"]],
+    ["Active sessions UI aur 'sab devices se sign out'", "Product", "P3", "Worker", ["F-34"]],
+    ["Analytics, royalties aur payouts", "PRD §7 (Future)", "Future", "Alag PRD", []],
+    ["DSP delivery integrations", "PRD §4.8, §7 (Future)", "Future", "Alag PRD", []]
+  ];
+
+  var OPPS = [
+    ["O-1", "White-label 'distribution-in-a-box' for labels aur aggregators",
+      "Tenant model pehle se white-label ke liye fit hai: apna subdomain, workspace appearance, roles, customers aur approval-based signup. Branding ko gehra karein (logo, favicon, email sender) aur custom domain ko paid plan feature banayein.",
+      "F-11, F-28, F-37"],
+    ["O-2", "Data isolation ko trust differentiator banayein",
+      "Database-per-tenant, least-privilege login, tenant-bound sessions aur append-only audit labels ke liye strong selling point hain. Public 'security & isolation' page tabhi banayein jab F-01, F-02 aur F-18 theek ho jaayen, taaki claim sach ho.",
+      "F-01, F-02, F-18"],
+    ["O-3", "Release QC automation",
+      "Metadata completeness, artwork size/format aur audio format checks submission ke waqt hi chalein, taaki tenant reviewers ka kaam kam ho. Yeh tenant admins ke liye clear value hai.",
+      "F-05, F-16"],
+    ["O-4", "Onboarding ko KYC/document verification tak badhayein",
+      "Customer registration approval flow pehle se hai. Label/artist verification documents ka step jodkar fraud kam kiya ja sakta hai. Exact documents business se tay karein.",
+      "F-12, F-05"],
+    ["O-5", "India-first experience (agar target market India hai)",
+      "Hindi/Hinglish UI, Indian mobile validation (pehle se hai), regional language metadata (Devanagari titles), aur aage chalkar INR/GST invoicing. Global target ho to phone rule aur i18n pehle generalize karein.",
+      "F-33"],
+    ["O-6", "Plan-based packaging",
+      "Tenant module switches (`platform.tenant_modules`) pehle se hain; inhe plans se jodkar Starter/Pro jaise packages bina naye authorization system ke ban sakte hain.",
+      "F-37"],
+    ["O-7", "Tenant API aur webhooks",
+      "Bade labels apne CRM ya website se integrate karna chahte hain. Release status aur registration events ke webhooks ek natural extension hain, jab worker (F-17) aur audit outbox ban jaaye.",
+      "F-17, F-18"],
+    ["O-8", "Tenant analytics dashboard",
+      "Count-details transparency pattern pehle se hai. Releases aane ke baad submission funnel, approval time aur customer activity jaise operational metrics dikhayein. Royalty analytics alag PRD ke baad.",
+      "F-16"]
+  ];
+
+  var PHASES = [
+    ["Phase 0 · Abhi (1–2 hafte)", "P0", "Decision workshop pehle, kyunki baaki kaam ispar tika hai. Phir CI gate, DB roles aur interim backups parallel mein.", ["F-04", "F-03", "F-02", "F-01"], "F-04 → (F-03, F-02, F-01 parallel)"],
+    ["Phase 1 · Agle 1–2 sprints", "P1", "Security quick wins aur observability pehle; email service ke baad public signup; decisions aate hi storage phase 2, phir release workflow ka PRD.", ["F-08", "F-09", "F-07", "F-13", "F-14", "F-15", "F-06", "F-11", "F-10", "F-12", "F-05", "F-16"], "F-03 → F-14, F-15 · F-11 → F-10, F-06 recovery · F-04 → F-05 → F-16"],
+    ["Phase 2 · Agla quarter", "P2", "Worker process sabse pehle, kyunki audit outbox, scheduled backups, emails aur cleanup usi par chalenge.", ["F-17", "F-18", "F-19", "F-20", "F-21", "F-22", "F-23", "F-24", "F-25", "F-26", "F-27", "F-28", "F-29"], "F-17 → F-18, F-21, F-34 · F-15 → F-25, F-27"],
+    ["Phase 3 · Jab mauka mile", "P3", "Refactors aur polish, jab related files waise bhi touch hon.", ["F-30", "F-31", "F-32", "F-33", "F-34", "F-35", "F-36", "F-37"], "Koi hard dependency nahi"]
+  ];
+
+  /* ------------------------------------------------------------------ */
+  /* Helpers                                                             */
+  /* ------------------------------------------------------------------ */
+
+  function esc(text) {
+    return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function fmt(text) {
+    return esc(text).replace(/`([^`]+)`/g, "<code>$1</code>");
+  }
+  function byId(id) { return document.getElementById(id); }
+  function catName(id) {
+    for (var i = 0; i < CATS.length; i++) { if (CATS[i].id === id) return CATS[i].name; }
+    return id;
+  }
+  function findingById(id) {
+    for (var i = 0; i < F.length; i++) { if (F[i].id === id) return F[i]; }
+    return null;
+  }
+  function sevChip(sev) { return '<span class="chip sev-' + sev + '">' + sev + '</span>'; }
+  function priChip(pri) { return '<span class="chip pri pri-' + pri + '">' + pri + '</span>'; }
+  function stChip(st) { return '<span class="chip st-' + st + '">' + st + '</span>'; }
+  function idLinks(ids) {
+    return ids.map(function (id) { return '<a href="#' + id + '" class="mono">' + id + '</a>'; }).join(", ");
+  }
+  function ratingDots(n) {
+    var out = '<span class="rating" aria-label="' + n + ' / 5">';
+    for (var i = 1; i <= 5; i++) out += '<i class="' + (i <= n ? "on" : "") + '"></i>';
+    return out + "</span>";
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Details dialog (count transparency)                                 */
+  /* ------------------------------------------------------------------ */
+
+  var dialog = byId("details");
+  function openDialog(title, how, rowsHtml) {
+    byId("dlg-title").textContent = title;
+    byId("dlg-how").innerHTML = how;
+    byId("dlg-list").innerHTML = rowsHtml || '<li><span></span><span class="muted">Koi record nahi.</span><span></span></li>';
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else dialog.setAttribute("open", "");
+  }
+  function closeDialog() {
+    if (typeof dialog.close === "function") dialog.close();
+    else dialog.removeAttribute("open");
+  }
+  byId("dlg-close").addEventListener("click", closeDialog);
+  byId("dlg-close-2").addEventListener("click", closeDialog);
+  dialog.addEventListener("click", function (event) {
+    if (event.target === dialog) closeDialog();
+    var link = event.target.closest ? event.target.closest("a[data-goto]") : null;
+    if (link) {
+      event.preventDefault();
+      closeDialog();
+      goToFinding(link.getAttribute("data-goto"));
+    }
+  });
+
+  function findingRows(list) {
+    return list.map(function (f) {
+      return '<li><a href="#' + f.id + '" data-goto="' + f.id + '" class="mono">' + f.id + '</a><span>' + fmt(f.title) +
+        ' <span class="muted small">· ' + esc(catName(f.cat)) + '</span></span><span class="chips">' + sevChip(f.sev) + priChip(f.pri) + '</span></li>';
+    }).join("");
+  }
+  function reqRows(list) {
+    return list.map(function (r) {
+      return '<li><span class="mono">' + esc(r[0]) + '</span><span>' + fmt(r[2]) + ' <span class="muted small">· ' + esc(r[1]) + '</span></span><span>' + stChip(r[3]) + '</span></li>';
+    }).join("");
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Section 1: tiles and top list                                       */
+  /* ------------------------------------------------------------------ */
+
+  var SEV_ORDER = ["Critical", "High", "Medium", "Low"];
+  var SEV_TONE = { Critical: "crit", High: "high", Medium: "med", Low: "low" };
+  var PRI_ORDER = ["P0", "P1", "P2", "P3"];
+  var PRI_LABEL = { P0: "Production se pehle turant", P1: "Agle 1–2 sprints", P2: "Agla quarter", P3: "Jab mauka mile" };
+
+  byId("sev-tiles").innerHTML = SEV_ORDER.map(function (sev) {
+    var n = F.filter(function (f) { return f.sev === sev; }).length;
+    return '<button type="button" class="tile" data-tone="' + SEV_TONE[sev] + '" data-sev-tile="' + sev + '"><span class="n">' + n + '</span><span class="l">' + sev + '</span><span class="hint">Records dekhein</span></button>';
+  }).join("") + '<button type="button" class="tile" data-all-tile="1"><span class="n">' + F.length + '</span><span class="l">Kul findings</span><span class="hint">Records dekhein</span></button>';
+
+  byId("pri-tiles").innerHTML = PRI_ORDER.map(function (pri) {
+    var n = F.filter(function (f) { return f.pri === pri; }).length;
+    return '<button type="button" class="tile" data-pri-tile="' + pri + '"><span class="n">' + n + '</span><span class="l">' + pri + ' · ' + PRI_LABEL[pri] + '</span><span class="hint">Records dekhein</span></button>';
+  }).join("");
+
+  document.addEventListener("click", function (event) {
+    var tile = event.target.closest ? event.target.closest(".tile") : null;
+    if (!tile) return;
+    var sev = tile.getAttribute("data-sev-tile");
+    var pri = tile.getAttribute("data-pri-tile");
+    var st = tile.getAttribute("data-req-tile");
+    if (sev) {
+      openDialog(sev + " severity findings", "Kaise gina: report ki findings list mein jin items ki severity <b>" + sev + "</b> hai. Severity production go-live ke context mein auditor ka judgment hai.", findingRows(F.filter(function (f) { return f.sev === sev; })));
+    } else if (pri) {
+      openDialog(pri + " priority findings", "Kaise gina: jin findings ki priority <b>" + pri + "</b> (" + esc(PRI_LABEL[pri]) + ") hai.", findingRows(F.filter(function (f) { return f.pri === pri; })));
+    } else if (tile.getAttribute("data-all-tile")) {
+      openDialog("Saari findings", "Kaise gina: Section 3 ki saari findings, 10 categories mein.", findingRows(F));
+    } else if (st) {
+      openDialog(st + " requirements", "Kaise gina: Section 4 ki traceability table ke jin rows ka status <b>" + st + "</b> hai (acceptance criteria, functional/non-functional requirements aur undocumented behaviour).", reqRows(REQS.filter(function (r) { return r[3] === st; })));
+    }
+  });
+
+  byId("top-list").innerHTML = F.filter(function (f) { return f.top; }).map(function (f) {
+    return '<li><span class="mono muted small">' + f.id + '</span><a href="#' + f.id + '" data-goto-top="' + f.id + '">' + fmt(f.title) + '</a><span class="chips">' + sevChip(f.sev) + priChip(f.pri) + '</span></li>';
+  }).join("");
+
+  /* ------------------------------------------------------------------ */
+  /* Section 2: requirement coverage tiles                               */
+  /* ------------------------------------------------------------------ */
+
+  var ST_ORDER = ["Implemented", "Partial", "Missing", "Divergent", "Undocumented"];
+  byId("req-tiles").innerHTML = ST_ORDER.map(function (st) {
+    var n = REQS.filter(function (r) { return r[3] === st; }).length;
+    return '<button type="button" class="tile" data-req-tile="' + st + '"><span class="n">' + n + '</span><span class="l">' + stChip(st) + '</span><span class="hint">Requirements dekhein</span></button>';
+  }).join("");
+
+  /* ------------------------------------------------------------------ */
+  /* Section 3: findings                                                 */
+  /* ------------------------------------------------------------------ */
+
+  var catSelect = byId("f-cat");
+  var tocCats = byId("toc-cats");
+  var tocSub = '<ol>';
+  var body = "";
+  CATS.forEach(function (cat, index) {
+    var list = F.filter(function (f) { return f.cat === cat.id; });
+    var opt = document.createElement("option");
+    opt.value = cat.id;
+    opt.textContent = cat.name + " (" + list.length + ")";
+    catSelect.appendChild(opt);
+    tocSub += '<li><a href="#cat-' + cat.id + '">3.' + (index + 1) + ' ' + esc(cat.name) + '</a></li>';
+    var sevCounts = SEV_ORDER.map(function (s) {
+      var n = list.filter(function (f) { return f.sev === s; }).length;
+      return n ? '<span class="chip sev-' + s + '">' + n + ' ' + s + '</span>' : "";
+    }).join("");
+    body += '<section class="cat" id="cat-' + cat.id + '" data-cat="' + cat.id + '" data-spy>' +
+      '<div class="cat-head"><h3>3.' + (index + 1) + ' ' + esc(cat.name) + '</h3>' +
+      '<div class="cat-meta"><span>Auditor rating ' + ratingDots(cat.rating) + ' ' + cat.rating + '/5</span><span class="chips">' + sevCounts + '</span></div>' +
+      '<p class="muted small">' + fmt(cat.verdict) + '</p></div><div class="cards">';
+    list.forEach(function (f) {
+      body += '<article class="card" id="' + f.id + '" data-sev="' + f.sev + '" data-pri="' + f.pri + '" data-type="' + esc(f.type) + '" data-cat="' + f.cat + '">' +
+        '<div class="card-head"><span class="card-id">' + f.id + ' · ' + esc(cat.name) + '</span>' +
+        '<h4 class="card-title">' + fmt(f.title) + '</h4>' +
+        '<div class="chips">' + sevChip(f.sev) + priChip(f.pri) +
+        '<span class="chip tag">Effort ' + f.eff + '</span><span class="chip tag">Impact ' + f.imp + '</span><span class="chip tag">' + esc(f.type) + '</span></div></div>' +
+        '<div class="card-body">' +
+        '<div class="block"><h4>Saboot (evidence)</h4><ul class="ev">' + f.ev.map(function (e) {
+          return '<li><span class="path">' + esc(e[0]) + '</span><span>' + fmt(e[1]) + '</span></li>';
+        }).join("") + '</ul></div>' +
+        '<div class="block"><h4>Risk / opportunity</h4><p>' + fmt(f.risk) + '</p></div>' +
+        '<div class="block"><h4>Sujhaav (recommendation)</h4><ul class="bullets">' + f.rec.map(function (r) { return "<li>" + fmt(r) + "</li>"; }).join("") + '</ul></div>' +
+        '<p class="dep">Depends on: ' + fmt(f.dep) + '</p>' +
+        '</div></article>';
+    });
+    body += "</div></section>";
+  });
+  tocCats.innerHTML = tocSub + "</ol>";
+  byId("findings-body").innerHTML = body;
+
+  var state = { q: "", cat: "", pri: "", type: "", sev: {} };
+  var searchBox = byId("f-q");
+
+  function applyFilters() {
+    var q = state.q.trim().toLowerCase();
+    var anySev = Object.keys(state.sev).some(function (k) { return state.sev[k]; });
+    var shown = 0;
+    F.forEach(function (f) {
+      var card = byId(f.id);
+      var hay = (f.id + " " + f.title + " " + f.risk + " " + f.rec.join(" ") + " " + f.ev.map(function (e) { return e[0] + " " + e[1]; }).join(" ")).toLowerCase();
+      var ok = (!q || hay.indexOf(q) !== -1) &&
+        (!state.cat || f.cat === state.cat) &&
+        (!state.pri || f.pri === state.pri) &&
+        (!state.type || f.type === state.type) &&
+        (!anySev || state.sev[f.sev]);
+      card.hidden = !ok;
+      if (ok) shown++;
+    });
+    CATS.forEach(function (cat) {
+      var section = byId("cat-" + cat.id);
+      var visible = section.querySelectorAll(".card:not([hidden])").length;
+      section.hidden = visible === 0;
+    });
+    byId("f-count").textContent = shown + " / " + F.length + " findings dikh rahi hain";
+    byId("findings-empty").hidden = shown !== 0;
+  }
+
+  function clearFilters() {
+    state = { q: "", cat: "", pri: "", type: "", sev: {} };
+    searchBox.value = "";
+    catSelect.value = "";
+    byId("f-pri").value = "";
+    byId("f-type").value = "";
+    SEV_ORDER.forEach(function (s) { byId("f-sev-" + s).setAttribute("aria-pressed", "false"); });
+    applyFilters();
+  }
+
+  searchBox.addEventListener("input", function () { state.q = searchBox.value; applyFilters(); });
+  catSelect.addEventListener("change", function () { state.cat = catSelect.value; applyFilters(); });
+  byId("f-pri").addEventListener("change", function (e) { state.pri = e.target.value; applyFilters(); });
+  byId("f-type").addEventListener("change", function (e) { state.type = e.target.value; applyFilters(); });
+  SEV_ORDER.forEach(function (s) {
+    var btn = byId("f-sev-" + s);
+    btn.addEventListener("click", function () {
+      state.sev[s] = !state.sev[s];
+      btn.setAttribute("aria-pressed", state.sev[s] ? "true" : "false");
+      applyFilters();
+    });
+  });
+  byId("f-clear").addEventListener("click", clearFilters);
+  byId("f-clear-2").addEventListener("click", clearFilters);
+
+  function goToFinding(id) {
+    var card = byId(id);
+    if (!card) return;
+    if (card.hidden) clearFilters();
+    card.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+    card.classList.add("flash");
+    window.setTimeout(function () { card.classList.remove("flash"); }, 1600);
+    try { history.replaceState(null, "", "#" + id); } catch (err) { /* sandboxed history */ }
+  }
+  document.addEventListener("click", function (event) {
+    var a = event.target.closest ? event.target.closest('a[href^="#F-"]') : null;
+    if (!a || dialog.contains(a)) return;
+    event.preventDefault();
+    goToFinding(a.getAttribute("href").slice(1));
+  });
+
+  applyFilters();
+
+  /* ------------------------------------------------------------------ */
+  /* Section 4: traceability                                             */
+  /* ------------------------------------------------------------------ */
+
+  var reqFilter = "";
+  function renderReqs() {
+    byId("req-body").innerHTML = REQS.filter(function (r) { return !reqFilter || r[3] === reqFilter; }).map(function (r) {
+      return '<tr><td class="nowrap mono">' + esc(r[0]) + '</td><td class="nowrap muted">' + esc(r[1]) + '</td><td>' + fmt(r[2]) + '</td><td class="nowrap">' + stChip(r[3]) + '</td><td>' + fmt(r[4]) + '</td></tr>';
+    }).join("");
+    Array.prototype.forEach.call(document.querySelectorAll("#req-filters .toggle"), function (b) {
+      b.setAttribute("aria-pressed", b.getAttribute("data-st") === reqFilter ? "true" : "false");
+    });
+  }
+  byId("req-filters").innerHTML = '<span class="muted small">Status:</span>' +
+    '<button type="button" class="toggle" id="rf-all" data-st="">Saare (' + REQS.length + ')</button>' +
+    ST_ORDER.map(function (st) {
+      var n = REQS.filter(function (r) { return r[3] === st; }).length;
+      return '<button type="button" class="toggle" id="rf-' + st + '" data-st="' + st + '">' + st + ' (' + n + ')</button>';
+    }).join("");
+  byId("req-filters").addEventListener("click", function (event) {
+    var b = event.target.closest ? event.target.closest(".toggle") : null;
+    if (!b) return;
+    reqFilter = b.getAttribute("data-st");
+    renderReqs();
+  });
+  renderReqs();
+
+  /* ------------------------------------------------------------------ */
+  /* Sections 5–7                                                        */
+  /* ------------------------------------------------------------------ */
+
+  byId("backlog-body").innerHTML = BACKLOG.map(function (b, i) {
+    var pri = b[2] === "Future" ? '<span class="chip tag">Future</span>' : priChip(b[2]);
+    return '<tr><td class="mono muted">' + (i + 1) + '</td><td>' + fmt(b[0]) + '</td><td class="nowrap muted">' + esc(b[1]) + '</td><td class="nowrap">' + pri + '</td><td>' + esc(b[3]) + '</td><td class="nowrap">' + (b[4].length ? idLinks(b[4]) : '<span class="muted">—</span>') + '</td></tr>';
+  }).join("");
+
+  byId("opps").innerHTML = OPPS.map(function (o) {
+    return '<article class="card"><div class="card-head"><span class="card-id">' + o[0] + '</span><h4 class="card-title">' + fmt(o[1]) + '</h4></div><p>' + fmt(o[2]) + '</p><p class="dep">Related findings: ' + idLinks(o[3].split(", ")) + '</p></article>';
+  }).join("");
+
+  byId("phases").innerHTML = PHASES.map(function (p) {
+    return '<div class="phase"><div class="phase-head"><h3>' + esc(p[0]) + '</h3>' + priChip(p[1]) + '</div><p class="small">' + fmt(p[2]) + '</p><p class="small"><b>Items:</b> ' + idLinks(p[3]) + '</p><p class="small muted"><b>Order / dependencies:</b> ' + esc(p[4]) + '</p></div>';
+  }).join("");
+
+  byId("plan-tables").innerHTML = PRI_ORDER.map(function (pri) {
+    var rows = F.filter(function (f) { return f.pri === pri; });
+    return '<div class="block"><h4>' + pri + ' · ' + esc(PRI_LABEL[pri]) + ' (' + rows.length + ')</h4><div class="table-wrap"><table><thead><tr><th class="nowrap">ID</th><th>Kaam</th><th class="nowrap">Severity</th><th class="nowrap">Effort</th><th class="nowrap">Impact</th><th class="nowrap">Type</th><th>Depends on</th></tr></thead><tbody>' +
+      rows.map(function (f) {
+        return '<tr><td class="nowrap"><a href="#' + f.id + '" class="mono">' + f.id + '</a></td><td>' + fmt(f.title) + '</td><td class="nowrap">' + sevChip(f.sev) + '</td><td class="nowrap mono">' + f.eff + '</td><td class="nowrap mono">' + f.imp + '</td><td class="nowrap">' + esc(f.type) + '</td><td>' + fmt(f.dep) + '</td></tr>';
+      }).join("") + '</tbody></table></div></div>';
+  }).join("");
+
+  /* ------------------------------------------------------------------ */
+  /* Navigation: click-to-scroll and scroll-spy                          */
+  /* ------------------------------------------------------------------ */
+
+  var tocLinks = Array.prototype.slice.call(document.querySelectorAll(".toc a"));
+  function setActive(id) {
+    tocLinks.forEach(function (a) {
+      var match = a.getAttribute("href") === "#" + id;
+      if (match) a.setAttribute("aria-current", "true"); else a.removeAttribute("aria-current");
+    });
+    var parentCat = id.indexOf("cat-") === 0;
+    if (parentCat) {
+      var findingsLink = document.querySelector('.toc a[href="#findings"]');
+      if (findingsLink && window.matchMedia("(max-width: 999px)").matches) findingsLink.setAttribute("aria-current", "true");
+    }
+  }
+  if ("IntersectionObserver" in window) {
+    var visible = {};
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) { visible[entry.target.id] = entry.isIntersecting ? entry.boundingClientRect.top : undefined; });
+      var best = null, bestTop = Infinity;
+      Object.keys(visible).forEach(function (id) {
+        var top = visible[id];
+        if (top === undefined) return;
+        var el = byId(id);
+        if (!el || el.hidden) return;
+        var score = Math.abs(top);
+        if (id.indexOf("cat-") === 0) score -= 1;
+        if (score < bestTop) { bestTop = score; best = id; }
+      });
+      if (best) setActive(best);
+    }, { rootMargin: "-10% 0px -70% 0px", threshold: 0 });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-spy]"), function (el) { observer.observe(el); });
+  }
+  setActive("summary");
+
+  /* ------------------------------------------------------------------ */
+  /* Theme switch (remembered per viewer when storage is available)      */
+  /* ------------------------------------------------------------------ */
+
+  function applyTheme(mode) {
+    var root = document.documentElement;
+    if (mode === "light" || mode === "dark") root.setAttribute("data-theme", mode);
+    else root.removeAttribute("data-theme");
+    Array.prototype.forEach.call(document.querySelectorAll("[data-theme-set]"), function (b) {
+      b.setAttribute("aria-pressed", b.getAttribute("data-theme-set") === mode ? "true" : "false");
+    });
+  }
+  var savedTheme = "system";
+  try { savedTheme = window.localStorage.getItem("md-audit-theme") || "system"; } catch (err) { savedTheme = "system"; }
+  applyTheme(savedTheme);
+  Array.prototype.forEach.call(document.querySelectorAll("[data-theme-set]"), function (b) {
+    b.addEventListener("click", function () {
+      var mode = b.getAttribute("data-theme-set");
+      applyTheme(mode);
+      try { window.localStorage.setItem("md-audit-theme", mode); } catch (err) { /* storage blocked */ }
+    });
+  });
+
+  /* Deep link to a finding on load */
+  if (location.hash && /^#F-\d{2}$/.test(location.hash)) {
+    window.setTimeout(function () { goToFinding(location.hash.slice(1)); }, 50);
+  }
+})();
+</script>
+</body>
+</html>
