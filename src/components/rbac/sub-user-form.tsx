@@ -37,7 +37,7 @@ import { EMAIL_MAX_LENGTH, FULL_NAME_MAX_LENGTH, MASTER_PASSWORD_MAX_LENGTH, TEN
 import { cn } from "@/lib/utils";
 import { ACCOUNT_TYPE_OPTIONS, accountTypeLabel } from "@/lib/workspace/rules";
 import { ROLE_PICKER_HINT, RolePicker } from "./role-picker";
-import type { AccountTypeValue, RoleOptionView, SubUserFormState } from "./types";
+import type { AccountTypeValue, LoadRoleOptions, RoleOptionView, SubUserFormState } from "./types";
 
 // The section ids of the form (one form per page) and its secondary menu.
 const SECTION_PERSONAL = "sub-user-personal";
@@ -74,6 +74,8 @@ export type SubUserFormProps = {
   mode: SubUserMode;
   /** Active roles the actor may assign (exactly one is submitted as `roleId`). */
   roles: readonly RoleOptionView[];
+  /** Scoped search and paging for options outside the initial page. */
+  loadRoles?: LoadRoleOptions;
   /** While the role list is still loading (the picker shows "Loading…" and stays disabled). */
   rolesLoading?: boolean;
   /** Saved values (edit) — required on edit. */
@@ -141,7 +143,7 @@ function focusField(name: SubUserFieldName) {
  * Created: 2026-10-16
  * Last modified: 2026-10-16
  */
-export function SubUserForm({ variant, mode, roles, rolesLoading = false, initial, action, cancelHref }: SubUserFormProps) {
+export function SubUserForm({ variant, mode, roles, loadRoles, rolesLoading = false, initial, action, cancelHref }: SubUserFormProps) {
   const router = useRouter();
   const [state, dispatch, pending] = useActionState(action, INITIAL_STATE);
 
@@ -502,6 +504,7 @@ export function SubUserForm({ variant, mode, roles, rolesLoading = false, initia
             <RolePicker
               id={fieldId("roleId")}
               roles={roles}
+              loadRoles={loadRoles}
               value={fields.roleId}
               onValueChange={(value) => {
                 change("roleId", value);

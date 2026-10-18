@@ -298,7 +298,7 @@ export async function getSubUserEditModel(actor: AuthzActor, userId: unknown): P
 
     // Step 2: the policy decision and the role picker options.
     const decision = checkUserManageable(toPolicyActor(actor), policyUserOf(user));
-    const roles    = await listAssignableRoles(actor);
+    const roles    = await listAssignableRoles(actor, { selectedRoleId: user.role?.id });
     if (!roles.ok) return roles;
     return {
       ok: true,

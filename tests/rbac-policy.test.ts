@@ -87,6 +87,16 @@ describe("privilege requests", () => {
     expect(finalStoredKeys("tenant", [], ["tenant.roles.view"], ["tenant.roles"]).preservedKeys).toStrictEqual([]);
   });
 
+  it("allows disabled-only edits without adding a grant, while empty creates stay invalid", () => {
+    const limited = tenantActor(["tenant.roles.view"], { disabledModules: ["tenant.registrations"] });
+    expect(validatePrivilegeRequest(limited, [], ["tenant.registrations.view"])).toMatchObject({
+      ok: true, requestedKeys: [], preservedKeys: ["tenant.registrations.view"], finalKeys: ["tenant.registrations.view"],
+    });
+    expect(validatePrivilegeRequest(limited, [])).toMatchObject({ ok: false, problem: "empty" });
+    expect(validatePrivilegeRequest(limited, [], ["tenant.roles.view"])).toMatchObject({ ok: false, problem: "empty" });
+    expect(validatePrivilegeRequest(limited, ["tenant.registrations.view"], ["tenant.registrations.view"])).toMatchObject({ ok: false, problem: "module_disabled" });
+  });
+
   it("names the lock reason of a privilege for the editor", () => {
     const limited = tenantActor(["tenant.roles.view"], { disabledModules: ["tenant.registrations"] });
     expect(privilegeLockReason(limited, "tenant.roles.view")).toBeNull();

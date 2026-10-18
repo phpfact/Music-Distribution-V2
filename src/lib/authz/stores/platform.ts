@@ -132,6 +132,15 @@ function roleWhere(filter: RoleFilter): Prisma.PlatformRoleWhereInput {
     });
   }
   if (filter.status && filter.status !== "all") and.push({ status: filter.status });
+  if (filter.excludeRoleId) and.push({ id: { not: filter.excludeRoleId } });
+  if (filter.assignable) {
+    // Eligibility is applied before COUNT/OFFSET/LIMIT, so later eligible roles remain reachable.
+    const custom: Prisma.PlatformRoleWhereInput = {
+      systemKey: null,
+      permissions: { none: { permissionKey: { in: [...filter.assignable.forbiddenKeys] } } },
+    };
+    and.push(filter.assignable.allowMaster ? { OR: [{ systemKey: "master_platform" }, custom] } : custom);
+  }
   return { AND: and };
 }
 

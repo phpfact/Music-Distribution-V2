@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 import { RoleDeleteDialog, RoleStatusDialog, type DialogRole } from "@/components/rbac/role-dialogs";
-import type { AssignedUserView, RbacActionResult, RoleOptionView, RoleStatusValue } from "@/components/rbac/types";
+import type { AssignedUserView, RbacActionResult, RoleOptionView, LoadRoleOptions, RoleStatusValue } from "@/components/rbac/types";
 import { Button } from "@/components/ui/button";
 import { withRbacNotice } from "./notices";
 
@@ -29,6 +29,8 @@ type RoleDetailsActionsProps = {
   deleteAction?: (roleId: string, replacementRoleId: string | null) => Promise<RbacActionResult>;
   /** Active roles the viewer may assign (delete-and-reassign choices). */
   replacementRoles: readonly RoleOptionView[];
+  /** Scoped database search for later replacement options. */
+  loadReplacementRoles?: LoadRoleOptions;
   /** The first page of the role's holders (named in the confirmations). */
   affectedUsers: readonly AssignedUserView[];
 };
@@ -57,6 +59,7 @@ export function RoleDetailsActions({
   toggleStatusAction,
   deleteAction,
   replacementRoles,
+  loadReplacementRoles,
   affectedUsers,
 }: RoleDetailsActionsProps) {
   const router                 = useRouter();
@@ -114,6 +117,7 @@ export function RoleDetailsActions({
           role={dialog === "delete" ? role : null}
           onClose={() => setDialog(null)}
           replacementRoles={replacementRoles}
+          loadReplacementRoles={loadReplacementRoles}
           onConfirm={deleteAction}
           // The role no longer exists: continue on the list with a notice.
           onDone={() => startTransition(() => router.replace(withRbacNotice(listHref, "role-deleted")))}

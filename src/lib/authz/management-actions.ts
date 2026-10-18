@@ -31,6 +31,8 @@ import type {
   RecordsResult,
   RoleFormState,
   RoleRowView,
+  RoleOptionView,
+  RoleOptionsPurpose,
   SubUserFormState,
   SubUserRowView,
 } from "@/components/rbac/types";
@@ -46,6 +48,7 @@ import {
   toRecordsResult,
   toRoleFormState,
   toRoleRowView,
+  toRoleOptionView,
   toSubUserFormState,
   toSubUserRowView,
 } from "./management-view";
@@ -57,6 +60,7 @@ import {
   getRoleDetails,
   listRoleCountRecords,
   listRoleUsers,
+  searchRoleOptions,
   setRoleStatus,
   updateRole,
   type RoleInput,
@@ -456,4 +460,30 @@ export async function handleSetSubUserStatus(
   const result = await setSubUserStatus(authorization.actor, userId, change);
   if (result.ok) refreshPages([paths.users]);
   return toActionResult(result);
+}
+
+/**
+ * Description: Load one scoped database page for a role picker or role filter.
+ * Input: The exact panel/purpose authorize step and untrusted search/page/exclusion.
+ * Output: Options with pagination metadata, or a friendly authorization/load failure.
+ * Use case: Remote role choices across all three panels.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-10-17
+ * Last modified: 2026-10-17
+ */
+export async function handleLoadRoleOptions(
+  authorize: AuthorizeStep,
+  purpose: RoleOptionsPurpose,
+  search: unknown,
+  page: unknown,
+  excludeRoleId?: unknown,
+): Promise<RecordsResult<RoleOptionView>> {
+  const authorization = await authorize();
+  if (!authorization.ok) return { ok: false, error: authorization.error };
+  return toRecordsResult(await searchRoleOptions(authorization.actor, {
+    kind: purpose === "filter" ? "filter" : "assignable",
+    q: search,
+    page,
+    excludeRoleId,
+  }), toRoleOptionView);
 }

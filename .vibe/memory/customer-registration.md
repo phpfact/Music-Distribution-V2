@@ -159,3 +159,9 @@
   Registrations page shows the same Active / Suspended state.
 - The tenant dashboard's "Active customers" figure now comes from the
   Customers module (all active main customers), not from registrations.
+
+## Audit correction (2026-10-17)
+
+- AUD-20261017-011: selecting a status, Clear filters, or navigating to an
+  externally changed query invalidates the pending search debounce. A stale
+  callback cannot restore an earlier search/status after the newer choice.

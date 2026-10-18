@@ -54,6 +54,12 @@ export function RegistrationToolbar({ basePath, query }: RegistrationToolbarProp
     if (query.q !== search.trim()) setSearch(query.q);
   }
 
+  // A newer URL invalidates any callback that captured the earlier filters.
+  useEffect(() => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+  }, [query.q, query.status, query.page]);
+
   // A pending debounce never fires after the toolbar is gone.
   useEffect(() => () => {
     if (timer.current) clearTimeout(timer.current);
@@ -69,6 +75,9 @@ export function RegistrationToolbar({ basePath, query }: RegistrationToolbarProp
    * Last modified: 2026-10-16
    */
   function navigate(q: string, status: RegistrationFilter) {
+    // Explicit status/role/Clear choices supersede pending typed searches.
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
     const href = registrationListHref(basePath, { q: q.trim(), status, page: 1 });
     startTransition(() => router.push(href, { scroll: false }));
   }

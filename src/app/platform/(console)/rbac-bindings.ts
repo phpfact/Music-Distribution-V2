@@ -6,6 +6,7 @@
  * page of /platform/roles and /platform/users passes these, so a page can
  * never be wired to another panel's actions or privileges by mistake.
  */
+import { loadRoleOptionsAction } from "./rbac-options-actions";
 import type { RbacPanelBinding, RoleScreenBinding, SubUserScreenBinding } from "@/components/rbac/screens/types";
 import { getNavItem } from "./navigation";
 import { PLATFORM_RBAC_PATHS, platformPageActor } from "./rbac-actor";
@@ -34,6 +35,7 @@ export const PLATFORM_RBAC_PANEL: RbacPanelBinding = {
   // The console shell already pads its content area.
   gutterClassName: "",
   pageActor: platformPageActor,
+  loadRoleOptions: loadRoleOptionsAction,
 };
 
 /** The platform role screens (each action authorizes its own platform.roles.* privilege). */

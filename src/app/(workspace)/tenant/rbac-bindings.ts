@@ -6,6 +6,7 @@
  * /tenant/roles and /tenant/users passes these, so a page can never be wired
  * to another panel's actions or privileges by mistake.
  */
+import { loadRoleOptionsAction } from "./rbac-options-actions";
 import type { RbacPanelBinding, RoleScreenBinding, SubUserScreenBinding } from "@/components/rbac/screens/types";
 import { TENANT_DASHBOARD_PATH } from "./navigation";
 import { TENANT_RBAC_PATHS, tenantPageActor } from "./rbac-actor";
@@ -29,6 +30,7 @@ export const TENANT_RBAC_PANEL: RbacPanelBinding = {
   // The portal pages pad themselves.
   gutterClassName: "px-4 lg:px-6",
   pageActor: tenantPageActor,
+  loadRoleOptions: loadRoleOptionsAction,
 };
 
 /** The tenant role screens (each action authorizes its own tenant.roles.* privilege). */

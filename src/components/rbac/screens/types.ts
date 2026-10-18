@@ -18,6 +18,8 @@ import type {
   RecordsResult,
   RoleFormState,
   RoleRowView,
+  RoleOptionView,
+  RoleOptionsPurpose,
   RoleStatusValue,
   SubUserFormState,
   SubUserRowView,
@@ -61,6 +63,8 @@ export type SubUserScreenActions = {
 
 /** What every RBAC screen of a panel needs, whatever it shows. */
 export type RbacPanelBinding = {
+  /** Every remote request authorizes this panel and the current operation again. */
+  loadRoleOptions: (purpose: RoleOptionsPurpose, search: string, page: number, excludeRoleId?: string) => Promise<RecordsResult<RoleOptionView>>;
   /** The panel's dashboard (access-denied "Go to dashboard"). */
   home: string;
   /** The PageHeader eyebrow, e.g. "Access control" (platform, tenant) or "Account" (customer). */

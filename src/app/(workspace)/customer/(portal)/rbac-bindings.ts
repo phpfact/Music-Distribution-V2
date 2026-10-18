@@ -6,6 +6,7 @@
  * of /customer/roles and /customer/sub-customers passes these, so a page can
  * never be wired to another panel's actions or privileges by mistake.
  */
+import { loadRoleOptionsAction } from "./rbac-options-actions";
 import type { RbacPanelBinding, RoleScreenBinding, SubUserScreenBinding } from "@/components/rbac/screens/types";
 import { CUSTOMER_DASHBOARD_PATH } from "./navigation";
 import { CUSTOMER_RBAC_PATHS, customerPageActor } from "./rbac-actor";
@@ -34,6 +35,7 @@ export const CUSTOMER_RBAC_PANEL: RbacPanelBinding = {
   // The portal pages pad themselves.
   gutterClassName: "px-4 lg:px-6",
   pageActor: customerPageActor,
+  loadRoleOptions: loadRoleOptionsAction,
 };
 
 /** The customer role screens (each action authorizes its own customer.roles.* privilege). */

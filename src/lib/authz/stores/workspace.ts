@@ -172,6 +172,15 @@ function roleWhere(actor: WorkspaceActor, filter: RoleFilter): Prisma.RoleWhereI
     });
   }
   if (filter.status && filter.status !== "all") and.push({ status: filter.status });
+  if (filter.excludeRoleId) and.push({ id: { not: filter.excludeRoleId } });
+  if (filter.assignable) {
+    // Existing domain/customer conditions stay in AND; options cannot escape their hierarchy.
+    const custom: Prisma.RoleWhereInput = {
+      systemKey: null,
+      permissions: { none: { permission: { key: { in: [...filter.assignable.forbiddenKeys] } } } },
+    };
+    and.push(filter.assignable.allowMaster ? { OR: [{ systemKey: MASTER_SYSTEM_KEYS[actor.domain] }, custom] } : custom);
+  }
   return { AND: and };
 }
 
