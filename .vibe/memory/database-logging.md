@@ -23,3 +23,6 @@ server health information without copying authentication SQL or bind values.
 - 2026-10-18: Implemented and verified on a disposable PostgreSQL 18 instance:
   successful slow SQL and failing verifier-bearing DDL retained duration/error
   signals without synthetic credential markers; all configured values matched.
+- 2026-10-18: Applied to the local development stack. A file bind retained the
+  previous inode across reload; a controlled PostgreSQL restart loaded the new
+  file. Live `pg_settings` matched the policy and the app/database were healthy.

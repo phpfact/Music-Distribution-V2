@@ -25,3 +25,6 @@ verification classifications stay intact. Current remediation status is separate
 ## Change history
 
 - 2026-10-18: Recorded the completion/status update before editing the HTML ledger.
+- 2026-10-18: Main merge verified with identical source trees; additive control
+  migration and client generation completed locally. Applied logging settings and
+  post-restart health/login/protected-route smoke checks passed.
