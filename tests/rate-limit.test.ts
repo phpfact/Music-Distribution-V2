@@ -222,7 +222,7 @@ describe("when Redis cannot be reached", () => {
     const logged = captureConsole();
     const { username, key: userKey } = await newUsername();
     const { ip, key: ipKey } = await useIp("203.0.113.19");
-    vi.mocked(getRedis).mockRejectedValueOnce(new Error("connect ECONNREFUSED"));
+    vi.mocked(getRedis).mockRejectedValueOnce(new Error("connect ECONNREFUSED token=AUDIT_REDIS_CANARY"));
 
     const started = Date.now();
     const outcome = await countLoginAttempt(username, ip);
@@ -232,6 +232,7 @@ describe("when Redis cannot be reached", () => {
     expect(await keys.count(userKey)).toBeNull();
     expect(await keys.count(ipKey)).toBeNull();
     expect(logged.text()).toContain("rate limiter unavailable");
+    expect(logged.text()).not.toContain("AUDIT_REDIS_CANARY");
     expect(logged.text()).not.toContain(username);
   });
 

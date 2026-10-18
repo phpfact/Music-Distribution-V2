@@ -1,6 +1,7 @@
 import "server-only";
 import { getRedis } from "./redis";
 import { withTimeout } from "./with-timeout";
+import { sanitizeLogMessage } from "./log-sanitizer";
 
 /**
  * A generic fixed-window rate limiter on Redis, for actions other than the
@@ -91,7 +92,7 @@ export async function consumeRateLimit(rule: RateLimitRule): Promise<RateLimitOu
     if (!Number.isInteger(count)) throw new Error("unexpected reply from Redis");
     return count > rule.limit ? "limited" : "allowed";
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = sanitizeLogMessage(error instanceof Error ? error.message : String(error));
     console.error(`[rate-limit] limiter unavailable: ${message}`);
     return "unavailable";
   }
@@ -116,7 +117,7 @@ export async function clearRateLimit(key: string): Promise<void> {
       await redis.del(`${KEY_PREFIX}${key}`);
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = sanitizeLogMessage(error instanceof Error ? error.message : String(error));
     console.error(`[rate-limit] could not clear a counter: ${message}`);
   }
 }

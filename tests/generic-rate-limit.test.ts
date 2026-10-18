@@ -122,13 +122,14 @@ describe("when Redis cannot be reached", () => {
   it("answers `unavailable` at once when the connection fails", async () => {
     const logged = captureConsole();
     const { key, redisKey } = newKey();
-    vi.mocked(getRedis).mockRejectedValueOnce(new Error("connect ECONNREFUSED"));
+    vi.mocked(getRedis).mockRejectedValueOnce(new Error("connect ECONNREFUSED password=AUDIT_REDIS_CANARY"));
 
     const started = Date.now();
     expect(await consumeRateLimit({ key, limit: 5, windowSeconds: 60 })).toBe("unavailable");
     expect(Date.now() - started).toBeLessThan(1_000);
     expect(await redis.get(redisKey)).toBeNull();
     expect(logged.text()).toContain("limiter unavailable");
+    expect(logged.text()).not.toContain("AUDIT_REDIS_CANARY");
   });
 
   it("answers `unavailable` after about 2 seconds when Redis never answers", async () => {

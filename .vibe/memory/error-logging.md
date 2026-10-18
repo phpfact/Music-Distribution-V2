@@ -22,3 +22,5 @@ depend on provisioning or introduce a circular database import.
 ## Change history
 
 - 2026-10-17: Recorded AUD-019 implementation and verification requirements before code.
+- 2026-10-18: Authentication rate-limiter outage/cleanup diagnostics also use the
+  shared sanitizer; Redis errors must not bypass the credential boundary.
