@@ -28,3 +28,6 @@ depend on provisioning or introduce a circular database import.
   and overlapping SQL-escape regex alternatives. URI redaction now consumes the
   whole whitespace-delimited value; SQL literals use disjoint escape branches,
   including unterminated literals, with bounded-time regression coverage.
+- 2026-10-18: Implementation complete. All credential, alternate URI/literal,
+  multiline, benign diagnostic, cause-chain and malformed-escape regressions pass;
+  the combined suite, lint, TypeScript and production build also pass.

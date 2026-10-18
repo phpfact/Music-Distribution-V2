@@ -21,3 +21,7 @@ saving a server-generated tenant storage key. SVG and other formats are refused.
 ## Change history
 
 - 2026-10-17: Recorded AUD-020 server decode/normalization requirements before code.
+- 2026-10-18: Implemented with explicit pinned `sharp` dependency. All three valid
+  formats decode successfully after normalization; signature-only, damaged pixels
+  and excessive dimensions are refused. A storage-boundary spy confirms invalid
+  decoded input creates no file; tenant create/edit and image route regressions pass.

@@ -20,3 +20,6 @@ server health information without copying authentication SQL or bind values.
 ## Change history
 
 - 2026-10-17: Recorded AUD-018 configuration boundary before implementation.
+- 2026-10-18: Implemented and verified on a disposable PostgreSQL 18 instance:
+  successful slow SQL and failing verifier-bearing DDL retained duration/error
+  signals without synthetic credential markers; all configured values matched.

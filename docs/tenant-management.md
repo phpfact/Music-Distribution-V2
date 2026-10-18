@@ -278,7 +278,11 @@ change → new token, `pending`. Audit `tenant.updated` with the changed field
 
 ### 8.6 Profile images
 PNG, JPEG or WebP only, ≤ 2 MB (2 097 152 bytes), detected from magic bytes
-(never the client's content type or file name). No SVG. Key
+(never the client's content type or file name). Browser checks reject incomplete
+containers; the server fully decodes pixels with `sharp` (16 megapixels maximum,
+five-second processing timeout), then re-encodes the first frame in the same
+format without uploaded metadata. Corrupt or oversized output is rejected before
+storage. No SVG. Key
 `tenants/<tenantId>/profile/<uuid>.<png|jpg|webp>`; path built only from that
 pattern, resolved under `STORAGE_ROOT` and checked to stay inside it. Written to a
 temp file then renamed. Served by `GET /platform/tenants/[id]/avatar` (platform

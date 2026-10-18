@@ -20,3 +20,6 @@ port replaces the old client. Suspension/password rotation can explicitly evict.
 ## Change history
 
 - 2026-10-17: Recorded AUD-008 cleanup policy and regression scenarios before code.
+- 2026-10-18: Implemented cleanup on hits/insertion/eviction and a single unref'ed
+  overflow timer. Deterministic burst, recent-hit preservation and timer-removal
+  regressions pass, along with the real database-target integration suite.

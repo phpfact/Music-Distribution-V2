@@ -45,3 +45,7 @@ collection remain deployment responsibilities.
 ## Completion and verification — 2026-10-18
 
 Shared request-context, structured authentication outcomes and bounded host telemetry implemented. The existing administrative writer automatically records sanitized context in JSON metadata; no schema migration. Validation: targeted real-database regression 6 files / 120 tests passed; database-free observability/logout regression 2 files / 16 tests passed; ESLint, TypeScript, production build and diff whitespace checks passed. The parent integration task owns the exclusive full-suite run and main merge.
+
+Combined integration verified: 67 files, 1,616 passed tests and one existing skip;
+lint, TypeScript and production build pass. Existing administrative audit tests
+now assert both their original business metadata and the additional safe envelope.

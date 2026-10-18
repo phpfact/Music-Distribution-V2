@@ -1,5 +1,14 @@
 # Tenant management
 
+## Audit completion — 2026-10-18
+
+- AUD-007 custom-domain ingress validation is deferred at the user's explicit
+  request; DNS behavior is unchanged and the remaining issue stays visible.
+- AUD-020 profile uploads are fully decoded and re-encoded before storage;
+  see `profile-images.md` for the byte/pixel/time limits and validation flow.
+- Combined verification passed 67 files / 1,616 tests, with one existing skip;
+  lint, TypeScript and production build passed.
+
 ## Overview and current architecture
 
 The platform owner creates and manages tenants in `/platform/tenants`. The directory, summary counts, detail view, creation form and edit form are protected server pages. Existing tenant actions and services remain authoritative for validation, authentication, permissions, database writes, provisioning and auditing.

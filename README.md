@@ -156,7 +156,7 @@ never copied into an image.
 | `POSTGRES_PASSWORD`                        | database password (**secret**)                  | applied on first initialization only |
 | `POSTGRES_POOL_MAX`                        | max control-plane connections per app instance (default 10) | 1 to 100 |
 | `POSTGRES_TENANT_POOL_MAX`                 | max connections per tenant database, per app instance (default 3) | 1 to 20 |
-| `POSTGRES_TENANT_CLIENTS_MAX`              | tenant clients kept open per app instance (default 50) | 1 to 1000 |
+| `POSTGRES_TENANT_CLIENTS_MAX`              | soft retained-client target per app instance; idle overflow drains after 30 seconds (default 50), separate from pool connection limits | 1 to 1000 |
 | `REDIS_PASSWORD`                           | Redis password (**secret**)                     | applied on every start |
 | `REDIS_MAXMEMORY`, `REDIS_MAXMEMORY_POLICY`| memory cap and eviction policy                  | see "Redis" |
 | `PGADMIN_DEFAULT_EMAIL`, `PGADMIN_DEFAULT_PASSWORD` | initial pgAdmin login (**secret**)     | applied on first initialization only |
