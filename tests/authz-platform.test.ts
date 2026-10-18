@@ -190,7 +190,8 @@ describe("request guards", () => {
         tenant_id: null,
         target_type: "permission",
         target_id: "platform.roles.create",
-        metadata: { permission: "platform.roles.create", roleState: "active" },
+        metadata: expect.objectContaining({ permission: "platform.roles.create", roleState: "active",
+          request: expect.objectContaining({ requestId: expect.stringMatching(/^[a-f0-9-]{36}$/), outcome: "denied" }) }),
         ip: "203.0.113.9",
       },
     ]);

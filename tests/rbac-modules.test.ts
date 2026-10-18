@@ -299,7 +299,8 @@ describe("platform modules", () => {
 
     // Exactly one audit row per real change, with the module and client address.
     expect(await auditRows(ownerId, "platform_module.disabled")).toStrictEqual([
-      { target_type: "module", target_id: "platform.tenants", tenant_id: null, metadata: { moduleKey: "platform.tenants" }, ip_address: CLIENT_IP },
+      { target_type: "module", target_id: "platform.tenants", tenant_id: null,
+        metadata: expect.objectContaining({ moduleKey: "platform.tenants", request: expect.objectContaining({ clientIp: CLIENT_IP, outcome: "success" }) }), ip_address: CLIENT_IP },
     ]);
     expect(await auditRows(ownerId, "platform_module.enabled")).toHaveLength(1);
   });
@@ -363,7 +364,7 @@ describe("tenant modules", () => {
         target_type: "module",
         target_id: "tenant.registrations",
         tenant_id: tenant.id,
-        metadata: { moduleKey: "tenant.registrations" },
+        metadata: expect.objectContaining({ moduleKey: "tenant.registrations", request: expect.objectContaining({ clientIp: CLIENT_IP, outcome: "success" }) }),
         ip_address: CLIENT_IP,
       },
     ]);

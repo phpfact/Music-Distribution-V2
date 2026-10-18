@@ -11,7 +11,7 @@ import "server-only";
  */
 import type { RoleOptionView } from "@/components/rbac/types";
 import type { AuthzActor } from "./actor";
-import { holdsPrivilege } from "./management-common";
+import { holdsPrivilege, logFailure } from "./management-common";
 import { toRoleOptionView } from "./management-view";
 import { searchRoleOptions } from "./role-service";
 import { isUuid } from "@/lib/uuid";
@@ -26,18 +26,23 @@ import { storeFor } from "./stores";
  * Use case: All three sub-user directories; later pages/search use searchRoleOptions.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-16
- * Last modified: 2026-10-17
+ * Last modified: 2026-10-18
  */
 export async function listRoleFilterOptions(actor: AuthzActor, selectedRoleId?: string): Promise<RoleOptionView[] | undefined> {
-  const result = await searchRoleOptions(actor, { kind: "filter" });
-  if (!result.ok) return undefined;
-  const roles = result.data.rows.map(toRoleOptionView);
-  if (isUuid(selectedRoleId) && !roles.some((role) => role.id === selectedRoleId)) {
-    const selected = await storeFor(actor).findRole(selectedRoleId);
-    const visible = selected && (holdsPrivilege(actor, "rolesView") || checkRoleAssignable(toPolicyActor(actor), selected).ok);
-    if (selected && visible) {
-      roles.push({ id: selected.id, name: selected.name, isMaster: isMasterRole(selected), privilegeCount: isMasterRole(selected) ? null : roleCeilingKeys(selected, actor.disabledModules).length });
+  try {
+    const result = await searchRoleOptions(actor, { kind: "filter" });
+    if (!result.ok) return undefined;
+    const roles = result.data.rows.map(toRoleOptionView);
+    if (isUuid(selectedRoleId) && !roles.some((role) => role.id === selectedRoleId)) {
+      const selected = await storeFor(actor).findRole(selectedRoleId);
+      const visible = selected && (holdsPrivilege(actor, "rolesView") || checkRoleAssignable(toPolicyActor(actor), selected).ok);
+      if (selected && visible) {
+        roles.push({ id: selected.id, name: selected.name, isMaster: isMasterRole(selected), privilegeCount: isMasterRole(selected) ? null : roleCeilingKeys(selected, actor.disabledModules).length });
+      }
     }
+    return roles;
+  } catch (error) {
+    logFailure(actor, "loading selected role filter options", error);
+    return undefined;
   }
-  return roles;
 }

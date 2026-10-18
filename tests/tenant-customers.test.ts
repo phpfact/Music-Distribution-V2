@@ -471,7 +471,7 @@ describe("suspending and reactivating a customer", () => {
     expect(await validateUserSession(tenantA.ws.db, tenantA.tenant.id, "customer", subToken)).toBeNull();
     expect(await auditRows(control, "customer_account.suspended", tenantA.adminId)).toContainEqual({
       target_id: created.customerId,
-      metadata: { via: "customers" },
+      metadata: expect.objectContaining({ via: "customers", request: expect.objectContaining({ outcome: "success" }) }),
     });
 
     // Step 2: a second suspend (stale page) changes nothing.

@@ -486,23 +486,28 @@ export async function getRoleEditorModel(actor: AuthzActor, roleId?: unknown): P
  * Use case: Sub-user form role picker; "Delete and reassign" replacement picker.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-16
- * Last modified: 2026-10-16
+ * Last modified: 2026-10-18
  */
 export async function listAssignableRoles(
   actor: AuthzActor,
   options: { excludeRoleId?: string | null; selectedRoleId?: string | null } = {},
 ): Promise<QueryResult<AssignableRoleOption[]>> {
-  const page = await searchRoleOptions(actor, { kind: "assignable", excludeRoleId: options.excludeRoleId });
-  if (!page.ok) return page;
-  const roles = [...page.data.rows];
-  // A saved value may sit on a later page. Fetch only that one scoped, eligible role.
-  if (isUuid(options.selectedRoleId) && !roles.some((role) => role.id === options.selectedRoleId)) {
-    const selected = await storeFor(actor).findRole(options.selectedRoleId);
-    if (selected && checkRoleAssignable(toPolicyActor(actor), selected).ok) {
-      roles.push(toRoleOption(toPolicyActor(actor), selected));
+  try {
+    const page = await searchRoleOptions(actor, { kind: "assignable", excludeRoleId: options.excludeRoleId });
+    if (!page.ok) return page;
+    const roles = [...page.data.rows];
+    // A saved value may sit on a later page. Fetch only that one scoped, eligible role.
+    if (isUuid(options.selectedRoleId) && !roles.some((role) => role.id === options.selectedRoleId)) {
+      const selected = await storeFor(actor).findRole(options.selectedRoleId);
+      if (selected && checkRoleAssignable(toPolicyActor(actor), selected).ok) {
+        roles.push(toRoleOption(toPolicyActor(actor), selected));
+      }
     }
+    return { ok: true, data: roles };
+  } catch (error) {
+    logFailure(actor, "loading selected assignable role", error);
+    return { ok: false, reason: "unavailable", error: LOAD_FAILED_MESSAGE };
   }
-  return { ok: true, data: roles };
 }
 
 /** The untrusted role-option search, shared by pickers and directory filters. */

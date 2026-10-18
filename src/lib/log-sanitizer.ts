@@ -3,10 +3,12 @@ export const MAX_LOG_MESSAGE_LENGTH = 2_000;
 
 const REDACTIONS: [RegExp, string][] = [
   // A URI can hold credentials in its authority, path or query string.
-  [/\b(?:postgres(?:ql)?|redis(?:s)?|https?):\/\/[^\s<>"']+/gi, "<connection string>"],
+  [/\b(?:postgres(?:ql)?|redis(?:s)?|https?):\/\/\S+/gi, "<connection string>"],
   [/SCRAM-SHA-256\$[^\s'"<>]+/gi, "<scram verifier>"],
   [/\$argon2(?:id|i|d)\$[^\s'"<>]+/gi, "<password hash>"],
-  [/\bPASSWORD\s+(?:E|U&)?'(?:\\.|[^']|'')*'/gi, "PASSWORD '<redacted>'"],
+  // Disjoint alternatives keep malformed runs of backslashes linear-time.
+  // A missing final quote still redacts the remainder of the sensitive literal.
+  [/\bPASSWORD\s+(?:E|U&)?'(?:\\[\s\S]|''|[^'\\])*(?:'|$)/gi, "PASSWORD '<redacted>'"],
   [/\bPASSWORD\s+(\$(?:[A-Za-z_][A-Za-z0-9_]*)?\$)[\s\S]*?\1/gi, "PASSWORD '<redacted>'"],
   // Headers contain compound values; consume the whole line before assignments.
   [/\b(?:authorization|proxy-authorization|cookie|set-cookie)\s*:\s*[^\r\n]+/gi, "<credential header>"],
@@ -23,7 +25,7 @@ const REDACTIONS: [RegExp, string][] = [
  * Use case: Prisma last-line extraction without leaking multiline quoted secrets.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-17
- * Last modified: 2026-10-17
+ * Last modified: 2026-10-18
  */
 export function redactLogCredentials(text: string, secrets: readonly string[] = []): string {
   let result = text;
@@ -41,7 +43,7 @@ export function redactLogCredentials(text: string, secrets: readonly string[] = 
  * Use case: Shared authentication, provisioning and database pool log boundaries.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-17
- * Last modified: 2026-10-17
+ * Last modified: 2026-10-18
  */
 export function sanitizeLogMessage(text: string, secrets: readonly string[] = []): string {
   let result = redactLogCredentials(text, secrets);

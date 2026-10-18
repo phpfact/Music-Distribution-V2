@@ -10,6 +10,7 @@ import type { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { permissionKeysOfDomain } from "@/lib/authz/catalog";
 import { loadPlatformAccess } from "@/lib/authz/platform-access";
+import { listRoleFilterOptions } from "@/lib/authz/role-filter";
 import {
   createRole,
   deleteRole,
@@ -498,6 +499,22 @@ describe("customer roles", () => {
 
 // Audit regression fixtures remain in these scratch databases and are removed by the suite teardown.
 describe("audit role editor and unbounded option reachability", () => {
+  it("keeps selected-role hydration outages inside the friendly query contract", async () => {
+    const actor = await platformActorOf(ownerM);
+    const selectedRoleId = randomUUID();
+    const lookup = vi.spyOn(getControlDb().platformRole, "findUnique");
+    const logged = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    try {
+      lookup.mockRejectedValueOnce(new Error("simulated selected-role lookup outage"));
+      expect(await listRoleFilterOptions(actor, selectedRoleId)).toBeUndefined();
+      lookup.mockRejectedValueOnce(new Error("simulated selected-role lookup outage"));
+      expect(await listAssignableRoles(actor, { selectedRoleId })).toMatchObject({ ok: false, reason: "unavailable" });
+      expect(logged).toHaveBeenCalledTimes(2);
+    } finally {
+      lookup.mockRestore();
+      logged.mockRestore();
+    }
+  });
   it("saves metadata for platform and tenant roles with only disabled-module grants", async () => {
     const platformRole = await insertPlatformRole(control, { name: roleName("Disabled Only"), permissionKeys: ["platform.tenants.view"] });
     const tenantRole = await insertRole(tenantA.rt, { name: roleName("Disabled Only"), domain: "tenant", keys: ["tenant.registrations.view"] });

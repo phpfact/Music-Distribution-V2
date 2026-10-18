@@ -1024,6 +1024,9 @@ tenants; Server Actions invoked like Next.js does).
 
 ## Audit corrections (2026-10-17)
 
+- 2026-10-18 integration review: selected-role hydration failures preserve the
+  existing friendly unavailable result for pickers and filters. A transient
+  later-page lookup error cannot crash the whole directory.
 - AUD-20261017-009: role metadata edits validate the final stored privilege
   set, including the existing grants of disabled modules. Those preserved
   grants appear read-only in the editor and never travel as editable grants.

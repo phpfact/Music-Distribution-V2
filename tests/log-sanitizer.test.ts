@@ -15,6 +15,9 @@ describe("AUD-019 shared error credential boundary", () => {
     "ALTER ROLE app PASSWORD 'AUDIT_CANARY'", "PASSWORD 'one''AUDIT_CANARY'",
     "PASSWORD E'prefix\\nAUDIT_CANARY'", "PASSWORD $tag$AUDIT_CANARY$tag$",
     'password="first line\nAUDIT_CANARY"',
+    "postgresql://user:prefix'AUDIT_CANARY@host/app",
+    "redis://user:prefix'AUDIT_CANARY@host/0",
+    "PASSWORD 'AUDIT_CANARY",
   ])("removes recognized secret form %s through both existing exports", (text) => {
     expect(describeError(new Error(text))).not.toContain("AUDIT_CANARY");
     expect(redact(text)).not.toContain("AUDIT_CANARY");
@@ -33,5 +36,11 @@ describe("AUD-019 shared error credential boundary", () => {
     const output = sanitizeLogMessage(`token=${"a".repeat(10_000)} ${"b".repeat(10_000)}`);
     expect(output).toHaveLength(MAX_LOG_MESSAGE_LENGTH);
     expect(output.startsWith("token=<redacted>")).toBe(true);
+  });
+
+  it("handles malformed SQL escapes without synchronous exponential backtracking", () => {
+    const started = performance.now();
+    expect(describeError(new Error(`PASSWORD '${"\\".repeat(20_000)}`))).toBe("PASSWORD '<redacted>'");
+    expect(performance.now() - started).toBeLessThan(250);
   });
 });
