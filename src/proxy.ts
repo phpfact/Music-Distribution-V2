@@ -18,6 +18,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { isIpAddress, normalizeHostName, parseHostHeader } from "@/lib/domains/rules";
 
+import { REQUEST_ID_HEADER, REQUEST_PATH_HEADER, REQUEST_METHOD_HEADER, requestContextFromHeaders } from "@/lib/request-context";
+import { recordHostRejection } from "@/lib/security-events";
+import { randomUUID } from "node:crypto";
+
 const DEFAULT_BASE_DOMAIN = "localhost";
 
 /**
@@ -88,17 +92,34 @@ function plainNotFound(): NextResponse {
  * Use case: Next.js Proxy for the matcher below.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-17
  */
 export function proxy(request: NextRequest): NextResponse {
+  // Replace correlation headers supplied by a client before the route can read them.
+  const context = requestContextFromHeaders(request.headers, {
+    requestId: randomUUID(), pathname: request.nextUrl.pathname, method: request.method,
+  });
+  const downstream = new Headers(request.headers);
+  downstream.set(REQUEST_ID_HEADER, context.requestId);
+  downstream.set(REQUEST_PATH_HEADER, context.endpoint);
+  downstream.set(REQUEST_METHOD_HEADER, context.method);
+  const path           = request.nextUrl.pathname;
   const onPlatformHost = isPlatformHost(request.headers.get("host"), platformBaseDomain());
-  const platformPath   = isPlatformPath(request.nextUrl.pathname);
+  const platformPath   = isPlatformPath(path);
+  const portalPath     = path === "/login" || /^\/(tenant|customer)(\/|$)/.test(path);
 
-  // Console paths need the platform host; portal paths need a tenant host.
-  if (platformPath === onPlatformHost) return NextResponse.next();
-  return plainNotFound();
+  // Other routes (root/health/assets) still receive request correlation without a host restriction.
+  if ((!platformPath && !portalPath) || platformPath === onPlatformHost) {
+    const response = NextResponse.next({ request: { headers: downstream } });
+    response.headers.set("X-Request-ID", context.requestId);
+    return response;
+  }
+  recordHostRejection(request.headers.get("host"), "wrong_host", context);
+  const response = plainNotFound();
+  response.headers.set("X-Request-ID", context.requestId);
+  return response;
 }
 
 export const config = {
-  matcher: ["/platform/:path*", "/login", "/tenant/:path*", "/customer/:path*"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };

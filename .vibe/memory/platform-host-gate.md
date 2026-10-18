@@ -69,3 +69,11 @@ shared login form for tenant staff and customers (`workspace-auth.md`).
   the proxy rules for the tenant portal routes before implementation.
 
 - 2026-10-16: Implemented as recorded above. Verified: TypeScript, ESLint (0 warnings), full Vitest suite 40 files / 1174 tests passed (new: workspace-rules, workspace-portal with two real provisioned tenants, workspace-http). Browser-verified on a test tenant created in the Platform Owner panel: welcome, login (errors, wrong password, admin by username/email), tenant dashboard, dark theme switch persisting after reload, customer sign-up (validation, pending login blocked), tenant-admin approval, logout + Back, customer dashboard, customer blocked from /tenant, Platform Owner registrations page (count popup, reject with reason), rejected login -> status page -> review request, Platform Owner suspension ending the active session. Not browser-verified yet: "Apply to everyone" appearance, phone/tablet layouts.
+
+## Audit remediation requested 2026-10-17 (AUD-015)
+
+Wrong-host and unknown-domain decisions keep their generic responses and add bounded security telemetry. Events use normalized host, an allowlisted/redacted path, method, trusted last-hop IP, UTC, generated request correlation and a fixed reason. A process-wide fixed-window budget caps emitted logs without attacker-controlled map growth.
+
+## Completion and verification — 2026-10-18
+
+AUD-015 implemented. Proxy overwrites incoming internal request metadata with a generated correlation ID and safe endpoint/method, then retains generic wrong-host 404 responses. Resolver unknown/invalid-domain decisions emit the same bounded sanitized event contract. Twenty rejection events per process per minute cap memory and log volume. Existing host-gate tests, sanitization/budget unit tests and production build passed.

@@ -1,4 +1,6 @@
 import "server-only";
+import { recordAuthenticationEvent, type AuthenticationEvent } from "../security-events";
+import type { AuditRequestContext } from "../request-context";
 import { getControlDb } from "../db/control";
 import { PASSWORD_MAX_LENGTH, verifyAgainstDummy, verifyPassword } from "./password";
 import { clearLoginAttempts, countLoginAttempt } from "./rate-limit";
@@ -67,13 +69,27 @@ async function verifyCredentials(
  * Use case: loginAction (the platform sign-in form).
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-17
  */
 export async function authenticatePlatformOwner(
   input: LoginInput,
   clientIp: string,
+  requestContext?: AuditRequestContext | null,
 ): Promise<LoginResult> {
   const username = normalizeUsername(typeof input.username === "string" ? input.username : "");
+  /**
+   * Description: Attach this attempt's safe correlation to a fixed outcome.
+   * Input: Outcome/reason and a verified owner ID when available.
+   * Output: One structured authentication event without a raw submitted name.
+   * Use case: Every terminal platform login decision.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-10-17
+   * Last modified: 2026-10-17
+   */
+  function report(outcome: AuthenticationEvent["outcome"], reason: AuthenticationEvent["reason"], actorId?: string): void {
+    recordAuthenticationEvent({ operation: "login", area: "platform", tenantId: null,
+      outcome, reason, actorId, submittedIdentifier: username, clientIp, requestContext });
+  }
   // Used exactly as given: a password is never trimmed or otherwise altered.
   const password = typeof input.password === "string" ? input.password : "";
 
@@ -84,15 +100,19 @@ export async function authenticatePlatformOwner(
   if (!username) fieldErrors.username = "Enter your username.";
   if (password.trim().length === 0) fieldErrors.password = "Enter your password.";
   if (fieldErrors.username || fieldErrors.password) {
+    report("denied", "validation");
     return { ok: false, reason: "validation", fieldErrors };
   }
 
   // Counted before anything else is checked. While blocked, even the correct
   // password is refused, and neither the database nor the hash is touched.
   const attempt = await countLoginAttempt(username, clientIp);
-  if (attempt === "unavailable") return { ok: false, reason: "unavailable" };
+  if (attempt === "unavailable") {
+    report("unavailable", "unavailable");
+    return { ok: false, reason: "unavailable" };
+  }
   if (attempt === "limited") {
-    console.warn("[platform-auth] login rejected (rate limited)");
+    report("denied", "rate_limited");
     return { ok: false, reason: "rate_limited" };
   }
 
@@ -102,14 +122,15 @@ export async function authenticatePlatformOwner(
     if (!owner || !token) {
       // The submitted name is not logged: people sometimes type their
       // password into the user name field.
-      console.warn("[platform-auth] login rejected (invalid credentials)");
+      report("failure", "invalid_credentials");
       return { ok: false, reason: "invalid_credentials" };
     }
 
     await clearLoginAttempts(owner.username);
-    console.log(`[platform-auth] login succeeded for "${owner.username}"`);
+    report("success", "authenticated", owner.id);
     return { ok: true, token };
   } catch (error) {
+    report("unavailable", "unavailable");
     console.error(`[platform-auth] login failed: ${describeError(error)}`);
     return { ok: false, reason: "unavailable" };
   }

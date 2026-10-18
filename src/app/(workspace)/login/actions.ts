@@ -1,5 +1,6 @@
 "use server";
 
+import { currentRequestContext } from "@/lib/request-context-server";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { clientIpFromForwardedFor } from "@/lib/platform-auth/rate-limit";
@@ -49,7 +50,7 @@ const DESTINATIONS = {
  *   header only; the destination is decided by the account, never by the form.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-15
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-17
  */
 export async function workspaceLoginAction(
   _previousState: WorkspaceLoginState,
@@ -65,7 +66,7 @@ export async function workspaceLoginAction(
 
   // Step 3: the whole decision happens in the service.
   const clientIp = clientIpFromForwardedFor((await headers()).get("x-forwarded-for"));
-  const result   = await authenticateWorkspaceUser(workspace, { identifier: identifierInput, password: passwordInput }, clientIp);
+  const result   = await authenticateWorkspaceUser(workspace, { identifier: identifierInput, password: passwordInput }, clientIp, await currentRequestContext());
 
   if (!result.ok) {
     if (result.reason === "validation") return { fieldErrors: result.fieldErrors, identifier };

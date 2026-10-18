@@ -130,3 +130,11 @@ of a protected page after logout, and functions without the mandatory doc block
 - 2026-10-16: Seed bootstrap assigns Master Platform + primary; the rbac
   migration mapped existing owners (oldest active → primary master, others →
   legacy custom roles with only their previous capabilities).
+
+## Audit remediation requested 2026-10-17 (AUD-014)
+
+Platform sign-in/out must use the shared structured authentication writer with UTC, generated request correlation, trusted last-hop IP, platform scope, outcome, verified actor IDs or a domain-separated HMAC pseudonymous submitted identifier. Credentials, tokens and raw submitted names are excluded. Logging is best effort and cannot prevent authentication/logout.
+
+## Completion and verification — 2026-10-18
+
+AUD-014 implemented through shared UTC JSON auth events and current request context. Failed and successful attempts share a domain-separated tenant-scoped HMAC pseudonym, stable across replicas using the same tenantSecretsKey; only verified database actor IDs appear. Platform logout attributes before revocation without allowing attribution errors to skip revocation. Targeted login regressions, TypeScript, ESLint and production build passed.

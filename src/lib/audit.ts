@@ -2,6 +2,8 @@ import "server-only";
 import { isIP } from "node:net";
 import type { AuditActorType } from "@/generated/prisma/control/client";
 import type { ControlDb } from "./db/control";
+import { sanitizeRequestContext, type AuditRequestContext } from "./request-context";
+import { currentRequestContext } from "./request-context-server";
 
 /** Every action written to `audit_events`. Add new ones here, never ad hoc strings. */
 export type AuditAction =
@@ -51,10 +53,10 @@ export type AuditAction =
   | "authz.denied"
   | "authz.escalation_blocked";
 
-type AuditMetadataValue = string | number | boolean | null | string[];
+type AuditMetadataValue = string | number | boolean | null | string[] | AuditRequestContext;
 
 /**
- * Extra detail for an audit row: flat JSON only. NEVER credentials, password
+ * Extra detail for an audit row: safe JSON, including the standardized request envelope. NEVER credentials, password
  * hashes, secret references, tokens, connection strings or private media URLs
  * (e.g. for an update, the changed field *names*, not their values).
  */
@@ -72,6 +74,8 @@ export type AuditEntry = {
   metadata?: AuditMetadata;
   /** The client address; anything that is not an IP address is stored as NULL. */
   ipAddress?: string | null;
+  /** Optional explicit HTTP context; otherwise the writer reads the current request. */
+  requestContext?: AuditRequestContext | null;
 };
 
 /** The application's client or an interactive transaction on it. */
@@ -100,9 +104,18 @@ function inetOrNull(value: string | null | undefined): string | null {
  * Use case: Every tenant and appearance change.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-14
- * Last modified: 2026-10-15
+ * Last modified: 2026-10-17
  */
 export async function recordAudit(db: AuditDb, entry: AuditEntry): Promise<void> {
+  // Read at the common boundary so existing admin callers cannot omit correlation.
+  // CLI provisioning has no request scope and continues without an HTTP envelope.
+  const context = entry.requestContext === undefined ? await currentRequestContext() : entry.requestContext;
+  const metadata = {
+    ...entry.metadata,
+    ...(context ? { request: sanitizeRequestContext({
+      ...context, outcome: context.outcome ?? (entry.action.startsWith("authz.") ? "denied" : entry.action.endsWith("failed") ? "failure" : "success"),
+    }) } : {}),
+  };
   await db.auditEvent.create({
     data: {
       actorType: entry.actorType,
@@ -111,8 +124,8 @@ export async function recordAudit(db: AuditDb, entry: AuditEntry): Promise<void>
       action: entry.action,
       targetType: entry.targetType ?? null,
       targetId: entry.targetId ?? null,
-      ...(entry.metadata ? { metadata: entry.metadata } : {}),
-      ipAddress: inetOrNull(entry.ipAddress),
+      ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
+      ipAddress: inetOrNull(entry.ipAddress) ?? inetOrNull(context?.clientIp),
     },
   });
 }
