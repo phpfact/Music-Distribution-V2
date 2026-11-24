@@ -57,25 +57,7 @@ export default async function PlatformDashboardPage() {
 
   return (
     <div className="flex flex-col gap-5 sm:gap-6">
-      <header className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div className="min-w-0">
-          <p className="mb-1.5 text-[10px] font-semibold tracking-[0.12em] text-primary uppercase sm:text-[11px]">Workspace overview</p>
-          {/* No username here: it is sensitive and the account menu reveals it on request. */}
-          <h1 className="text-xl font-semibold tracking-tight break-words sm:text-2xl">Welcome back</h1>
-          <p className="mt-1.5 max-w-xl text-xs leading-normal text-fg-muted sm:text-sm sm:leading-5">
-            Here&apos;s an overview of your platform. Manage your tenants and keep everything moving from one workspace.
-          </p>
-        </div>
-        {canSeeTenants ? (
-          <Button asChild variant="outline" className="self-start lg:self-auto">
-            <Link href={getNavItem("tenants").href}>
-              <Icon name="building-2" className="size-4" />
-              Manage tenants
-              <Icon name="arrow-right" className="size-4" />
-            </Link>
-          </Button>
-        ) : null}
-      </header>
+      <h1 className="sr-only">Dashboard</h1>
 
       {access.roleState !== "active" ? <NoActiveRoleNotice /> : null}
 
@@ -83,10 +65,7 @@ export default async function PlatformDashboardPage() {
         {/* Gated widgets: the tenant figures need platform.tenants.view. */}
         {canSeeTenants ? (
           <section id={SECTION_IDS.summary} aria-labelledby="platform-summary">
-            <div className="mb-2.5 flex items-center justify-between gap-3">
-              <h2 id="platform-summary" className="text-xs font-semibold sm:text-sm">Platform at a glance</h2>
-              <span className="text-xs text-fg-subtle">Tenant overview</span>
-            </div>
+            <h2 id="platform-summary" className="sr-only">Platform at a glance</h2>
             <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {/* Each tenant figure opens the exact tenants it counts. */}
               <StatCard
