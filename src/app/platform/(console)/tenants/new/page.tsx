@@ -50,7 +50,7 @@ export default async function CreateTenantPage() {
   // ancestor they would stretch the document below it.
   return (
     // Centred and capped so the two-column fields stay readable beside the menu.
-    <div className="relative mx-auto flex w-full max-w-6xl flex-col gap-8">
+    <div className="relative mx-auto flex w-full max-w-6xl flex-col gap-4 sm:gap-5">
       <PageHeader
         backHref="/platform/tenants"
         backLabel="Tenants"

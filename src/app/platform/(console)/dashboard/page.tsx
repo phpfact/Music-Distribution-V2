@@ -56,13 +56,13 @@ export default async function PlatformDashboardPage() {
   const menuItems = canSeeTenants ? MENU_ITEMS : MENU_ITEMS.filter((item) => item.id !== SECTION_IDS.summary);
 
   return (
-    <div className="flex flex-col gap-9">
-      <header className="flex min-w-0 flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+    <div className="flex flex-col gap-5 sm:gap-6">
+      <header className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
-          <p className="mb-3 text-[11px] font-semibold tracking-[0.15em] text-primary uppercase">Workspace overview</p>
+          <p className="mb-1.5 text-[10px] font-semibold tracking-[0.12em] text-primary uppercase sm:text-[11px]">Workspace overview</p>
           {/* No username here: it is sensitive and the account menu reveals it on request. */}
-          <h1 className="text-3xl font-semibold tracking-tight break-words sm:text-4xl">Welcome back</h1>
-          <p className="mt-3 max-w-xl text-sm leading-6 text-fg-muted">
+          <h1 className="text-xl font-semibold tracking-tight break-words sm:text-2xl">Welcome back</h1>
+          <p className="mt-1.5 max-w-xl text-xs leading-normal text-fg-muted sm:text-sm sm:leading-5">
             Here&apos;s an overview of your platform. Manage your tenants and keep everything moving from one workspace.
           </p>
         </div>
@@ -79,15 +79,15 @@ export default async function PlatformDashboardPage() {
 
       {access.roleState !== "active" ? <NoActiveRoleNotice /> : null}
 
-      <SectionedLayout items={menuItems} variant="top" contentClassName="flex flex-col gap-9">
+      <SectionedLayout items={menuItems} variant="top" contentClassName="flex flex-col gap-5 sm:gap-6">
         {/* Gated widgets: the tenant figures need platform.tenants.view. */}
         {canSeeTenants ? (
           <section id={SECTION_IDS.summary} aria-labelledby="platform-summary">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 id="platform-summary" className="text-sm font-semibold">Platform at a glance</h2>
+            <div className="mb-2.5 flex items-center justify-between gap-3">
+              <h2 id="platform-summary" className="text-xs font-semibold sm:text-sm">Platform at a glance</h2>
               <span className="text-xs text-fg-subtle">Tenant overview</span>
             </div>
-            <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {/* Each tenant figure opens the exact tenants it counts. */}
               <StatCard
                 label="Total Tenants"

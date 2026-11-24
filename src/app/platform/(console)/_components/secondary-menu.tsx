@@ -258,20 +258,24 @@ export function SectionedLayout({
   children,
   contentClassName,
 }: SectionedLayoutProps) {
-  // Only sections that exist right now get a menu item.
-  const presentItems = usePresentItems(items);
-  const hasMenu      = presentItems.length > 0;
+  // Top-bar in-page navigation buttons are disabled to conserve vertical space.
+  const presentItems = usePresentItems(variant === "top" ? [] : items);
+  const hasMenu      = variant !== "top" && presentItems.length > 0;
   // The two-column grid is used only when there is a sidebar menu to place.
   const sideBySide = hasMenu && variant === "sidebar";
+
+  if (!hasMenu) {
+    return <div className={cn("min-w-0", contentClassName)}>{children}</div>;
+  }
 
   return (
     <div
       className={cn(
-        "flex min-w-0 flex-col gap-6",
-        sideBySide && "lg:grid lg:grid-cols-[13rem_minmax(0,1fr)] lg:items-start lg:gap-8",
+        "flex min-w-0 flex-col gap-4 sm:gap-5",
+        sideBySide && "lg:grid lg:grid-cols-[13rem_minmax(0,1fr)] lg:items-start lg:gap-7",
       )}
     >
-      {hasMenu ? <SecondaryMenu items={presentItems} variant={variant} label={label} /> : null}
+      <SecondaryMenu items={presentItems} variant={variant} label={label} />
       <div className={cn("min-w-0", contentClassName)}>{children}</div>
     </div>
   );
@@ -433,11 +437,11 @@ function SecondaryMenu({ items, variant, label }: SecondaryMenuProps) {
       aria-label={label}
       className={cn(
         // Horizontal bar: sticks to the top of the scroll area, full content width.
-        "sticky top-0 z-20 -mx-4 border-b border-border bg-background/95 px-4 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:-mx-6 sm:px-6",
+        "sticky top-0 z-20 -mx-4 border-b border-border bg-background/95 px-4 py-1.5 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:-mx-6 sm:px-6",
         horizontalOnly
-          ? "lg:-mx-9 lg:px-9"
+          ? "lg:-mx-8 lg:px-8"
           : // Sidebar from lg: a plain sticky column beside the content.
-            "lg:top-6 lg:mx-0 lg:self-start lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none",
+            "lg:top-4 lg:mx-0 lg:self-start lg:border-0 lg:bg-transparent lg:p-0 lg:backdrop-blur-none",
       )}
     >
       {horizontalOnly ? null : (
@@ -462,7 +466,7 @@ function SecondaryMenu({ items, variant, label }: SecondaryMenuProps) {
                 aria-current={active ? "location" : undefined}
                 onClick={(event) => handleClick(event, item.id)}
                 className={cn(
-                  "flex items-center gap-2 rounded-md px-3 py-2 text-sm whitespace-nowrap transition-colors motion-reduce:transition-none",
+                  "flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs sm:text-sm whitespace-nowrap transition-colors motion-reduce:transition-none",
                   horizontalOnly ? null : "lg:border-l-2 lg:border-transparent lg:rounded-l-none",
                   active
                     ? "bg-accent font-medium text-accent-foreground lg:border-primary"
@@ -470,7 +474,7 @@ function SecondaryMenu({ items, variant, label }: SecondaryMenuProps) {
                   FOCUS_RING,
                 )}
               >
-                {item.icon ? <Icon name={item.icon} className="size-4 shrink-0" /> : null}
+                {item.icon ? <Icon name={item.icon} className="size-3.5 sm:size-4 shrink-0" /> : null}
                 {item.label}
               </a>
             </li>

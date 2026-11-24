@@ -150,9 +150,9 @@ export async function RolesListScreen({ binding, searchParams }: RolesListScreen
   // refuses a stale change), so the panel's action is passed as is.
   return (
     <ScreenFrame {...frame}>
-      <SectionedLayout items={LIST_MENU} variant="top" contentClassName="flex flex-col gap-6">
-        <section id={LIST_SECTIONS.summary.id} aria-labelledby={`${LIST_SECTIONS.summary.id}-title`} className="flex flex-col gap-3">
-          <h2 id={`${LIST_SECTIONS.summary.id}-title`} className="text-base font-semibold">
+      <SectionedLayout items={LIST_MENU} variant="top" contentClassName="flex flex-col gap-4 sm:gap-5">
+        <section id={LIST_SECTIONS.summary.id} aria-labelledby={`${LIST_SECTIONS.summary.id}-title`} className="flex flex-col gap-2">
+          <h2 id={`${LIST_SECTIONS.summary.id}-title`} className="sr-only">
             Summary
           </h2>
           <RolesSummary

@@ -48,18 +48,18 @@ export function StatCard({ label, icon, value, note, details }: StatCardProps) {
   const figure = value === null ? null : NUMBER_FORMAT.format(value);
 
   return (
-    <Card className="relative min-w-0 gap-0 overflow-hidden p-5 shadow-xs sm:p-6">
-      <div className="flex items-start justify-between gap-3">
-        <dt className="pt-1 text-sm font-medium text-fg-muted">{label}</dt>
-        <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-primary">
-          <Icon name={icon} className="size-[18px]" />
+    <Card className="relative min-w-0 gap-0 overflow-hidden p-3.5 shadow-xs sm:p-4">
+      <div className="flex items-center justify-between gap-2.5">
+        <dt className="text-xs font-medium text-fg-muted truncate sm:text-sm">{label}</dt>
+        <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-accent-soft text-primary sm:size-8">
+          <Icon name={icon} className="size-3.5 sm:size-4" />
         </span>
       </div>
-      <dd className="mt-4">
+      <dd className="mt-2 sm:mt-2.5">
         {figure === null ? (
           <>
             {/* No figure: a dash for the eye, "No data" for screen readers. */}
-            <span aria-hidden="true" className="text-4xl font-semibold tracking-tight">
+            <span aria-hidden="true" className="text-2xl font-semibold tracking-tight sm:text-3xl">
               —
             </span>
             <span className="sr-only">No data</span>
@@ -72,14 +72,14 @@ export function StatCard({ label, icon, value, note, details }: StatCardProps) {
             description={details.description}
             calculation={details.calculation}
             records={details.records}
-            className="text-4xl font-semibold tracking-tight tabular-nums"
+            className="text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl"
           >
             {figure}
           </CountDetails>
         ) : (
-          <span className="text-4xl font-semibold tracking-tight tabular-nums">{figure}</span>
+          <span className="text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl">{figure}</span>
         )}
-        {note ? <div className="mt-2 text-xs leading-5 text-fg-subtle">{note}</div> : null}
+        {note ? <div className="mt-1 text-[11px] leading-4 text-fg-subtle truncate sm:text-xs">{note}</div> : null}
       </dd>
     </Card>
   );

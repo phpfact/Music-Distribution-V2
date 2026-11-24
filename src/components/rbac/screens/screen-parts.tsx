@@ -52,7 +52,7 @@ export function ScreenFrame({
   children,
 }: ScreenFrameProps) {
   return (
-    <div className={cn("relative flex min-w-0 flex-col gap-6", gutterClassName)}>
+    <div className={cn("relative flex min-w-0 flex-col gap-4 sm:gap-5", gutterClassName)}>
       <PageHeader
         eyebrow={eyebrow}
         title={title}

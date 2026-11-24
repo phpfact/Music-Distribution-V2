@@ -76,7 +76,7 @@ export default async function TenantRegistrationsPage({ params, searchParams }: 
 
   if (!access.ok) {
     return (
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4 sm:gap-5">
         {header}
         <Notice variant={access.reason === "not_ready" ? "info" : "error"}>
           {access.reason === "not_ready"
@@ -94,7 +94,7 @@ export default async function TenantRegistrationsPage({ params, searchParams }: 
   const tenantId = access.tenant.id;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4 sm:gap-5">
       {header}
       {access.tenant.status === "suspended" ? (
         <Notice variant="warning">
@@ -102,9 +102,9 @@ export default async function TenantRegistrationsPage({ params, searchParams }: 
         </Notice>
       ) : null}
 
-      <SectionedLayout items={MENU_ITEMS} variant="top" contentClassName="flex flex-col gap-6">
-        <section id={SECTIONS.summary.id} aria-labelledby={`${SECTIONS.summary.id}-title`} className="flex flex-col gap-3">
-          <h2 id={`${SECTIONS.summary.id}-title`} className="text-base font-semibold">
+      <SectionedLayout items={MENU_ITEMS} variant="top" contentClassName="flex flex-col gap-4 sm:gap-5">
+        <section id={SECTIONS.summary.id} aria-labelledby={`${SECTIONS.summary.id}-title`} className="flex flex-col gap-2">
+          <h2 id={`${SECTIONS.summary.id}-title`} className="sr-only">
             Summary
           </h2>
           <RegistrationSummaryCards

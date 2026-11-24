@@ -39,7 +39,7 @@ export function Topbar({ username, roleLabel, sections, drawerId, drawerOpen, on
   const child    = current?.children?.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
 
   return (
-    <header className="flex h-20 shrink-0 items-center gap-3 border-b border-border bg-card/80 px-4 backdrop-blur sm:px-6 lg:px-9">
+    <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-card/80 px-4 backdrop-blur sm:h-16 sm:px-6 lg:px-8">
       <Button ref={menuToggleRef} type="button" variant="ghost" size="icon" onClick={onOpenDrawer} aria-label="Open navigation" aria-haspopup="dialog" aria-controls={drawerId} aria-expanded={drawerOpen} className="size-9 shrink-0 text-muted-foreground lg:hidden">
         <Icon name="menu" className="size-5" />
       </Button>

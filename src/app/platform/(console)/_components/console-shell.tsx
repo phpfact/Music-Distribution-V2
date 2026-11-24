@@ -130,7 +130,7 @@ export function ConsoleShell({ username, roleLabel, permissions, initialCollapse
           <Topbar username={username} roleLabel={roleLabel} sections={sections} drawerId={drawerId} drawerOpen={drawerOpen} onOpenDrawer={() => setDrawerOpen(true)} menuToggleRef={menuToggleRef} />
           <main id="main-content" tabIndex={-1} className="relative flex-1 overflow-y-auto focus:outline-none">
             {/* Full Width removes only the content cap, keeping mobile gutters. */}
-            <div style={{ maxWidth: "var(--platform-content-max-width, 96rem)" }} className="mx-auto w-full px-4 py-7 sm:px-6 lg:px-9 lg:py-9">
+            <div style={{ maxWidth: "var(--platform-content-max-width, 96rem)" }} className="mx-auto w-full px-4 py-4 sm:px-6 sm:py-5 lg:px-8 lg:py-6">
               {children}
             </div>
           </main>

@@ -73,12 +73,12 @@ export function RegistrationSummaryCards({ summary, loadRecords }: RegistrationS
   };
 
   return (
-    <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 sm:gap-3.5 md:grid-cols-3 xl:grid-cols-5">
       {FIGURES.map((figure) => (
-        <Card key={figure.filter} className="gap-2 py-5">
-          <CardHeader className="px-5">
-            <CardDescription>{figure.label}</CardDescription>
-            <CardTitle className="text-3xl font-semibold tabular-nums">
+        <Card key={figure.filter} className="gap-1.5 p-3.5 shadow-xs sm:p-4">
+          <CardHeader className="p-0">
+            <CardDescription className="text-xs">{figure.label}</CardDescription>
+            <CardTitle className="text-2xl font-semibold tabular-nums sm:text-3xl">
               <CountDetails
                 label={`${figure.label} registrations: ${values[figure.filter]}. Show the registrations behind this figure.`}
                 title={`${figure.label} registrations`}
@@ -91,12 +91,12 @@ export function RegistrationSummaryCards({ summary, loadRecords }: RegistrationS
                     loadRecords={loadRecords}
                   />
                 }
-                className="text-3xl font-semibold tabular-nums"
+                className="text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl"
               >
                 {values[figure.filter]}
               </CountDetails>
             </CardTitle>
-            <p className="text-xs text-muted-foreground">{figure.hint}</p>
+            <p className="mt-1 text-[11px] leading-4 text-muted-foreground truncate sm:text-xs">{figure.hint}</p>
           </CardHeader>
         </Card>
       ))}

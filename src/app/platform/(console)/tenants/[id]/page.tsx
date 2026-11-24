@@ -163,17 +163,17 @@ export default async function TenantDetailsPage({
 
   return (
     <TenantFlashProvider>
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4 sm:gap-5">
         <Link
           href={TENANTS_PATH}
-          className={`inline-flex items-center gap-1.5 self-start rounded-md text-sm font-medium text-fg-muted transition-colors hover:text-fg ${FOCUS_RING}`}
+          className={`inline-flex items-center gap-1.5 self-start rounded-md text-xs sm:text-sm font-medium text-fg-muted transition-colors hover:text-fg ${FOCUS_RING}`}
         >
-          <Icon name="arrow-left" className="size-4" />
+          <Icon name="arrow-left" className="size-3.5 sm:size-4" />
           Tenants
         </Link>
 
-        <header className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex min-w-0 items-center gap-4">
+        <header className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             <Avatar
               name={tenant.name}
               src={
@@ -181,17 +181,17 @@ export default async function TenantDetailsPage({
                   ? `${TENANTS_PATH}/${tenant.id}/avatar`
                   : null
               }
-              size="lg"
+              size="md"
             />
-            <div className="flex min-w-0 flex-col gap-1">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <h1 className="text-2xl font-semibold tracking-tight break-words sm:text-3xl">
+            <div className="flex min-w-0 flex-col gap-0.5 sm:gap-1">
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                <h1 className="text-xl font-semibold tracking-tight break-words sm:text-2xl">
                   {tenant.name}
                 </h1>
                 <StatusBadge status={tenant.status} />
               </div>
               {/* The username is masked in the Admin login card, so it is not repeated here. */}
-              <p className="text-sm break-words text-fg-muted">
+              <p className="text-xs sm:text-sm break-words text-fg-muted">
                 Created{" "}
                 <time dateTime={tenant.createdAt}>
                   {formatDate(tenant.createdAt)}

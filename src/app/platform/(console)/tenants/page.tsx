@@ -114,7 +114,7 @@ export default async function PlatformTenantsPage({ searchParams }: PageProps) {
 
   return (
     <TenantFlashProvider>
-      <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-4 sm:gap-5">
         <PageHeader
           eyebrow="Platform management"
           title="Tenant Management"
@@ -134,14 +134,14 @@ export default async function PlatformTenantsPage({ searchParams }: PageProps) {
         {notice ? <Notice variant="success">{notice}</Notice> : null}
         <TenantFlashNotice />
 
-        <SectionedLayout items={MENU_ITEMS} variant="top" contentClassName="flex flex-col gap-8">
+        <SectionedLayout items={MENU_ITEMS} variant="top" contentClassName="flex flex-col gap-4 sm:gap-5">
           <section id={SECTION_IDS.summary} aria-labelledby="tenant-summary">
             <h2 id="tenant-summary" className="sr-only">
               Tenant summary
             </h2>
             {/* Real figures only: when they can't be read, each card says so.
                 Every figure opens the exact tenants it counts. */}
-            <dl className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <StatCard
                 label="Total tenants"
                 icon="building-2"
@@ -192,7 +192,7 @@ export default async function PlatformTenantsPage({ searchParams }: PageProps) {
             aria-labelledby="tenant-list"
             className="min-w-0 gap-0 overflow-hidden py-0"
           >
-            <CardHeader className="flex flex-wrap items-center justify-between gap-3 py-5">
+            <CardHeader className="flex flex-wrap items-center justify-between gap-3 py-3.5 sm:py-4">
               <div className="flex items-center gap-3">
                 <CardTitle
                   id="tenant-list"

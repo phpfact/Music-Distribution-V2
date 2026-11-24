@@ -315,30 +315,30 @@ function AppearanceForm({ saved, initialFeedback }: { saved: AppearanceState; in
     saved.source === "personal" ? "Personal override" : saved.source === "global" ? "Platform default" : "Application default";
 
   return (
-    <div className={cn("mx-auto flex w-full flex-col gap-6", pageWidthClass(saved.appearance.width))}>
-      <header>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">Your workspace</p>
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground">Settings</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Make the platform feel like your own.</p>
+    <div className={cn("mx-auto flex w-full flex-col gap-4 sm:gap-5", pageWidthClass(saved.appearance.width))}>
+      <header className="min-w-0">
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-primary sm:text-[11px]">Your workspace</p>
+        <h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">Settings</h1>
+        <p className="mt-1 text-xs text-muted-foreground sm:text-sm">Make the platform feel like your own.</p>
       </header>
-      <nav aria-label="Settings" className="border-b border-border pb-3">
-        <Button asChild variant="ghost" className="bg-accent-soft text-primary">
+      <nav aria-label="Settings" className="border-b border-border pb-2.5">
+        <Button asChild variant="ghost" className="h-8 gap-2 px-3 text-xs sm:text-sm bg-accent-soft text-primary">
           <a href="/platform/settings/appearance" aria-current="page">
-            <Icon name="sun" className="size-4" />
+            <Icon name="sun" className="size-3.5 sm:size-4" />
             Appearance
           </a>
         </Button>
       </nav>
       {message ? <Notice variant="success">{message}</Notice> : null}
 
-      <SectionedLayout items={MENU_ITEMS} label="Appearance sections" contentClassName="flex flex-col gap-6">
+      <SectionedLayout items={MENU_ITEMS} label="Appearance sections" contentClassName="flex flex-col gap-4 sm:gap-5">
         <Card role="region" aria-labelledby="appearance-title" className="gap-0 overflow-hidden py-0">
-          <CardHeader className="flex flex-col justify-between gap-4 border-b border-border px-5 py-6 sm:flex-row sm:items-center sm:px-8">
+          <CardHeader className="flex flex-col justify-between gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:px-6">
             <div>
               <CardTitle>
-                <h2 id="appearance-title" className="text-lg font-semibold tracking-tight">Appearance</h2>
+                <h2 id="appearance-title" className="text-base font-semibold tracking-tight sm:text-lg">Appearance</h2>
               </CardTitle>
-              <CardDescription className="mt-1">Choose your colors and the way your interface looks.</CardDescription>
+              <CardDescription className="mt-0.5 text-xs sm:text-sm">Choose your colors and the way your interface looks.</CardDescription>
             </div>
             <Badge variant={dirty ? "warning" : "secondary"} role="status" className="w-fit">
               <Icon name={dirty ? "pencil" : "check"} className="size-3" />

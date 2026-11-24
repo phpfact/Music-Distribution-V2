@@ -37,7 +37,7 @@ type RolesSummaryProps = {
  */
 export function RolesSummary({ counts, catalogPrivilegeCount, loadRoles, loadAssignedUsers }: RolesSummaryProps) {
   return (
-    <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-3.5 xl:grid-cols-4">
       <StatCard
         label="Total roles"
         icon="shield-check"
@@ -114,7 +114,7 @@ type SubUsersSummaryProps = {
  */
 export function SubUsersSummary({ counts, nounPlural, loadUsers }: SubUsersSummaryProps) {
   return (
-    <dl className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-3.5">
       <StatCard
         label={`Total ${nounPlural}`}
         icon="user"

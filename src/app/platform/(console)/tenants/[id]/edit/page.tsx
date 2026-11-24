@@ -81,7 +81,7 @@ export default async function EditTenantPage({ params }: PageProps) {
 
   return (
     // Centred and capped like the create page, so both forms look the same.
-    <div className="relative mx-auto flex w-full max-w-6xl flex-col gap-8">
+    <div className="relative mx-auto flex w-full max-w-6xl flex-col gap-4 sm:gap-5">
       <PageHeader
         backHref={detailsHref}
         backLabel={tenant.fullName}
