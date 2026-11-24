@@ -1,19 +1,62 @@
 import type { Metadata } from "next";
-import { SubUserFormScreen } from "@/components/rbac/screens/sub-users-screens";
 import { SUB_PLATFORM_OWNER_SCREENS } from "@/app/platform/(console)/rbac-bindings";
+import { ActorFallback, DeniedScreen, LoadFailed, ScreenFrame } from "@/components/rbac/screens/screen-parts";
+import { toRoleOptionView } from "@/lib/authz/management-view";
+import { listAssignableRoles } from "@/lib/authz/role-service";
+import { PlatformOwnerForm } from "../_components/platform-owner-form";
+import { createSubPlatformOwnerAction } from "../actions";
 
-export const metadata: Metadata = { title: "Add Sub-Platform Owner" };
+export const metadata: Metadata = { title: "Create Platform Owner" };
 
 /**
- * Description: The Platform panel's create page of a Sub-Platform Owner (UI spec "Sub-user form").
+ * Description: Dedicated Create Platform Owner Page with 7 mandatory fields.
  * Input: None.
- * Output: The shared sub-user form: without platform.users.create the access-denied state; otherwise
- *   the form with the roles the viewer may assign (exactly one is submitted).
- * Use case: /platform/users/new.
+ * Output: Dedicated creation form with authorized assignable roles dropdown.
+ * Use case: /platform/users/new
  * Author: Mr. Sachin Sharma
- * Created: 2026-10-16
- * Last modified: 2026-10-16
+ * Created: 2026-11-24
+ * Last modified: 2026-11-24
  */
-export default async function CreateSubPlatformOwnerPage() {
-  return <SubUserFormScreen binding={SUB_PLATFORM_OWNER_SCREENS} mode="create" />;
+export default async function CreatePlatformOwnerPage() {
+  const binding = SUB_PLATFORM_OWNER_SCREENS;
+  const access = await binding.pageActor("usersCreate");
+  if (!access.ok) {
+    return <ActorFallback binding={binding} result={access} title="Create Platform Owner" />;
+  }
+
+  const actor = access.actor;
+  const rolesResult = await listAssignableRoles(actor);
+  if (!rolesResult.ok) {
+    return (
+      <ScreenFrame
+        gutterClassName={binding.gutterClassName}
+        title="Create Platform Owner"
+        eyebrow={binding.eyebrow}
+      >
+        {rolesResult.reason === "forbidden" ? (
+          <DeniedScreen gutterClassName={binding.gutterClassName} homeHref={binding.home} />
+        ) : (
+          <LoadFailed message="Assignable roles could not be loaded. Please refresh the page." />
+        )}
+      </ScreenFrame>
+    );
+  }
+
+  const roleOptions = rolesResult.data.map(toRoleOptionView);
+
+  return (
+    <ScreenFrame
+      gutterClassName={binding.gutterClassName}
+      title="Create Platform Owner"
+      description="Create a new platform owner and assign their role immediately. Role selection is mandatory."
+      eyebrow={binding.eyebrow}
+    >
+      <PlatformOwnerForm
+        mode="create"
+        roles={roleOptions}
+        action={createSubPlatformOwnerAction}
+        cancelHref={binding.list}
+      />
+    </ScreenFrame>
+  );
 }

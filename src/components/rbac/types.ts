@@ -112,6 +112,8 @@ export type SubUserRowView = {
   fullName: string;
   username: string | null;
   email: string | null;
+  phone?: string | null;
+  lastLoginAt?: string | null;
   roleName: string;
   roleIsMaster: boolean;
   status: UserStatusValue;

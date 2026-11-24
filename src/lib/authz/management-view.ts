@@ -148,6 +148,8 @@ export function toSubUserRowView(row: SubUserRow): SubUserRowView {
     fullName:     row.fullName,
     username:     row.username,
     email:        row.email,
+    phone:        row.phone,
+    lastLoginAt:  row.lastLoginAt,
     roleName:     row.roleName ?? NO_ACTIVE_ROLE_LABEL,
     roleIsMaster: row.roleIsMaster,
     status:       toUserStatus(row.status),

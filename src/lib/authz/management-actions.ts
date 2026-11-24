@@ -65,7 +65,7 @@ import {
   updateRole,
   type RoleInput,
 } from "./role-service";
-import { createSubUser, listSubUserCountRecords, setSubUserStatus, updateSubUser } from "./sub-user-service";
+import { createSubUser, deleteSubUser, listSubUserCountRecords, setSubUserStatus, updateSubUser } from "./sub-user-service";
 
 /** The panel's authorize step for one action (exact privilege → actor or friendly refusal). */
 export type AuthorizeStep = () => Promise<AuthorizedActor>;
@@ -382,6 +382,8 @@ export async function handleCreateSubUser(authorize: AuthorizeStep, formData: Fo
     accountType:     formData.get("accountType"),
     username:        formData.get("username"),
     email:           formData.get("email"),
+    phone:           formData.get("phone"),
+    status:          formData.get("status"),
     password:        formData.get("password"),
     confirmPassword: formData.get("confirmPassword"),
     roleId:          role.roleId,
@@ -424,6 +426,9 @@ export async function handleUpdateSubUser(
   // Step 3: one service call (missing password pair = empty = keep the password).
   const result = await updateSubUser(authorization.actor, userId, {
     fullName:        formData.get("fullName"),
+    email:           formData.get("email"),
+    phone:           formData.get("phone"),
+    status:          formData.get("status"),
     roleId:          role.roleId,
     password:        formData.get("password") ?? "",
     confirmPassword: formData.get("confirmPassword") ?? "",
@@ -459,6 +464,28 @@ export async function handleSetSubUserStatus(
 
   const result = await setSubUserStatus(authorization.actor, userId, change);
   if (result.ok) refreshPages([paths.users]);
+  return toActionResult(result);
+}
+
+/**
+ * Description: Delete a sub-user safely.
+ * Input: The panel's users delete authorize step, the user id and paths.
+ * Output: Success message or a friendly error.
+ * Use case: Sub-user delete action.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-11-24
+ * Last modified: 2026-11-24
+ */
+export async function handleDeleteSubUser(
+  authorize: AuthorizeStep,
+  userId: unknown,
+  paths: RbacPanelPaths,
+): Promise<RbacActionResult> {
+  const authorization = await authorize();
+  if (!authorization.ok) return { ok: false, error: authorization.error };
+
+  const result = await deleteSubUser(authorization.actor, userId);
+  if (result.ok) refreshPages([paths.users, paths.roles]);
   return toActionResult(result);
 }
 

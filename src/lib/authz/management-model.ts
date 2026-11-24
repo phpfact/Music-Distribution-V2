@@ -25,6 +25,7 @@ export type ManagementPrivileges<D extends AuthzDomain> = {
   usersCreate: DomainPermissionKey<D>;
   usersEdit: DomainPermissionKey<D>;
   usersSuspend: DomainPermissionKey<D>;
+  usersDelete: DomainPermissionKey<D>;
 };
 
 /** The catalog keys of roles and sub-user management in each domain. */
@@ -38,6 +39,7 @@ export const MANAGEMENT_PRIVILEGES: { [D in AuthzDomain]: ManagementPrivileges<D
     usersCreate: "platform.users.create",
     usersEdit: "platform.users.edit",
     usersSuspend: "platform.users.suspend",
+    usersDelete: "platform.users.delete",
   },
   tenant: {
     rolesView: "tenant.roles.view",
@@ -48,6 +50,7 @@ export const MANAGEMENT_PRIVILEGES: { [D in AuthzDomain]: ManagementPrivileges<D
     usersCreate: "tenant.users.create",
     usersEdit: "tenant.users.edit",
     usersSuspend: "tenant.users.suspend",
+    usersDelete: "tenant.users.edit",
   },
   customer: {
     rolesView: "customer.roles.view",
@@ -58,6 +61,7 @@ export const MANAGEMENT_PRIVILEGES: { [D in AuthzDomain]: ManagementPrivileges<D
     usersCreate: "customer.sub_customers.create",
     usersEdit: "customer.sub_customers.edit",
     usersSuspend: "customer.sub_customers.suspend",
+    usersDelete: "customer.sub_customers.edit",
   },
 };
 
@@ -319,8 +323,12 @@ export type SubUserRow = {
   id: string;
   fullName: string;
   username: string | null;
-  /** null for platform owners. */
+  /** Email (platform and workspace). */
   email: string | null;
+  /** Phone number (platform owners). */
+  phone?: string | null;
+  /** Last login timestamp. */
+  lastLoginAt?: string | null;
   roleId: string | null;
   roleName: string | null;
   roleIsMaster: boolean;
@@ -351,6 +359,8 @@ export type SubUserEditModel = {
     fullName: string;
     username: string | null;
     email: string | null;
+    phone?: string | null;
+    lastLoginAt?: string | null;
     accountType: "artist" | "label" | "white_label" | null;
     roleId: string | null;
     roleName: string | null;
