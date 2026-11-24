@@ -34,8 +34,12 @@ export type StoredUser = {
   id: string;
   fullName: string;
   username: string | null;
-  /** null for platform owners (they have no email). */
+  /** Email of the user (platform owners and workspace users). */
   email: string | null;
+  /** Phone/mobile number of the user. */
+  phone?: string | null;
+  /** Timestamp of the user's last login. */
+  lastLoginAt?: Date | null;
   /** suspended = account disabled (sub-customers: user or its customer disabled). */
   status: "active" | "suspended";
   isPrimary: boolean;
@@ -92,20 +96,28 @@ export type RoleChanges = { name: string; description: string | null; status: "a
 export type NewUser = {
   fullName: string;
   username: string;
-  /** Workspace only. */
+  /** Email (platform and workspace). */
   email: string | null;
+  /** Phone number (platform owners). */
+  phone?: string | null;
   passwordHash: string;
   /** Sub-customers only. */
   accountType: AccountType | null;
   roleId: string;
   createdById: string;
+  status?: "active" | "disabled";
 };
 
 /**
- * The editable details of a sub-user. Business rule "Edit: full name, role,
- * optional new password": email, username and account type never change here.
+ * The editable details of a sub-user.
  */
-export type UserChanges = { fullName: string };
+export type UserChanges = {
+  fullName: string;
+  email?: string | null;
+  phone?: string | null;
+  status?: "active" | "disabled";
+  roleId?: string;
+};
 
 /** The fresh actor read inside a transaction (ceiling + primary flag). */
 export type ReloadedActor = PolicyActor & { isPrimary: boolean };
@@ -142,8 +154,8 @@ export interface AuthzTxOps {
   lockUser(userId: string): Promise<StoredUser | null>;
   /** Serialize identity claims (workspace: the registration advisory lock; platform: no-op). */
   lockIdentities(): Promise<void>;
-  /** Which of username / email is already claimed (excluding one user on edit). */
-  findIdentityConflicts(identity: { username?: string; email?: string }, excludeUserId: string | null): Promise<IdentityConflicts>;
+  /** Which of username / email / phone is already claimed (excluding one user on edit). */
+  findIdentityConflicts(identity: { username?: string; email?: string; phone?: string }, excludeUserId: string | null): Promise<IdentityConflicts>;
   /** Insert a sub-user with its single role; returns the user id. */
   insertUser(user: NewUser): Promise<string>;
   /** Update a sub-user's details. */
@@ -154,6 +166,8 @@ export interface AuthzTxOps {
   setPassword(userId: string, passwordHash: string): Promise<void>;
   /** Suspend / reactivate (conditional); suspend ends sessions. False when already in that state. */
   setUserStatus(userId: string, change: "suspend" | "reactivate"): Promise<boolean>;
+  /** Delete a sub-user/platform owner safely. */
+  deleteUser?(userId: string): Promise<void>;
 }
 
 /** The reads of one scope plus its transactions. */

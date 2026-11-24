@@ -45,9 +45,12 @@ const USER_SELECT = {
   id: true,
   username: true,
   fullName: true,
+  email: true,
+  phone: true,
   status: true,
   isPrimary: true,
   createdAt: true,
+  lastLoginAt: true,
   role: { select: { id: true, name: true, status: true, systemKey: true, permissions: { select: { permissionKey: true } } } },
 } as const satisfies Prisma.PlatformOwnerSelect;
 
@@ -86,7 +89,7 @@ function toStoredRole(row: SelectedRole): StoredRole {
  * Use case: Every user read of this store.
  * Author: Mr. Sachin Sharma
  * Created: 2026-10-16
- * Last modified: 2026-10-16
+ * Last modified: 2026-11-24
  */
 function toStoredUser(row: SelectedUser): StoredUser {
   return {
@@ -94,10 +97,12 @@ function toStoredUser(row: SelectedUser): StoredUser {
     // Owners created before RBAC have no full name yet; the username identifies them.
     fullName: row.fullName ?? row.username,
     username: row.username,
-    email: null,
+    email: row.email,
+    phone: row.phone,
     status: row.status === "active" ? "active" : "suspended",
     isPrimary: row.isPrimary,
     createdAt: row.createdAt,
+    lastLoginAt: row.lastLoginAt,
     customerId: null,
     accountType: null,
     role: {
@@ -161,6 +166,8 @@ function userWhere(filter: UserFilter): Prisma.PlatformOwnerWhereInput {
       OR: [
         { fullName: { contains: filter.q, mode: "insensitive" } },
         { username: { contains: filter.q.toLowerCase() } },
+        { email: { contains: filter.q, mode: "insensitive" } },
+        { phone: { contains: filter.q } },
       ],
     });
   }
@@ -289,24 +296,40 @@ function platformTxOps(tx: Prisma.TransactionClient, actor: PlatformAuthzActor):
     },
 
     async findIdentityConflicts(identity, excludeUserId): Promise<IdentityConflicts> {
-      // Only usernames exist for platform owners.
-      if (!identity.username) return {};
-      const taken = await tx.platformOwner.count({
-        where: { username: identity.username, ...(excludeUserId ? { id: { not: excludeUserId } } : {}) },
-      });
-      return taken > 0 ? { username: "account" } : {};
+      const conflicts: IdentityConflicts = {};
+      if (identity.username) {
+        const taken = await tx.platformOwner.count({
+          where: { username: identity.username, ...(excludeUserId ? { id: { not: excludeUserId } } : {}) },
+        });
+        if (taken > 0) conflicts.username = "account";
+      }
+      if (identity.email) {
+        const taken = await tx.platformOwner.count({
+          where: { email: { equals: identity.email, mode: "insensitive" }, ...(excludeUserId ? { id: { not: excludeUserId } } : {}) },
+        });
+        if (taken > 0) conflicts.email = "account";
+      }
+      if (identity.phone) {
+        const taken = await tx.platformOwner.count({
+          where: { phone: identity.phone, ...(excludeUserId ? { id: { not: excludeUserId } } : {}) },
+        });
+        if (taken > 0) (conflicts as Record<string, string>).phone = "account";
+      }
+      return conflicts;
     },
 
     async insertUser(user: NewUser): Promise<string> {
       const created = await tx.platformOwner.create({
         data: {
           username: user.username,
+          email: user.email,
+          phone: user.phone,
           passwordHash: user.passwordHash,
           fullName: user.fullName,
-          status: "active",
+          status: user.status === "disabled" ? "disabled" : "active",
           roleId: user.roleId,
           createdById: user.createdById,
-          // Sub-Platform Owners are never primary (lockout protection belongs to the seeded owner).
+          // Platform owners created here are never primary (primary Super Admin is unique).
           isPrimary: false,
         },
         select: { id: true },
@@ -315,8 +338,16 @@ function platformTxOps(tx: Prisma.TransactionClient, actor: PlatformAuthzActor):
     },
 
     async updateUser(userId: string, changes: UserChanges): Promise<void> {
-      // Platform owners only have a full name to edit (no email, no account type).
-      await tx.platformOwner.update({ where: { id: userId }, data: { fullName: changes.fullName } });
+      await tx.platformOwner.update({
+        where: { id: userId },
+        data: {
+          fullName: changes.fullName,
+          ...(changes.email !== undefined ? { email: changes.email } : {}),
+          ...(changes.phone !== undefined ? { phone: changes.phone } : {}),
+          ...(changes.status ? { status: changes.status === "active" ? "active" : "disabled" } : {}),
+          ...(changes.roleId ? { roleId: changes.roleId } : {}),
+        },
+      });
     },
 
     async assignRole(userId, roleId): Promise<void> {
@@ -337,6 +368,12 @@ function platformTxOps(tx: Prisma.TransactionClient, actor: PlatformAuthzActor):
       // A suspension ends every open session right away.
       if (updated.count === 1 && change === "suspend") await tx.platformOwnerSession.deleteMany({ where: { ownerId: userId } });
       return updated.count === 1;
+    },
+
+    async deleteUser(userId: string): Promise<void> {
+      await tx.platformOwnerSession.deleteMany({ where: { ownerId: userId } });
+      await tx.platformOwnerAppearance.deleteMany({ where: { ownerId: userId } });
+      await tx.platformOwner.delete({ where: { id: userId } });
     },
   };
 }

@@ -322,6 +322,12 @@ model PlatformOwner {
 
   /// Display name of a Sub-Platform Owner (optional for existing accounts).
   fullName    String?        @map("full_name") @db.VarChar(200)
+  /// Contact email of the platform owner (unique).
+  email       String?        @unique @db.VarChar(320)
+  /// Contact phone/mobile of the platform owner.
+  phone       String?        @unique @db.VarChar(20)
+  /// Last sign-in time of the platform owner.
+  lastLoginAt DateTime?      @map("last_login_at") @db.Timestamptz(3)
   /// The seeded/oldest Platform Owner: always Master Platform, never suspended
   /// or reassigned through RBAC paths. At most one (partial unique index in the
   /// rbac migration).

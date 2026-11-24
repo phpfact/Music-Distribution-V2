@@ -32,20 +32,26 @@ type VerifiedOwner = { id: string; username: string; passwordHash: string };
  * Last modified: 2026-10-15
  */
 async function verifyCredentials(
-  username: string,
+  identifier: string,
   password: string,
 ): Promise<VerifiedOwner | null> {
-  // No such account can exist, so the database is not asked. The format rules
-  // are not revealed: the caller reports this like any other wrong credential.
-  if (!isValidUsername(username) || password.length > PASSWORD_MAX_LENGTH) {
+  // Support both username format and email address format
+  const isEmail = identifier.includes("@");
+  if ((!isEmail && !isValidUsername(identifier)) || password.length > PASSWORD_MAX_LENGTH) {
     await verifyAgainstDummy(password);
     return null;
   }
 
-  const owner = await getControlDb().platformOwner.findUnique({
-    where: { username },
-    select: { id: true, passwordHash: true, status: true },
-  });
+  const owner = isEmail
+    ? await getControlDb().platformOwner.findFirst({
+        where: { email: { equals: identifier, mode: "insensitive" } },
+        select: { id: true, username: true, passwordHash: true, status: true },
+      })
+    : await getControlDb().platformOwner.findUnique({
+        where: { username: identifier },
+        select: { id: true, username: true, passwordHash: true, status: true },
+      });
+
   if (!owner) {
     await verifyAgainstDummy(password);
     return null;
@@ -56,7 +62,17 @@ async function verifyCredentials(
   const passwordMatches = await verifyPassword(owner.passwordHash, password);
   if (!passwordMatches || owner.status !== "active") return null;
 
-  return { id: owner.id, username, passwordHash: owner.passwordHash };
+  // Record last login timestamp
+  try {
+    await getControlDb().platformOwner.update({
+      where: { id: owner.id },
+      data: { lastLoginAt: new Date() },
+    });
+  } catch {
+    // Ignore non-fatal login timestamp recording error
+  }
+
+  return { id: owner.id, username: owner.username, passwordHash: owner.passwordHash };
 }
 
 /**

@@ -88,10 +88,10 @@ export const PLATFORM_NAV_SECTIONS: readonly PlatformNavSection[] = [
       },
       {
         id: "users",
-        label: "Sub-Platform Owners",
+        label: "Platform Owners",
         href: "/platform/users",
         icon: "user",
-        description: "Manage the owners who help run the platform and their roles.",
+        description: "Manage all platform owners and their roles from a centralized interface.",
         status: "available",
         permission: "platform.users.view",
       },

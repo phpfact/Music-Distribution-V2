@@ -19,7 +19,7 @@ import "server-only";
  */
 import type { AuditMetadata } from "@/lib/audit";
 import { hashPassword } from "@/lib/platform-auth/password";
-import { validateEmail, validateFullName, validateTenantUsername } from "@/lib/tenants/rules";
+import { validateEmail, validateFullName, validatePhone, validateTenantUsername } from "@/lib/tenants/rules";
 import { isUuid } from "@/lib/uuid";
 import { identityConflictErrors, type IdentityConflicts } from "@/lib/workspace/identity";
 import { textOf, validateAccountType, type AccountType } from "@/lib/workspace/rules";
@@ -67,9 +67,12 @@ export type SubUserCreateInput = {
   fullName: unknown;
   /** Sub-customers only. */
   accountType?: unknown;
-  username: unknown;
-  /** Sub-Tenants and Sub-Customers only. */
+  username?: unknown;
+  /** Sub-Tenants, Sub-Customers and Platform Owners. */
   email?: unknown;
+  /** Platform Owners. */
+  phone?: unknown;
+  status?: unknown;
   password: unknown;
   confirmPassword: unknown;
   /** Usually FormData.getAll("roleId"): exactly one entry is accepted. */
@@ -77,9 +80,7 @@ export type SubUserCreateInput = {
 };
 
 /**
- * The submitted edit form (untrusted). Business rule "Edit: full name, role,
- * optional new password": any other submitted field (email, username, account
- * type, …) is ignored, so a crafted request cannot change it.
+ * The submitted edit form (untrusted).
  */
 export type SubUserUpdateInput = {
   fullName: unknown;
@@ -88,6 +89,9 @@ export type SubUserUpdateInput = {
   /** Optional "Set a new password" (both empty = keep the password). */
   password?: unknown;
   confirmPassword?: unknown;
+  email?: unknown;
+  phone?: unknown;
+  status?: unknown;
 };
 
 // Friendly messages of this service.
@@ -131,6 +135,8 @@ function toRow(actor: PolicyActor, user: StoredUser): SubUserRow {
     fullName: user.fullName,
     username: user.username,
     email: user.email,
+    phone: user.phone ?? null,
+    lastLoginAt: user.lastLoginAt ? user.lastLoginAt.toISOString() : null,
     roleId: user.role?.id ?? null,
     roleName: user.role?.name ?? null,
     roleIsMaster: user.role ? isMasterRole(user.role) : false,
@@ -308,6 +314,8 @@ export async function getSubUserEditModel(actor: AuthzActor, userId: unknown): P
           fullName: user.fullName,
           username: user.username,
           email: user.email,
+          phone: user.phone ?? null,
+          lastLoginAt: user.lastLoginAt ? user.lastLoginAt.toISOString() : null,
           accountType: user.accountType,
           roleId: user.role?.id ?? null,
           roleName: user.role?.name ?? null,
@@ -349,29 +357,51 @@ export async function createSubUser(actor: AuthzActor, input: SubUserCreateInput
 
   // Step 2: exactly one role id, then every field with the form's own rules.
   const role   = parseSingleRoleId(input.roleId);
+  const inputEmail = textOf(input.email);
+  const inputPhone = textOf(input.phone);
+  const inputStatus = textOf(input.status);
+  const rawProvidedUsername = textOf(input.username);
+
+  let rawUsername = rawProvidedUsername;
+  if (!rawUsername && actor.domain === "platform" && inputEmail) {
+    const derived = inputEmail.split("@")[0]?.toLowerCase().replace(/[^a-z0-9._-]/g, "") ?? "";
+    rawUsername = derived.length >= 3 ? derived : (derived + "00").slice(0, 10);
+  }
+
   const fields: SubUserFields = {
     fullName: textOf(input.fullName),
     accountType: textOf(input.accountType),
-    username: textOf(input.username),
-    email: textOf(input.email),
+    username: rawUsername,
+    email: inputEmail,
     password: textOf(input.password),
     confirmPassword: textOf(input.confirmPassword),
     roleId: role.ok ? role.roleId : "",
   };
   const fieldErrors = validateSubUserFields(fields, actor.domain, "create");
   if (!role.ok) fieldErrors.roleId = role.error;
+  if (actor.domain === "platform" && inputEmail) {
+    const emailCheck = validateEmail(inputEmail);
+    if (!emailCheck.ok) fieldErrors.email = emailCheck.error;
+  }
+  if (actor.domain === "platform" && inputPhone) {
+    const phoneCheck = validatePhone(inputPhone);
+    if (!phoneCheck.ok) (fieldErrors as Record<string, string>).phone = phoneCheck.error;
+  }
   if (Object.keys(fieldErrors).length > 0) return { ok: false, reason: "validation", error: MESSAGES.checkFields, fieldErrors };
 
   // Step 3: the normalized values (the rules above already passed).
   const fullName    = validateFullName(fields.fullName);
   const username    = validateTenantUsername(fields.username);
-  const email       = actor.domain === "platform" ? null : validateEmail(fields.email);
+  const email       = actor.domain === "platform" ? (inputEmail ? validateEmail(inputEmail) : null) : validateEmail(fields.email);
+  const phone       = actor.domain === "platform" && inputPhone ? validatePhone(inputPhone) : null;
   const accountType = actor.domain === "customer" ? validateAccountType(fields.accountType) : null;
-  if (!fullName.ok || !username.ok || !role.ok || (email && !email.ok) || (accountType && !accountType.ok)) {
+  if (!fullName.ok || !username.ok || !role.ok || (email && !email.ok) || (phone && !phone.ok) || (accountType && !accountType.ok)) {
     return { ok: false, reason: "validation", error: MESSAGES.checkFields };
   }
   const emailValue: string | null             = email && email.ok ? email.value : null;
+  const phoneValue: string | null             = phone && phone.ok ? phone.value : null;
   const accountTypeValue: AccountType | null  = accountType && accountType.ok ? accountType.value : null;
+  const initialStatus: "active" | "disabled"  = inputStatus === "disabled" ? "disabled" : "active";
 
   try {
     // Step 4: hash outside the transaction (Argon2 is deliberately slow; no locks held).
@@ -384,7 +414,11 @@ export async function createSubUser(actor: AuthzActor, input: SubUserCreateInput
 
       // Step 5a: identities (workspace: the registration flow's advisory lock).
       await ops.lockIdentities();
-      const conflicts = await ops.findIdentityConflicts({ username: username.value, ...(emailValue ? { email: emailValue } : {}) }, null);
+      const conflicts = await ops.findIdentityConflicts({
+        username: username.value,
+        ...(emailValue ? { email: emailValue } : {}),
+        ...(phoneValue ? { phone: phoneValue } : {}),
+      }, null);
       const taken     = identityErrors(conflicts);
       if (Object.keys(taken).length > 0) {
         return { ok: false, reason: "conflict", error: MESSAGES.checkFields, fieldErrors: taken } as Refusal<SubUserFieldErrors>;
@@ -403,6 +437,8 @@ export async function createSubUser(actor: AuthzActor, input: SubUserCreateInput
         fullName: fullName.value,
         username: username.value,
         email: emailValue,
+        phone: phoneValue,
+        status: initialStatus,
         passwordHash,
         accountType: accountTypeValue,
         roleId: assigned.id,
@@ -474,6 +510,30 @@ export async function updateSubUser(actor: AuthzActor, userId: unknown, input: S
     const fullName = validateFullName(fields.fullName);
     if (!fullName.ok) return { ok: false, reason: "validation", error: MESSAGES.checkFields, fieldErrors: { fullName: fullName.error } };
 
+    const inputEmail = textOf(input.email);
+    const inputPhone = textOf(input.phone);
+    const inputStatus = textOf(input.status);
+
+    let emailVal: string | null | undefined = undefined;
+    let phoneVal: string | null | undefined = undefined;
+    let statusVal: "active" | "disabled" | undefined = undefined;
+
+    if (actor.domain === "platform") {
+      if (inputEmail) {
+        const check = validateEmail(inputEmail);
+        if (!check.ok) return { ok: false, reason: "validation", error: MESSAGES.checkFields, fieldErrors: { email: check.error } };
+        emailVal = check.value;
+      }
+      if (inputPhone) {
+        const check = validatePhone(inputPhone);
+        if (!check.ok) return { ok: false, reason: "validation", error: MESSAGES.checkFields, fieldErrors: { fullName: check.error } };
+        phoneVal = check.value;
+      }
+      if (inputStatus === "active" || inputStatus === "disabled") {
+        statusVal = inputStatus;
+      }
+    }
+
     // Step 4: hash a new password outside the transaction.
     const passwordHash = fields.password !== "" ? await hashPassword(fields.password) : null;
 
@@ -490,6 +550,18 @@ export async function updateSubUser(actor: AuthzActor, userId: unknown, input: S
       const manageable = checkUserManageable(fresh, policyUserOf(target));
       if (!manageable.ok) return policyRefusal(manageable.reason, "user", target.id);
 
+      // Check conflicts for email and phone if updated on platform
+      if (actor.domain === "platform" && (emailVal || phoneVal)) {
+        const conflicts = await ops.findIdentityConflicts({
+          ...(emailVal ? { email: emailVal } : {}),
+          ...(phoneVal ? { phone: phoneVal } : {}),
+        }, target.id);
+        const taken = identityErrors(conflicts);
+        if (Object.keys(taken).length > 0) {
+          return { ok: false, reason: "conflict", error: MESSAGES.checkFields, fieldErrors: taken } as Refusal<SubUserFieldErrors>;
+        }
+      }
+
       // Step 5b: a different role must be assignable (share-locked until commit).
       const roleChanged = target.role?.id !== role.roleId;
       let nextRole      = target.role;
@@ -503,11 +575,25 @@ export async function updateSubUser(actor: AuthzActor, userId: unknown, input: S
         nextRole = assigned;
       }
 
-      // Step 5c: the writes (full name, role, password — nothing else).
+      // Step 5c: the writes (full name, email, phone, status, role, password).
       const changedFields = fullName.value !== target.fullName ? ["fullName"] : [];
-      await ops.updateUser(target.id, { fullName: fullName.value });
+      if (emailVal !== undefined && emailVal !== target.email) changedFields.push("email");
+      if (phoneVal !== undefined && phoneVal !== target.phone) changedFields.push("phone");
+      if (statusVal !== undefined && (statusVal === "active" ? "active" : "suspended") !== target.status) {
+        changedFields.push("status");
+      }
+
+      await ops.updateUser(target.id, {
+        fullName: fullName.value,
+        ...(emailVal !== undefined ? { email: emailVal } : {}),
+        ...(phoneVal !== undefined ? { phone: phoneVal } : {}),
+        ...(statusVal !== undefined ? { status: statusVal } : {}),
+      });
       if (roleChanged && nextRole) await ops.assignRole(target.id, nextRole.id);
       if (passwordHash) await ops.setPassword(target.id, passwordHash);
+      if (statusVal === "disabled") {
+        await ops.setUserStatus(target.id, "suspend");
+      }
       return { ok: true as const, target, nextRole, roleChanged, changedFields };
     });
     if (!outcome.ok) return settleRefusal(actor, outcome);
@@ -585,6 +671,52 @@ export async function setSubUserStatus(actor: AuthzActor, userId: unknown, chang
     return { ok: true, userId: outcome.target.id, message: change === "suspend" ? "Account suspended." : "Account reactivated." };
   } catch (error) {
     logFailure(actor, `changing the status of sub-user ${String(userId)}`, error);
+    return { ok: false, reason: "unavailable", error: UNAVAILABLE_MESSAGE };
+  }
+}
+
+/**
+ * Description: Delete a sub-user / platform owner safely.
+ * Input: The actor and the user id to delete.
+ * Output: ok, or refusal (cannot delete self, primary super admin, or last admin) / not_found / unavailable.
+ * Use case: Platform Owner delete action.
+ * Author: Mr. Sachin Sharma
+ * Created: 2026-11-24
+ * Last modified: 2026-11-24
+ */
+export async function deleteSubUser(actor: AuthzActor, userId: unknown): Promise<SubUserMutationResult> {
+  // Step 1: privilege check (platform.users.delete or platform.users.suspend) and UUID validation.
+  const hasPerm = holdsPrivilege(actor, "usersDelete" as any) || holdsPrivilege(actor, "usersSuspend");
+  if (!hasPerm) return forbidden(actor);
+  if (!isUuid(userId)) return { ok: false, reason: "not_found", error: MESSAGES.notFound };
+
+  try {
+    const outcome = await storeFor(actor).transaction(async (ops) => {
+      const fresh = await ops.reloadActor();
+      if (userId === fresh.userId) return policyRefusal("self", "user", userId);
+      const target = await ops.lockUser(userId);
+      if (!target) return { ok: false, reason: "not_found", error: MESSAGES.notFound } as Refusal<SubUserFieldErrors>;
+      if (target.isPrimary) return policyRefusal("primary", "user", target.id);
+      const manageable = checkUserManageable(fresh, policyUserOf(target));
+      if (!manageable.ok) return policyRefusal(manageable.reason, "user", target.id);
+
+      if (ops.deleteUser) {
+        await ops.deleteUser(target.id);
+      }
+      return { ok: true as const, target };
+    });
+    if (!outcome.ok) return settleRefusal(actor, outcome);
+
+    await auditAfterCommit(actor, {
+      action: "user.deleted",
+      targetType: "user",
+      targetId: outcome.target.id,
+      metadata: { username: outcome.target.username, roleId: outcome.target.role?.id ?? null },
+    });
+    console.log(`[rbac] ${actor.domain} user ${outcome.target.id} deleted by user ${actor.userId}`);
+    return { ok: true, userId: outcome.target.id, message: "Account deleted." };
+  } catch (error) {
+    logFailure(actor, `deleting user ${String(userId)}`, error);
     return { ok: false, reason: "unavailable", error: UNAVAILABLE_MESSAGE };
   }
 }

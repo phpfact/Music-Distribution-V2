@@ -45,6 +45,7 @@ export type AuditAction =
   | "user.password_reset"
   | "user.suspended"
   | "user.reactivated"
+  | "user.deleted"
   | "master_role.assigned"
   | "platform_module.enabled"
   | "platform_module.disabled"

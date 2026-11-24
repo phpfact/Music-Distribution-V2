@@ -160,6 +160,7 @@ const PERMISSIONS = [
   { key: "platform.users.create", module: "platform.users", action: "create", label: "Create Sub-Platform Owners", description: "Create Sub-Platform Owner accounts.", requires: ["platform.users.view"], sortOrder: 620 },
   { key: "platform.users.edit", module: "platform.users", action: "edit", label: "Edit Sub-Platform Owners", description: "Change a Sub-Platform Owner's details, role or password.", requires: ["platform.users.view"], sortOrder: 630 },
   { key: "platform.users.suspend", module: "platform.users", action: "suspend", label: "Suspend and reactivate Sub-Platform Owners", description: "Suspend a Sub-Platform Owner and reactivate it again.", requires: ["platform.users.view"], sortOrder: 640 },
+  { key: "platform.users.delete", module: "platform.users", action: "delete", label: "Delete Sub-Platform Owners", description: "Delete Sub-Platform Owner accounts safely.", requires: ["platform.users.view"], sortOrder: 650 },
   // platform.modules (core)
   { key: "platform.modules.manage", module: "platform.modules", action: "manage", label: "Manage platform modules", description: "Switch platform modules on or off for everyone.", requires: [], sortOrder: 710 },
   // tenant.registrations

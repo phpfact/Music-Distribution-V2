@@ -369,6 +369,65 @@ export function RoleEditor({
   }
 
   /**
+   * Description: Select all assignable privileges across all modules.
+   * Input: None.
+   * Output: All assignable keys added to selection with dependencies resolved.
+   * Use case: "Select All Permissions" button.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-11-24
+   * Last modified: 2026-11-24
+   */
+  function selectAllPermissions() {
+    let next: Set<string> = new Set(selected);
+    for (const key of assignable) {
+      next = toggleSelection(next, key, true, assignable);
+    }
+    setSelected(next);
+    revalidate("privileges", { name, description, status, selected: next });
+  }
+
+  /**
+   * Description: Clear all selected privileges.
+   * Input: None.
+   * Output: Empty selection.
+   * Use case: "Clear All Permissions" button.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-11-24
+   * Last modified: 2026-11-24
+   */
+  function clearAllPermissions() {
+    const next = new Set<string>();
+    setSelected(next);
+    revalidate("privileges", { name, description, status, selected: next });
+  }
+
+  /**
+   * Description: Expand all module cards.
+   * Input: None.
+   * Output: Collapsed set is emptied.
+   * Use case: "Expand All" button.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-11-24
+   * Last modified: 2026-11-24
+   */
+  function expandAllModules() {
+    setCollapsed(new Set());
+  }
+
+  /**
+   * Description: Collapse all module cards.
+   * Input: None.
+   * Output: Collapsed set contains all module keys.
+   * Use case: "Collapse All" button.
+   * Author: Mr. Sachin Sharma
+   * Created: 2026-11-24
+   * Last modified: 2026-11-24
+   */
+  function collapseAllModules() {
+    setCollapsed(new Set(modules.map((m) => m.key)));
+  }
+
+  /**
    * Description: Build the FormData the Server Action receives.
    * Input: None (reads the current values).
    * Output: `name` (normalized), `description` (trimmed), `status` and one
@@ -649,6 +708,56 @@ export function RoleEditor({
               className="pl-9"
             />
           </div>
+
+          {modules.length > 0 ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 p-2.5 text-xs">
+              <div className="flex items-center gap-1.5 font-medium text-muted-foreground">
+                <span className="font-semibold text-foreground tabular-nums">{selected.size}</span>
+                <span>of</span>
+                <span className="font-semibold text-foreground tabular-nums">{assignable.size}</span>
+                <span>permissions selected</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={selectAllPermissions}
+                >
+                  Select All Permissions
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={clearAllPermissions}
+                  disabled={selected.size === 0}
+                >
+                  Clear All
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={expandAllModules}
+                >
+                  Expand All
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={collapseAllModules}
+                >
+                  Collapse All
+                </Button>
+              </div>
+            </div>
+          ) : null}
 
           {privilegesError ? (
             <p id={errorId(PRIVILEGES_ID)} className="text-sm text-destructive">
